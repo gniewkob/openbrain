@@ -1,4 +1,4 @@
-# OpenBrain Unified (v2.1)
+# OpenBrain Unified
 
 OpenBrain is an intelligent, unified memory platform that serves as a semantic bridge between your personal knowledge (e.g., Obsidian) and Large Language Models (ChatGPT, Claude, Gemini).
 
