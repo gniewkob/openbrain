@@ -1,0 +1,34 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+dist/
+*.egg-info/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Claude Code worktrees
+.claude/
+
+# Docker / DB
+*.db
+*.db-shm
+*.db-wal
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+backups/
+
+# MCP config (contains local paths)
+.mcp.json

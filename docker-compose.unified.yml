@@ -1,0 +1,90 @@
+networks:
+  net_unified:
+    name: openbrain_net_unified
+    driver: bridge
+
+volumes:
+  openbrain_unified_data:
+  openbrain_ollama:
+
+services:
+  db:
+    image: ankane/pgvector:v0.5.1
+    container_name: openbrain-unified-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: openbrain_unified
+    ports:
+      - "5432:5432"
+    volumes:
+      - openbrain_unified_data:/var/lib/postgresql/data
+    networks:
+      - net_unified
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d openbrain_unified"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: ./unified
+    container_name: openbrain-unified-migrate
+    working_dir: /app
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified
+    networks:
+      - net_unified
+    depends_on:
+      db:
+        condition: service_healthy
+
+  unified-server:
+    build:
+      context: ./unified
+    container_name: openbrain-unified-server
+    volumes:
+      - ./unified:/app
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified
+      - OLLAMA_URL=http://embedding-service:11434
+      - PUBLIC_MODE=${PUBLIC_MODE:-false}
+      - OIDC_ISSUER_URL=${OIDC_ISSUER_URL:-}
+      - OIDC_AUDIENCE=${OIDC_AUDIENCE:-https://openbrain-mcp}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-openbrain-local-dev}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+    ports:
+      - "7010:80"
+    networks:
+      - net_unified
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  embedding-service:
+    image: ollama/ollama:latest
+    container_name: openbrain-unified-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - openbrain_ollama:/root/.ollama
+    networks:
+      - net_unified
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: openbrain-unified-ngrok
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command:
+      - "http"
+      - "unified-server:80"
+    networks:
+      - net_unified
+    depends_on:
+      - unified-server
+    restart: unless-stopped
