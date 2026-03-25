@@ -1,6 +1,6 @@
-# OpenBrain v2.1 — Installation and Configuration Guide
+# OpenBrain — Installation and Configuration Guide
 
-> Version: 2.1 (Industrial)
+> Version: (Industrial)
 
 ---
 
