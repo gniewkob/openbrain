@@ -1,0 +1,36 @@
+name: Unified Smoke Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: unified
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package
+        run: pip install -e .
+      - name: Run smoke tests
+        run: python -m unittest discover -s tests -v
+
+  gateway-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: unified/mcp-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install gateway package
+        run: pip install -e .
+      - name: Run gateway tests
+        run: python -m unittest discover -s tests -v

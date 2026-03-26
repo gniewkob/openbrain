@@ -60,6 +60,27 @@ The system uses intent-based descriptions ("Use when / Do not use when") to guid
 
 ## 3. Client Configuration
 
+### Codex CLI (Local)
+Use a local `stdio` server, not the HTTP `/sse` URL. In project `.mcp.json` or in `~/.codex/config.toml`:
+
+```json
+{
+  "mcpServers": {
+    "brain": {
+      "type": "stdio",
+      "command": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway/.venv/bin/python",
+      "args": ["-m", "src.main"],
+      "cwd": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway",
+      "env": {
+        "BRAIN_URL": "http://127.0.0.1:7010"
+      }
+    }
+  }
+}
+```
+
+If Codex returns `404`, first verify that the `brain` server uses the `stdio` gateway above and not `url = "http://localhost:7010/sse"`.
+
 ### Claude Desktop (Local)
 In your `claude_desktop_config.json`:
 ```json

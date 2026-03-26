@@ -118,7 +118,7 @@ async def brain_store(
     obsidian_ref — path to source note in Obsidian vault.
     """
     async with _client() as c:
-        r = await c.post("/memories", json={
+        r = await c.post("/api/memories", json={
             "content": content,
             "domain": domain,
             "entity_type": entity_type,
@@ -137,7 +137,7 @@ async def brain_store(
 async def brain_get(memory_id: str) -> BrainMemory:
     """Retrieve a specific memory by its ID."""
     async with _client() as c:
-        r = await c.get(f"/memories/{memory_id}")
+        r = await c.get(f"/api/memories/{memory_id}")
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         _raise(r)
@@ -171,7 +171,7 @@ async def brain_list(
         params["owner"] = owner
 
     async with _client() as c:
-        r = await c.get("/memories", params=params)
+        r = await c.get("/api/memories", params=params)
         _raise(r)
         return r.json()
 
@@ -198,7 +198,7 @@ async def brain_search(
         filters["sensitivity"] = sensitivity
 
     async with _client() as c:
-        r = await c.post("/memories/search", json={
+        r = await c.post("/api/memories/search", json={
             "query": query,
             "top_k": top_k,
             "filters": filters,
@@ -230,7 +230,7 @@ async def brain_update(
         payload["tags"] = tags
 
     async with _client() as c:
-        r = await c.put(f"/memories/{memory_id}", json=payload)
+        r = await c.put(f"/api/memories/{memory_id}", json=payload)
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         _raise(r)
@@ -244,7 +244,7 @@ async def brain_delete(memory_id: str) -> dict:
     Corporate memories cannot be deleted (returns 403).
     """
     async with _client() as c:
-        r = await c.delete(f"/memories/{memory_id}")
+        r = await c.delete(f"/api/memories/{memory_id}")
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         if r.status_code == 403:
@@ -265,7 +265,7 @@ async def brain_maintain(
     Always run with dry_run=True first to preview changes.
     """
     async with _client() as c:
-        r = await c.post("/admin/maintain", json={
+        r = await c.post("/api/admin/maintain", json={
             "dry_run": dry_run,
             "dedup_threshold": dedup_threshold,
             "normalize_owners": normalize_owners or {},
@@ -283,7 +283,7 @@ async def brain_export(memory_ids: list[str]) -> list[dict]:
     Restricted-sensitivity content is redacted automatically.
     """
     async with _client() as c:
-        r = await c.post("/memories/export", json={"ids": memory_ids, "format": "jsonl"})
+        r = await c.post("/api/memories/export", json={"ids": memory_ids, "format": "jsonl"})
         _raise(r)
         return r.json()
 
@@ -295,7 +295,7 @@ async def brain_sync_check(obsidian_ref: str, file_hash: str) -> dict:
     Returns: {status: "synced"|"outdated"|"missing", message: "..."}
     """
     async with _client() as c:
-        r = await c.post("/memories/sync-check", params={
+        r = await c.post("/api/memories/sync-check", params={
             "obsidian_ref": obsidian_ref,
             "file_hash": file_hash,
         })
