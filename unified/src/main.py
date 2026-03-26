@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from typing import Any
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -56,49 +57,7 @@ from .schemas import (
     SearchResult,
 )
 
-# ... (rest of imports remains the same)
-
-# ---------------------------------------------------------------------------
-# API V1 (Canonical)
-# ---------------------------------------------------------------------------
-
-@app.post("/api/v1/memory/write", response_model=MemoryWriteResponse)
-async def v1_write(
-    req: MemoryWriteRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> MemoryWriteResponse:
-    return await handle_memory_write(session, req, actor=_user.get("sub", "agent"))
-
-@app.post("/api/v1/memory/write-many", response_model=MemoryWriteManyResponse)
-async def v1_write_many(
-    req: MemoryWriteManyRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> MemoryWriteManyResponse:
-    return await handle_memory_write_many(session, req, actor=_user.get("sub", "agent"))
-
-@app.post("/api/v1/memory/find", response_model=list[dict[str, Any]])
-async def v1_find(
-    req: MemoryFindRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> list[dict[str, Any]]:
-    hits = await find_memories_v1(session, req)
-    return [{"record": rec, "score": score} for rec, score in hits]
-
-@app.post("/api/v1/memory/get-context", response_model=MemoryGetContextResponse)
-async def v1_get_context(
-    req: MemoryGetContextRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> MemoryGetContextResponse:
-    return await get_grounding_pack(session, req)
-
-# ---------------------------------------------------------------------------
-# API Routes (CRUD) - Deprecated
-# ---------------------------------------------------------------------------
-
+structlog.configure(
     processors=[
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
@@ -139,6 +98,43 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(RequestIDMiddleware)
+
+# ---------------------------------------------------------------------------
+# API V1 (Canonical)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/memory/write", response_model=MemoryWriteResponse)
+async def v1_write(
+    req: MemoryWriteRequest,
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> MemoryWriteResponse:
+    return await handle_memory_write(session, req, actor=_user.get("sub", "agent"))
+
+@app.post("/api/v1/memory/write-many", response_model=MemoryWriteManyResponse)
+async def v1_write_many(
+    req: MemoryWriteManyRequest,
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> MemoryWriteManyResponse:
+    return await handle_memory_write_many(session, req, actor=_user.get("sub", "agent"))
+
+@app.post("/api/v1/memory/find", response_model=list[dict[str, Any]])
+async def v1_find(
+    req: MemoryFindRequest,
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> list[dict[str, Any]]:
+    hits = await find_memories_v1(session, req)
+    return [{"record": rec, "score": score} for rec, score in hits]
+
+@app.post("/api/v1/memory/get-context", response_model=MemoryGetContextResponse)
+async def v1_get_context(
+    req: MemoryGetContextRequest,
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> MemoryGetContextResponse:
+    return await get_grounding_pack(session, req)
 
 # ---------------------------------------------------------------------------
 # Well-Known Discovery (for ChatGPT MCP)

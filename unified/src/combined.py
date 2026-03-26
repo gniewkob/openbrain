@@ -43,8 +43,8 @@ async def app(scope, receive, send):
             await send({"type": "http.response.body", "body": content})
             return
 
-        # 2. REST API
-        if path.startswith("/api"):
+        # 2. REST API and health
+        if path == "/health" or path.startswith("/api"):
             await rest_app(scope, receive, send)
             return
 
