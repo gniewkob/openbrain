@@ -4,16 +4,19 @@ OpenBrain is an intelligent, unified memory platform that serves as a semantic b
 
 It provides a governed, domain-aware vector store that allows AI agents to store, retrieve, and synthesize information with high precision and metadata integrity.
 
+By default the local stack binds service ports to `127.0.0.1`, not all interfaces. That is intentional: the compose file is optimized for local development first, and public exposure should happen through an explicit ingress layer such as ngrok or a reverse proxy.
+
 ## Key Features
 
 - **Unified Backend**: A single PostgreSQL + `pgvector` instance managing all your knowledge domains.
 - **Model Context Protocol (MCP)**: Full support for the MCP standard, enabling seamless integration with Claude Desktop and ChatGPT.
-- **Domain Governance**: 
-  - `corporate`: Append-only versioning and audit trails for professional work.
+- **Domain Governance**:
+  - `corporate`: Append-only versioning and audit trails for professional work. `brain_store` and `upsert_bulk` work correctly for all domains.
   - `build`: Mutable store for technical projects and code.
   - `personal`: Lightweight store for private notes and ideas.
-- **Industrial Routing**: Robust ASGI wrapper handling both MCP Transport (SSE) and OAuth Discovery (`.well-known`) out of the box.
+- **Industrial Routing**: Robust ASGI wrapper handling MCP Transport (SSE), OAuth Discovery (`.well-known`), and Swagger UI (`/docs`) — all routed to the authoritative FastAPI handler.
 - **Hybrid Search**: Combines semantic vector search with structured metadata filtering.
+- **Security Hardened**: Timing-safe `X-Internal-Key` comparison, thread-safe policy registry, SQL-based O(n) dedup.
 
 ## Quick Start
 
@@ -33,16 +36,36 @@ It provides a governed, domain-aware vector store that allows AI agents to store
    cp .env.example .env
    # Edit .env with your NGROK_AUTHTOKEN and other settings
    ```
+   In `PUBLIC_MODE=true`, OpenBrain now fails closed:
+   - `OIDC_ISSUER_URL` must be set
+   - `INTERNAL_API_KEY` must be set to a non-default secret
+   - `/health` and `/metrics` require authentication
+   - use `/healthz` for unauthenticated liveness and `/readyz` for readiness probes
 3. Start the system:
    ```bash
    ./start_unified.sh start
    ```
 
+## Tests
+
+Use the repo-level `Makefile` so tests always run with the intended interpreter instead of whichever `python` happens to be first in `PATH`.
+
+```bash
+make bootstrap-unified-venv
+make bootstrap-gateway-venv
+make test-unified
+make test-gateway
+make test
+```
+
 ## Documentation
 
 - [Installation & Configuration](INSTALLATION.md)
 - [Operating Manual](docs/operating-manual.md)
+- [Governance Layer](docs/governance-layer.md)
+- [Prometheus Alert Rules](docs/prometheus-alerts.yml)
 - [API Architecture](docs/README.md)
+- [Operational Report: 2026-03-27](docs/operational-report-2026-03-27.md)
 
 ## License
 

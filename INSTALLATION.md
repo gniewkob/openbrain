@@ -13,7 +13,7 @@ Remote Clients (ChatGPT) ────────┤          ↑ (SSE / JSON-RP
                                  └─→ ngrok ─┘                  Ollama (embed)
 ```
 
-- **Backend**: FastAPI + FastMCP in Docker (port 7010).
+- **Backend**: FastAPI + FastMCP in Docker (port 7010, bound to `127.0.0.1` in the local compose stack).
 - **Industrial Wrapper**: Stable ASGI routing handling MCP and OAuth Discovery automatically.
 - **Domains**: `corporate` (append-only), `build` (projects), `personal` (private).
 
@@ -29,9 +29,20 @@ cd ~/Repos/openbrain
 
 **Note:** ngrok starts **by default**. The public URL for ChatGPT changes on every restart (unless you have a static ngrok domain).
 
+### Monitoring Endpoints
+
+- OpenBrain API: `http://localhost:7010`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001` by default, or `http://localhost:$GRAFANA_PORT`
+- Unauthenticated liveness probe: `http://localhost:7010/healthz`
+- Readiness probe: `http://localhost:7010/readyz`
+- Auth-gated health summary: `http://localhost:7010/health`
+- Default Grafana login: `admin / admin` unless overridden with `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD`
+- Default Grafana credentials are dev-only. Replace them in any shared or public deployment.
+
 ---
 
-## 2. MCP Tools (12 + 1 Diagnostic)
+## 2. MCP Tools (15 + 1 Diagnostic)
 
 The system uses intent-based descriptions ("Use when / Do not use when") to guide AI models.
 
@@ -40,16 +51,19 @@ The system uses intent-based descriptions ("Use when / Do not use when") to guid
 
 ### Tier 1: Core (Daily Work)
 - `brain_search`: Semantic search (primary tool).
-- `brain_get`: Retrieve a specific record by ID.
-- `brain_store`: Save a single note/decision.
-- `brain_update`: Update an existing record.
+- `brain_get`: Retrieve a specific record by ID. Returns canonical V1 `MemoryRecord` shape (includes `title`, `summary`, `source`, `governance` fields).
+- `brain_store`: Save a single note/decision. Works for all three domains including `corporate` (auto-versioned).
+- `brain_update`: Update an existing record. Corporate records create a new version automatically.
 
 ### Tier 2: Advanced (Specialized)
 - `brain_list`: Browse the database with filters (domain, owner).
 - `brain_get_context`: Build a synthetic context pack from multiple records.
 - `brain_delete`: Delete (allowed ONLY for `build` and `personal` domains).
-- `brain_export`: Export data to JSON (redacts sensitive content).
-- `brain_sync_check`: Verify consistency with Obsidian (hash check).
+- `brain_export`: Export data to JSON or JSONL. Admin callers receive fully unredacted records.
+- `brain_sync_check`: Verify consistency with Obsidian (hash check). Requires exactly one of `memory_id`, `match_key`, or `obsidian_ref`.
+- `brain_obsidian_vaults`: List local Obsidian vaults visible to the backend.
+- `brain_obsidian_read_note`: Read a note with parsed frontmatter, tags, and content hash.
+- `brain_obsidian_sync`: One-way sync from Obsidian into OpenBrain using deterministic match keys.
 
 ### Tier 3: Admin (High Risk)
 - `brain_store_bulk`: Batch save (up to 50 records).
@@ -100,6 +114,21 @@ In your `claude_desktop_config.json`:
    - **URL**: `https://[YOUR-ID].ngrok-free.app` (use the base URL, system redirects to /sse)
    - **Authentication**: OAuth (if PUBLIC_MODE=true) or X-Internal-Key (Header).
 
+### Public Mode Requirements
+- `PUBLIC_MODE=true` now fails closed.
+- `OIDC_ISSUER_URL` is mandatory.
+- `INTERNAL_API_KEY` must be explicitly configured and must not use the dev default. The key is compared with `hmac.compare_digest` — timing attacks against the key are not viable.
+- `/health` and `/metrics` require authentication in public mode.
+- For containerized infrastructure probes, prefer `/healthz` and `/readyz` instead of `/health`.
+
+### Optional Environment Variables
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_SOURCE_SYSTEM` | `other` | Tags every `brain_store` record with the calling agent (`claude`, `chatgpt`, `codex`, etc.) |
+| `ENABLE_HTTP_OBSIDIAN_TOOLS` | `false` | Expose Obsidian sync tools via the HTTP MCP transport |
+| `BACKEND_TIMEOUT_S` | `30` | Timeout (seconds) for MCP gateway → backend HTTP calls |
+| `OIDC_DISCOVERY_CACHE_S` | `600` | OIDC discovery document cache TTL |
+
 ---
 
 ## 4. Maintenance and Logs
@@ -110,3 +139,27 @@ In your `claude_desktop_config.json`:
 ```
 
 **"Session Terminated" errors:** These usually happen when the ngrok URL changes. Refresh the ChatGPT page or click `Refresh` in the MCP settings.
+
+---
+
+## 5. Tests
+
+Run tests through the repo-level `Makefile` so the backend and gateway use their intended virtual environments instead of the shell's default `python`.
+
+```bash
+make bootstrap-unified-venv
+make bootstrap-gateway-venv
+make test-unified
+make test-gateway
+make test
+```
+
+## 6. Governance
+
+Before using Tier 3 tools in production, read the operating policy in [docs/governance-layer.md](docs/governance-layer.md).
+
+Minimum rules:
+- `corporate` records are versioned, not overwritten.
+- `upsert_bulk` should be used only with stable `match_key`.
+- `maintain` must start with `dry_run=true`.
+- retrieval quality depends on keeping duplicate rates bounded.

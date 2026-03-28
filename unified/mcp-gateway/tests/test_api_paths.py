@@ -1,16 +1,17 @@
-import importlib
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
+
+from helpers import load_gateway_main
 
 
 class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
     async def test_brain_list_calls_api_memories_path(self) -> None:
-        gateway = importlib.import_module("src.main")
+        gateway = load_gateway_main()
         response = Mock()
         response.is_error = False
         response.json.return_value = []
 
-        with patch("src.main._client") as mock_client:
+        with patch("_gateway_src.main._client") as mock_client:
             client = AsyncMock()
             client.__aenter__.return_value = client
             client.__aexit__.return_value = False
@@ -22,12 +23,12 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
         client.get.assert_awaited_once_with("/api/memories", params={"limit": 1})
 
     async def test_brain_search_calls_api_search_path(self) -> None:
-        gateway = importlib.import_module("src.main")
+        gateway = load_gateway_main()
         response = Mock()
         response.is_error = False
         response.json.return_value = []
 
-        with patch("src.main._client") as mock_client:
+        with patch("_gateway_src.main._client") as mock_client:
             client = AsyncMock()
             client.__aenter__.return_value = client
             client.__aexit__.return_value = False
@@ -39,6 +40,51 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
         client.post.assert_awaited_once_with(
             "/api/memories/search",
             json={"query": "test", "top_k": 1, "filters": {}},
+        )
+
+    async def test_brain_sync_check_calls_api_sync_check_path_with_json_body(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = {"status": "exists", "message": "Memory exists."}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_sync_check(match_key="mk-1")
+
+        client.post.assert_awaited_once_with(
+            "/api/memories/sync-check",
+            json={
+                "memory_id": None,
+                "match_key": "mk-1",
+                "obsidian_ref": None,
+                "file_hash": None,
+            },
+        )
+
+    async def test_brain_upsert_bulk_calls_bulk_upsert_endpoint(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = {"inserted": [], "updated": [], "skipped": []}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_upsert_bulk([{"match_key": "mk-1", "content": "x"}])
+
+        client.post.assert_awaited_once_with(
+            "/api/memories/bulk-upsert",
+            json=[{"match_key": "mk-1", "content": "x"}],
         )
 
 

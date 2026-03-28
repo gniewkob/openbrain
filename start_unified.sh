@@ -19,7 +19,10 @@ info() { echo -e "${CYAN}→${NC}  $*"; }
 
 # Load .env if it exists
 if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+    set -a
+    # shellcheck disable=SC1091
+    . ./.env
+    set +a
     ok "Loaded .env"
 fi
 
@@ -53,6 +56,8 @@ cmd_status() {
 
     echo -e "${GREEN}Local (Claude Desktop):${NC}   http://localhost:7010"
     echo -e "${GREEN}External (ChatGPT):${NC}    ${public_url}"
+    echo -e "${GREEN}Prometheus:${NC}            http://localhost:9090"
+    echo -e "${GREEN}Grafana:${NC}               http://localhost:${GRAFANA_PORT:-3001}"
     echo ""
     echo -e "${CYAN}─── MCP Configuration Guide ────────────────────────────${NC}"
     echo "1. Claude Desktop (local): Use http://localhost:7010"
@@ -60,9 +65,11 @@ cmd_status() {
     echo ""
     echo -e "Available Domains: ${YELLOW}corporate, build, personal${NC}"
     echo -e "Capabilities:      ${YELLOW}brain_capabilities (RUN THIS FIRST)${NC}"
-    echo -e "Available Tools:   ${YELLOW}brain_store, brain_get, brain_list, brain_search, brain_update, brain_delete,${NC}"
-    echo -e "                   ${YELLOW}brain_get_context, brain_sync_check, brain_store_bulk, brain_upsert_bulk,${NC}"
-    echo -e "                   ${YELLOW}brain_export, brain_maintain${NC}"
+    echo -e "HTTP MCP Tools:    ${YELLOW}brain_store, brain_get, brain_list, brain_search, brain_update, brain_delete,${NC}"
+    echo -e "                   ${YELLOW}brain_get_context, brain_sync_check, brain_store_bulk,${NC}"
+    echo -e "                   ${YELLOW}brain_upsert_bulk, brain_export, brain_maintain${NC}"
+    echo -e "Local-only Tools:  ${YELLOW}brain_obsidian_vaults, brain_obsidian_read_note, brain_obsidian_sync${NC}"
+    echo -e "Grafana Login:     ${YELLOW}${GRAFANA_ADMIN_USER:-admin} / ${GRAFANA_ADMIN_PASSWORD:-admin}${NC}"
     echo ""
 }
 

@@ -1,0 +1,76 @@
+groups:
+  - name: openbrain-operational-health
+    rules:
+      - alert: OpenBrainOperationalHealthElevated
+        expr: operational_health_status >= 2
+        for: 10m
+        labels:
+          severity: critical
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain operational health is elevated"
+          description: "The service reports elevated operational health pressure for at least 10 minutes. Check /api/diagnostics/metrics summary and recent maintain reports."
+
+      - alert: OpenBrainOperationalHealthWatch
+        expr: operational_health_status >= 1
+        for: 30m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain operational health is in watch state"
+          description: "The service reports sustained watch-level operational pressure. Review policy skips, duplicate candidates, and search zero-hit ratio."
+
+  - name: openbrain-governance
+    rules:
+      - alert: OpenBrainPolicySkipPressure
+        expr: policy_skip_per_maintain_run_ratio >= policy_skip_per_maintain_run_ratio_elevated_threshold
+        for: 15m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain governance is blocking mutations frequently"
+          description: "Policy skips per maintain run are at or above elevated threshold. Inspect maintain reports for policy_skip reasons and upstream pipeline behavior."
+
+      - alert: OpenBrainDuplicatePressure
+        expr: duplicate_candidates_per_maintain_run_ratio >= duplicate_candidates_per_maintain_run_ratio_elevated_threshold
+        for: 15m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain duplicate pressure is elevated"
+          description: "Duplicate candidates per maintain run exceed the elevated threshold. Investigate ingestion paths and match_key stability."
+
+      - alert: OpenBrainDeletePolicyViolations
+        expr: increase(policy_skip_delete_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "Attempted hard delete of append-only memories"
+          description: "At least one delete attempt was blocked by governance in the last hour. Review caller behavior and delete expectations."
+
+  - name: openbrain-retrieval
+    rules:
+      - alert: OpenBrainSearchZeroHitRateElevated
+        expr: search_zero_hit_ratio >= search_zero_hit_ratio_elevated_threshold
+        for: 30m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain retrieval zero-hit ratio is elevated"
+          description: "Search zero-hit ratio is above the elevated threshold. Review ingestion freshness, duplicate pressure, and query quality."
+
+      - alert: OpenBrainSyncMissingSpike
+        expr: increase(sync_missing_total[1h]) > 10
+        for: 0m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain sync missing spike detected"
+          description: "More than 10 missing sync checks were observed in the last hour. Check sync pipelines and identity strategy."

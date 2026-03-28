@@ -6,6 +6,7 @@ networks:
 volumes:
   openbrain_unified_data:
   openbrain_ollama:
+  openbrain_grafana_data:
 
 services:
   db:
@@ -16,7 +17,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: openbrain_unified
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - openbrain_unified_data:/var/lib/postgresql/data
     networks:
@@ -53,10 +54,10 @@ services:
       - PUBLIC_MODE=${PUBLIC_MODE:-false}
       - OIDC_ISSUER_URL=${OIDC_ISSUER_URL:-}
       - OIDC_AUDIENCE=${OIDC_AUDIENCE:-https://openbrain-mcp}
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-openbrain-local-dev}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
     ports:
-      - "7010:80"
+      - "127.0.0.1:7010:80"
     networks:
       - net_unified
     depends_on:
@@ -68,8 +69,6 @@ services:
   embedding-service:
     image: ollama/ollama:latest
     container_name: openbrain-unified-ollama
-    ports:
-      - "11434:11434"
     volumes:
       - openbrain_ollama:/root/.ollama
     networks:
@@ -87,4 +86,40 @@ services:
       - net_unified
     depends_on:
       - unified-server
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: openbrain-unified-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docs/prometheus-alerts.yml:/etc/prometheus/openbrain-alerts.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks:
+      - net_unified
+    depends_on:
+      - unified-server
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.5
+    container_name: openbrain-unified-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - openbrain_grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - net_unified
+    depends_on:
+      - prometheus
     restart: unless-stopped
