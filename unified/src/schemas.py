@@ -285,7 +285,7 @@ class SearchRequest(BaseModel):
 
 class ExportRequest(BaseModel):
     ids: list[str]
-    format: Literal["jsonl"] = "jsonl"
+    format: Literal["jsonl", "json"] = "json"
 
 
 class MaintenanceRequest(BaseModel):

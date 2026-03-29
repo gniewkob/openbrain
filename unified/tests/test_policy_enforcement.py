@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 from src import crud
 from src.models import DomainEnum, Memory
-from src.schemas import MaintenanceRequest, MemoryUpsertItem, MemoryWriteRecord, MemoryWriteRequest
+from src.schemas import MaintenanceRequest, MemoryCreate, MemoryUpsertItem, MemoryWriteRecord, MemoryWriteRequest
 from tests.test_metrics import _import_main_with_fake_auth_deps
 
 
@@ -32,6 +32,18 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as ctx:
                 await main.bulk_upsert_memories(
                     data=[MemoryUpsertItem(content="x", domain="build", entity_type="Note", match_key=None)],
+                    session=object(),
+                    _user={"sub": "tester"},
+                )
+
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    async def test_create_memory_endpoint_returns_422_for_corporate_without_owner(self) -> None:
+        data = MemoryCreate(content="x", domain="corporate", entity_type="Decision")
+        with patch.object(main, "store_memory", new=AsyncMock(side_effect=ValueError("Write failed: ['Owner is required for corporate domain.']"))):
+            with self.assertRaises(HTTPException) as ctx:
+                await main.create_memory(
+                    data=data,
                     session=object(),
                     _user={"sub": "tester"},
                 )

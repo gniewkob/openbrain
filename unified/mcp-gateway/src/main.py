@@ -344,7 +344,7 @@ async def brain_export(ids: list[str]) -> list[dict]:
     Restricted-sensitivity content is redacted automatically.
     """
     async with _client() as c:
-        r = await c.post("/api/memories/export", json={"ids": ids, "format": "jsonl"})
+        r = await c.post("/api/memories/export", json={"ids": ids})
         _raise(r)
         return r.json()
 

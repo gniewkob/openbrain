@@ -11,6 +11,26 @@ from src.schemas import MemoryFindRequest, MemoryWriteRecord, MemoryWriteRequest
 
 
 class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_search_memories_applies_owner_filter(self) -> None:
+        captured_stmt = None
+
+        async def execute(stmt):
+            nonlocal captured_stmt
+            captured_stmt = stmt
+            return SimpleNamespace(all=lambda: [])
+
+        session = SimpleNamespace(execute=execute)
+
+        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
+            await crud.search_memories(
+                session,
+                SearchRequest(query="policy", top_k=5, filters={"owner": "owner-a"}),
+            )
+
+        self.assertIsNotNone(captured_stmt)
+        stmt_text = str(captured_stmt)
+        self.assertIn("memories.owner", stmt_text)
+
     async def test_search_memories_filters_to_active_records_only(self) -> None:
         captured_stmt = None
 

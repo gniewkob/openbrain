@@ -606,6 +606,8 @@ async def search_memories(session: AsyncSession, req: SearchRequest) -> list[tup
         stmt = stmt.where(Memory.sensitivity == filters["sensitivity"])
     if "tenant_id" in filters:
         stmt = stmt.where(Memory.metadata_["tenant_id"].astext == filters["tenant_id"])
+    if "owner" in filters:
+        stmt = stmt.where(Memory.owner == filters["owner"])
     stmt = stmt.order_by("distance").limit(req.top_k)
     result = await session.execute(stmt)
     return [(_to_out(row.Memory), float(row.distance)) for row in result.all()]
@@ -836,7 +838,7 @@ async def run_maintenance(session: AsyncSession, req: MaintenanceRequest, actor:
                     ))
                     continue
                 m.owner = new_owner
-            owners_norm += 1
+                owners_norm += 1
 
     # --- SUPERSEDED LINK REPAIR ---
     if req.fix_superseded_links:

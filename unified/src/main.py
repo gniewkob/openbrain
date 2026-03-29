@@ -606,7 +606,10 @@ async def create_memory(
     _enforce_domain_access(_user, data.domain, "write")
     data.owner = _resolve_owner_for_write(_user, data.owner)
     data.tenant_id = _resolve_tenant_for_write(_user, data.tenant_id)
-    memory = await store_memory(session, data, actor=_user.get("sub", "agent"))
+    try:
+        memory = await store_memory(session, data, actor=_user.get("sub", "agent"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     incr_metric("memories_created_total")
     return memory
 

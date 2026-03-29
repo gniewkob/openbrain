@@ -207,7 +207,18 @@ class ObsidianCliAdapter:
         raw = await self._run("vaults")
         return [line.strip() for line in raw.splitlines() if line.strip()]
 
+    @staticmethod
+    def _validate_vault_path(vault: str, path: str | None = None) -> None:
+        """Reject path-traversal attempts before they reach the CLI."""
+        if ".." in vault.split("/") or "/" in vault or "\\" in vault:
+            raise ObsidianCliError(f"Invalid vault name: {vault!r}")
+        if path is not None:
+            parts = PurePosixPath(path).parts
+            if ".." in parts or (parts and parts[0] == "/"):
+                raise ObsidianCliError(f"Invalid note path: {path!r}")
+
     async def list_files(self, vault: str, folder: str | None = None, limit: int | None = None) -> list[str]:
+        self._validate_vault_path(vault, folder)
         args = ["files", "ext=md", f"vault={vault}"]
         if folder:
             args.append(f"folder={folder}")
@@ -218,6 +229,7 @@ class ObsidianCliAdapter:
         return paths
 
     async def read_note(self, vault: str, path: str) -> ObsidianNote:
+        self._validate_vault_path(vault, path)
         content = await self._run("read", f"path={path}", f"vault={vault}")
         tags_raw = await self._run("tags", f"path={path}", "format=json", f"vault={vault}")
         frontmatter, body = _parse_frontmatter(content)

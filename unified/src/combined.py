@@ -4,8 +4,11 @@ Combined ASGI app — Industrial Grade Wrapper v2.
 This wrapper:
 1. Forwards REST API, health, OpenAPI docs, and OAuth discovery to FastAPI (rest_app)
 2. Redirects root (/) to /sse for ChatGPT convenience
-3. Forwards everything else to FastMCP
+3. Forwards everything else to FastMCP (authenticated in PUBLIC_MODE)
 """
+import hmac
+
+from .auth import INTERNAL_API_KEY, PUBLIC_MODE, _oidc
 from .mcp_transport import mcp as mcp_server
 from .main import app as rest_app
 
@@ -38,6 +41,31 @@ async def app(scope, receive, send):
                 "headers": [(b"location", b"/sse")],
             })
             await send({"type": "http.response.body", "body": b""})
+            return
+
+    # Guard FastMCP transport with the same auth policy as the REST API.
+    if PUBLIC_MODE and scope["type"] == "http":
+        headers = {k.lower(): v for k, v in scope.get("headers", [])}
+        authorized = False
+        internal_key = headers.get(b"x-internal-key", b"").decode("latin-1")
+        if internal_key and INTERNAL_API_KEY and hmac.compare_digest(internal_key, INTERNAL_API_KEY):
+            authorized = True
+        if not authorized:
+            auth_header = headers.get(b"authorization", b"").decode("latin-1")
+            if auth_header.lower().startswith("bearer ") and _oidc:
+                token = auth_header[7:].strip()
+                try:
+                    await _oidc.verify_token(token)
+                    authorized = True
+                except Exception:
+                    pass
+        if not authorized:
+            await send({
+                "type": "http.response.start",
+                "status": 401,
+                "headers": [(b"content-type", b"application/json")],
+            })
+            await send({"type": "http.response.body", "body": b'{"detail":"Unauthorized"}'})
             return
 
     # Default: Forward to FastMCP (handles /sse and all MCP protocol paths)
