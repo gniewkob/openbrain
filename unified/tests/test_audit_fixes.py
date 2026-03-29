@@ -145,33 +145,20 @@ class UpdateMemoryErrorPropagationTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result)
 
     async def test_update_memory_skipped_returns_existing_record(self) -> None:
-        """status=skipped (no change) should still return the existing record."""
-        now = datetime.now(timezone.utc)
-        existing_out = MemoryOut(
-            id="mem-1",
-            domain="build",
-            entity_type="Note",
-            content="unchanged",
-            owner="owner-a",
-            status="active",
-            version=1,
-            sensitivity="internal",
-            content_hash="h",
-            created_at=now,
-            updated_at=now,
-            created_by="tester",
-        )
+        """status=skipped must return the loaded record without an extra get_memory SELECT."""
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: _mem())
 
         skipped_response = MemoryWriteResponse(status="skipped", record=_record())
         with (
             patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=skipped_response)),
-            patch.object(crud, "get_memory", new=AsyncMock(return_value=existing_out)),
+            patch.object(crud, "get_memory", new=AsyncMock()) as mock_get,
         ):
             result = await crud.update_memory(session, "mem-1", MemoryUpdate(content="unchanged"))
 
-        self.assertEqual(result, existing_out)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.id, "mem-1")
+        mock_get.assert_not_called()  # C2: no redundant SELECT on skip
 
 
 class AtomicWriteManyTest(unittest.IsolatedAsyncioTestCase):

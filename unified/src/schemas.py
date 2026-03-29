@@ -249,7 +249,7 @@ class MemoryCreate(BaseModel):
 
 
 class MemoryUpdate(BaseModel):
-    content: str
+    content: Optional[str] = None
     title: Optional[str] = None
     updated_by: str = "agent"
     sensitivity: Optional[str] = None
@@ -322,7 +322,7 @@ class MemoryOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     created_by: str
-    updated_by: str | None = None
+    updated_by: str = ""
 
     model_config = {"from_attributes": True}
 

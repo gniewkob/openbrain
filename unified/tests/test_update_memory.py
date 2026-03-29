@@ -206,7 +206,8 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.record.custom_fields, {"policy_area": "security"})
         self.assertEqual(handle_write.await_args.kwargs["actor"], "auth-sub")
 
-    async def test_update_memory_uses_append_version_for_policy_versioned_build_types(self) -> None:
+    async def test_update_memory_uses_upsert_for_build_decision_types(self) -> None:
+        """build domain records are mutable regardless of entity_type — only corporate is append-only."""
         now = datetime.now(timezone.utc)
         existing = Memory(
             id="mem-1",
@@ -234,13 +235,13 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
 
         with (
-            patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="versioned", record=None))) as handle_write,
+            patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="updated", record=None))) as handle_write,
             patch.object(crud, "get_memory", new=AsyncMock(return_value=None)),
         ):
             await crud.update_memory(session, "mem-1", MemoryUpdate(content="after"), actor="auth-sub")
 
         request = handle_write.await_args.args[1]
-        self.assertEqual(request.write_mode.value, "append_version")
+        self.assertEqual(request.write_mode.value, "upsert")
 
     async def test_to_out_and_to_record_surface_updated_by_metadata(self) -> None:
         now = datetime.now(timezone.utc)

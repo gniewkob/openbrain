@@ -49,14 +49,6 @@ from .schemas import (
 log = structlog.get_logger()
 
 CORPORATE = DomainEnum.corporate
-POLICY_VERSIONED_ENTITY_TYPES = {
-    "decision",
-    "policy",
-    "risk",
-    "incident",
-    "incidentreport",
-    "approval",
-}
 
 EXPORT_POLICY: dict[str, dict[str, Any]] = {
     "public": {
@@ -229,13 +221,9 @@ def _to_out(m: Memory) -> MemoryOut:
     )
 
 
-def _normalize_entity_type(entity_type: str) -> str:
-    return "".join(ch for ch in entity_type.lower() if ch.isalnum())
-
-
 def _requires_append_only(domain: str | DomainEnum, entity_type: str) -> bool:
     domain_value = domain.value if isinstance(domain, DomainEnum) else domain
-    return domain_value == "corporate" or _normalize_entity_type(entity_type) in POLICY_VERSIONED_ENTITY_TYPES
+    return domain_value == "corporate"
 
 
 def _can_hard_delete(domain: str | DomainEnum, entity_type: str) -> bool:
@@ -693,7 +681,7 @@ async def update_memory(session: AsyncSession, memory_id: str, data: MemoryUpdat
     metadata = m.metadata_ or {}
     write_rec = MemoryWriteRecord(
         match_key=m.match_key,
-        content=data.content,
+        content=data.content if data.content is not None else m.content,
         domain=m.domain.value,
         entity_type=m.entity_type,
         title=data.title if data.title is not None else metadata.get("title"),
@@ -713,6 +701,8 @@ async def update_memory(session: AsyncSession, memory_id: str, data: MemoryUpdat
     )
     if res_v1.status == "failed":
         raise ValueError(f"Update failed: {'; '.join(res_v1.errors)}")
+    if res_v1.status == "skipped":
+        return _to_out(m)  # idempotent write — no DB mutation, avoid extra SELECT
     if res_v1.record:
         return await get_memory(session, res_v1.record.id)
     return None

@@ -740,9 +740,10 @@ async def update(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if memory is None:
         raise HTTPException(status_code=404, detail="Memory not found")
-    if memory.version > 1:
+    # Only increment metrics on actual mutation; skipped writes return identical record.
+    if memory.id != existing.id:
         incr_metric("memories_versioned_total")
-    else:
+    elif memory.content_hash != existing.content_hash or memory.updated_at != existing.updated_at:
         incr_metric("memories_updated_total")
     return memory
 
@@ -837,7 +838,7 @@ async def update_policy_registry(
     _user: dict = Depends(require_auth),
 ) -> PolicyRegistry:
     _require_admin(_user)
-    return PolicyRegistry(**set_policy_registry(registry.model_dump()))
+    return PolicyRegistry(**await set_policy_registry(registry.model_dump()))
 
 
 @app.get("/api/admin/maintain/reports", response_model=list[MaintenanceReportEntry])

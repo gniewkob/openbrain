@@ -105,7 +105,8 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn(result.status, {"created", "versioned"})
 
-    async def test_handle_memory_write_sets_append_only_governance_for_policy_types(self) -> None:
+    async def test_handle_memory_write_sets_append_only_governance_for_corporate_domain(self) -> None:
+        """Only corporate domain records get append_only=True governance, regardless of entity_type."""
         session = AsyncMock()
         session.execute.return_value = type("Result", (), {"scalar_one_or_none": lambda self: None})()
         session.commit = AsyncMock()
@@ -131,7 +132,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
                 MemoryWriteRequest(
                     record=MemoryWriteRecord(
                         content="decision body",
-                        domain="build",
+                        domain="corporate",
                         entity_type="Decision",
                         owner="owner-a",
                         match_key="mk-1",
@@ -140,16 +141,57 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(result.status, "created")
-        self.assertEqual(len(added), 1)
-        governance = added[0].metadata_["governance"]
+        memory_objs = [o for o in added if isinstance(o, Memory)]
+        self.assertEqual(len(memory_objs), 1)
+        governance = memory_objs[0].metadata_["governance"]
         self.assertTrue(governance["append_only"])
         self.assertFalse(governance["mutable"])
 
-    async def test_delete_memory_blocks_append_only_build_records(self) -> None:
+    async def test_handle_memory_write_build_decision_is_mutable(self) -> None:
+        """build domain Decision must NOT be append-only — entity_type does not override domain governance."""
+        session = AsyncMock()
+        session.execute.return_value = type("Result", (), {"scalar_one_or_none": lambda self: None})()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+        added = []
+        session.add = lambda obj: added.append(obj)
+
+        async def _flush() -> None:
+            now = datetime.now(timezone.utc)
+            for idx, obj in enumerate(added, start=1):
+                if not getattr(obj, "id", None):
+                    obj.id = f"mem-{idx}"
+                if not getattr(obj, "created_at", None):
+                    obj.created_at = now
+                if not getattr(obj, "updated_at", None):
+                    obj.updated_at = now
+
+        session.flush = AsyncMock(side_effect=_flush)
+
+        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+            result = await crud.handle_memory_write(
+                session,
+                MemoryWriteRequest(
+                    record=MemoryWriteRecord(
+                        content="build decision body",
+                        domain="build",
+                        entity_type="Decision",
+                        owner="owner-a",
+                        match_key="mk-2",
+                    )
+                ),
+            )
+
+        self.assertEqual(result.status, "created")
+        governance = added[0].metadata_["governance"]
+        self.assertFalse(governance["append_only"])
+        self.assertTrue(governance["mutable"])
+
+    async def test_delete_memory_blocks_append_only_corporate_records(self) -> None:
         now = datetime.now(timezone.utc)
         existing = Memory(
             id="mem-1",
-            domain=DomainEnum.build,
+            domain=DomainEnum.corporate,
             entity_type="Decision",
             content="before",
             embedding=None,
@@ -219,7 +261,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         now = datetime.now(timezone.utc)
         primary = Memory(
             id="mem-1",
-            domain=DomainEnum.build,
+            domain=DomainEnum.corporate,
             entity_type="Decision",
             content="same",
             embedding=[0.1, 0.2],
@@ -234,14 +276,14 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             metadata_={},
             obsidian_ref=None,
             content_hash="hash-same",
-            match_key="build:decision:1",
+            match_key="corp:decision:1",
             valid_from=None,
             created_at=now,
             updated_at=now,
         )
         duplicate = Memory(
             id="mem-2",
-            domain=DomainEnum.build,
+            domain=DomainEnum.corporate,
             entity_type="Decision",
             content="same",
             embedding=[0.1, 0.2],
@@ -256,7 +298,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             metadata_={},
             obsidian_ref=None,
             content_hash="hash-same",
-            match_key="build:decision:2",
+            match_key="corp:decision:2",
             valid_from=None,
             created_at=now,
             updated_at=now,
@@ -264,7 +306,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session = AsyncMock()
         session.execute.side_effect = [
             SimpleNamespace(scalar_one=lambda: 2),
-            SimpleNamespace(all=lambda: [("hash-same", "Decision", DomainEnum.build)]),
+            SimpleNamespace(all=lambda: [("hash-same", "Decision", DomainEnum.corporate)]),
             SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [primary, duplicate])),
         ]
         session.add = lambda obj: None

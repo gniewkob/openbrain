@@ -38,8 +38,8 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             await gateway.brain_search(query="test", top_k=1)
 
         client.post.assert_awaited_once_with(
-            "/api/memories/search",
-            json={"query": "test", "top_k": 1, "filters": {}},
+            "/api/v1/memory/find",
+            json={"query": "test", "limit": 1, "filters": {}},
         )
 
     async def test_brain_sync_check_calls_api_sync_check_path_with_json_body(self) -> None:

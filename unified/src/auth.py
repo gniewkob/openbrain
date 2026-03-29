@@ -197,7 +197,7 @@ def get_policy_registry() -> dict[str, Any]:
     }
 
 
-def set_policy_registry(registry: dict[str, Any]) -> dict[str, Any]:
+async def set_policy_registry(registry: dict[str, Any]) -> dict[str, Any]:
     global POLICY_REGISTRY
     normalized = {
         "tenants": dict(registry.get("tenants", {})),
@@ -206,10 +206,13 @@ def set_policy_registry(registry: dict[str, Any]) -> dict[str, Any]:
     with _policy_registry_lock:
         # Atomic reference replacement — no clear()+update() race window.
         POLICY_REGISTRY = normalized
-        if POLICY_REGISTRY_PATH:
+    if POLICY_REGISTRY_PATH:
+        # Disk write is blocking I/O — run in thread pool to avoid blocking the event loop.
+        def _write() -> None:
             path = Path(POLICY_REGISTRY_PATH)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(normalized, indent=2, sort_keys=True), encoding="utf-8")
+        await asyncio.to_thread(_write)
     return get_policy_registry()
 
 
