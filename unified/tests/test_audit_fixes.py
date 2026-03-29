@@ -6,6 +6,11 @@ Regression tests for audit fixes:
   - H2: handle_memory_write uses SELECT FOR UPDATE for match_key
   - T5: store_memories_bulk maps custom_fields and relations
   - T6: readyz logs DB errors; combined.py logs OIDC failures
+  - A1: dedup query groups by domain to prevent cross-domain supersession
+  - A2: sensitivity-only change is NOT silently skipped
+  - A3: non-atomic batch rolls back session on per-record failure
+  - A4: dry_run=True maintenance does not persist AuditLog entries
+  - A5: embedding fetched before content mutation (safe write order)
 """
 from __future__ import annotations
 
@@ -350,6 +355,146 @@ class ReadyzLoggingTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(hasattr(response, "status_code"), "Expected JSONResponse on DB error")
         self.assertEqual(response.status_code, 503)
         self.assertGreater(len(log_calls), 0, "log.error must be called on DB failure")
+
+
+class CrossDomainDedupTest(unittest.IsolatedAsyncioTestCase):
+    """A1 — dedup must not group across domains (prevents corporate↔build supersession)."""
+
+    async def test_dedup_query_includes_domain_in_group_by(self) -> None:
+        """Verify the dup_groups query includes Memory.domain in SELECT/GROUP BY."""
+        from src.schemas import MaintenanceRequest
+        captured_stmts: list = []
+
+        async def _execute(stmt):
+            captured_stmts.append(str(stmt))
+            # First call: total count (>1 so dedup loop runs)
+            if len(captured_stmts) == 1:
+                return SimpleNamespace(scalar_one=lambda: 2)
+            # Second call: dup_groups (empty — no actual duplicates)
+            return SimpleNamespace(all=lambda: [], scalars=lambda: SimpleNamespace(all=lambda: []))
+
+        session = SimpleNamespace(execute=_execute)
+        session.add = lambda obj: None
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+
+        req = MaintenanceRequest(dry_run=True, dedup_threshold=0.05, fix_superseded_links=False)
+        await crud.run_maintenance(session, req)
+
+        # The dedup GROUP BY statement should reference domain
+        dedup_stmts = [s for s in captured_stmts if "GROUP BY" in s.upper()]
+        self.assertTrue(
+            any("domain" in s.lower() for s in dedup_stmts),
+            f"Expected 'domain' in GROUP BY but got: {dedup_stmts}",
+        )
+
+
+class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
+    """A2 — sensitivity-only change must NOT be skipped (triggers update, not 'skipped')."""
+
+    async def test_sensitivity_only_change_is_not_skipped(self) -> None:
+        from sqlalchemy import select as sa_select
+
+        now = datetime.now(timezone.utc)
+        existing = _mem(sensitivity="internal", content="same", content_hash="hash-same")
+
+        captured_stmts: list = []
+
+        async def _execute(stmt):
+            captured_stmts.append(stmt)
+            return SimpleNamespace(scalar_one_or_none=lambda: existing)
+
+        session = SimpleNamespace(execute=_execute)
+        session.add = lambda obj: None
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        record = MemoryWriteRecord(
+            content="same",
+            domain="build",
+            entity_type="Note",
+            match_key="mk-1",
+            sensitivity="confidential",  # only sensitivity changed
+        )
+        req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
+
+        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+            result = await crud.handle_memory_write(session, req)
+
+        self.assertNotEqual(result.status, "skipped", "sensitivity-only change must not be skipped")
+
+
+class NonAtomicSessionRollbackTest(unittest.IsolatedAsyncioTestCase):
+    """A3 — non-atomic batch must rollback session after each per-record failure."""
+
+    async def test_non_atomic_batch_rolls_back_on_per_record_failure(self) -> None:
+        session = AsyncMock()
+        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
+        session.rollback = AsyncMock()
+
+        call_count = 0
+
+        async def _write_side_effect(sess, req, actor, _commit=True):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise ValueError("Embedding unavailable")
+            return MemoryWriteResponse(status="created", record=_record())
+
+        records = [
+            MemoryWriteRecord(content=f"rec-{i}", domain="build", entity_type="Note")
+            for i in range(3)
+        ]
+        request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=False)
+
+        with patch.object(crud, "handle_memory_write", side_effect=_write_side_effect):
+            result = await crud.handle_memory_write_many(session, request)
+
+        session.rollback.assert_awaited_once()
+        self.assertEqual(result.status, "partial_success")
+
+
+class DryRunAuditLogTest(unittest.IsolatedAsyncioTestCase):
+    """A4 — dry_run=True must not persist AuditLog entries."""
+
+    async def test_dry_run_does_not_add_audit_log(self) -> None:
+        from src.schemas import MaintenanceRequest
+        added_objects: list = []
+
+        async def _execute(stmt):
+            return SimpleNamespace(scalar_one=lambda: 0, all=lambda: [], scalars=lambda: SimpleNamespace(all=lambda: []))
+
+        session = SimpleNamespace(execute=_execute)
+        session.add = lambda obj: added_objects.append(obj)
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+
+        req = MaintenanceRequest(dry_run=True, dedup_threshold=0.0, fix_superseded_links=False)
+        report = await crud.run_maintenance(session, req)
+
+        from src.models import AuditLog
+        audit_entries = [o for o in added_objects if isinstance(o, AuditLog)]
+        self.assertEqual(len(audit_entries), 0, "dry_run=True must not persist AuditLog")
+
+    async def test_non_dry_run_does_add_audit_log(self) -> None:
+        from src.models import AuditLog
+        from src.schemas import MaintenanceRequest
+        added_objects: list = []
+
+        async def _execute(stmt):
+            return SimpleNamespace(scalar_one=lambda: 0, all=lambda: [], scalars=lambda: SimpleNamespace(all=lambda: []))
+
+        session = SimpleNamespace(execute=_execute)
+        session.add = lambda obj: added_objects.append(obj)
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+
+        req = MaintenanceRequest(dry_run=False, dedup_threshold=0.0, fix_superseded_links=False)
+        await crud.run_maintenance(session, req)
+
+        audit_entries = [o for o in added_objects if isinstance(o, AuditLog)]
+        self.assertEqual(len(audit_entries), 1, "dry_run=False must persist exactly one AuditLog")
 
 
 if __name__ == "__main__":

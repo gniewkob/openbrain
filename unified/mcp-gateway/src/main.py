@@ -126,7 +126,6 @@ async def brain_store(
     sensitivity: str = "internal",
     owner: str = "",
     tenant_id: str | None = None,
-    created_by: str = "agent",
     tags: list[str] | None = None,
     custom_fields: dict[str, Any] | None = None,
     obsidian_ref: str | None = None,
@@ -152,29 +151,32 @@ async def brain_store(
     obsidian_ref — path to source note in Obsidian vault.
     """
     async with _client() as c:
-        r = await c.post("/api/memories", json={
-            "content": content,
-            "domain": domain,
-            "entity_type": entity_type,
-            "title": title,
-            "sensitivity": sensitivity,
-            "owner": owner,
-            "tenant_id": tenant_id,
-            "created_by": created_by,
-            "tags": tags or [],
-            "custom_fields": custom_fields or {},
-            "obsidian_ref": obsidian_ref,
-            "match_key": match_key,
+        r = await c.post("/api/v1/memory/write", json={
+            "record": {
+                "content": content,
+                "domain": domain,
+                "entity_type": entity_type,
+                "title": title,
+                "sensitivity": sensitivity,
+                "owner": owner,
+                "tenant_id": tenant_id,
+                "tags": tags or [],
+                "custom_fields": custom_fields or {},
+                "obsidian_ref": obsidian_ref,
+                "match_key": match_key,
+                "source": {"type": "agent", "system": "other"},
+            },
+            "write_mode": "upsert",
         })
         _raise(r)
-        return BrainMemory(**r.json())
+        return BrainMemory(**r.json()["record"])
 
 
 @mcp.tool()
 async def brain_get(memory_id: str) -> BrainMemory:
     """Retrieve a specific memory by its ID."""
     async with _client() as c:
-        r = await c.get(f"/api/memories/{memory_id}")
+        r = await c.get(f"/api/v1/memory/{memory_id}")
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         _raise(r)
@@ -247,13 +249,20 @@ async def brain_search(
         filters["sensitivity"] = sensitivity
 
     async with _client() as c:
-        r = await c.post("/api/memories/search", json={
+        r = await c.post("/api/v1/memory/find", json={
             "query": query,
-            "top_k": top_k,
+            "limit": top_k,
             "filters": filters,
         })
         _raise(r)
-        return r.json()
+        # V1 /find returns [{record: ..., score: similarity}] — normalize to flat list
+        hits = r.json()
+        return [
+            {"memory": hit["record"], "score": hit["score"]}
+            if isinstance(hit, dict) and "record" in hit
+            else hit
+            for hit in hits
+        ]
 
 
 @mcp.tool()

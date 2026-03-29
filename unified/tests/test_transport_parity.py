@@ -73,15 +73,18 @@ class _GatewayClient:
         return False
 
     async def post(self, path: str, json=None):
-        if path == "/api/memories":
-            return _FakeResponse(201, LEGACY_MEMORY)
-        if path == "/api/memories/search":
-            return _FakeResponse(200, [{"memory": LEGACY_MEMORY, "score": 0.9}])
+        # Gateway now uses V1 endpoints
+        if path == "/api/v1/memory/write":
+            return _FakeResponse(200, {"status": "created", "record": LEGACY_MEMORY})
+        if path == "/api/v1/memory/find":
+            return _FakeResponse(200, [{"record": LEGACY_MEMORY, "score": 0.9}])
         raise AssertionError(f"Unexpected POST path: {path}")
 
     async def get(self, path: str, params=None):
         if path == "/api/memories":
             return _FakeResponse(200, [LEGACY_MEMORY])
+        if path.startswith("/api/v1/memory/"):
+            return _FakeResponse(200, LEGACY_MEMORY)
         raise AssertionError(f"Unexpected GET path: {path}")
 
     async def put(self, path: str, json=None):

@@ -115,7 +115,12 @@ async def _safe_req(method: str, path: str, **kwargs) -> dict[str, Any]:
     async with _client() as c:
         full_path = f"/api/v1/memory{path}" if not path.startswith("/api") else path
         if "json" in kwargs:
-            log.info("mcp_v1_request", method=method, path=full_path, payload=kwargs["json"])
+            # Redact record content to avoid PII/secrets leaking into log stores.
+            _safe_payload = {
+                k: ({**v, "record": {**v["record"], "content": "[REDACTED]"}} if isinstance(v, dict) and "content" in v.get("record", {}) else v)
+                for k, v in kwargs["json"].items()
+            } if isinstance(kwargs["json"], dict) else kwargs["json"]
+            log.info("mcp_v1_request", method=method, path=full_path, payload=_safe_payload)
         
         r = await c.request(method, full_path, **kwargs)
         if r.is_error:

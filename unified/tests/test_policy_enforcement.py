@@ -209,7 +209,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session = AsyncMock()
         session.execute.side_effect = [
             SimpleNamespace(scalar_one=lambda: 2),
-            SimpleNamespace(all=lambda: [("hash-same", "Decision")]),
+            SimpleNamespace(all=lambda: [("hash-same", "Decision", DomainEnum.build)]),
             SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [primary, duplicate])),
         ]
         session.add = lambda obj: None

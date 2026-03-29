@@ -400,6 +400,7 @@ async def handle_memory_write(
                 existing.owner != rec.owner
                 or existing.tags != rec.tags
                 or existing.obsidian_ref != rec.obsidian_ref
+                or existing.sensitivity != rec.sensitivity
             )
             if not changed:
                 return MemoryWriteResponse(status="skipped", record=_to_record(existing))
@@ -450,9 +451,11 @@ async def handle_memory_write(
             return MemoryWriteResponse(status="versioned", record=_to_record(new_memory))
         else:
             # --- MUTATE IN PLACE (build/personal) ---
+            # Fetch embedding BEFORE mutating fields — if Ollama fails, no partial write.
+            new_embedding = await get_embedding(rec.content)
             existing.content = rec.content
             existing.content_hash = content_hash
-            existing.embedding = await get_embedding(rec.content)
+            existing.embedding = new_embedding
             existing.owner = rec.owner
             existing.tags = rec.tags
             existing.relations = rec.relations.model_dump()
@@ -522,6 +525,10 @@ async def handle_memory_write_many(
                 summary["failed"] += 1
                 if atomic:
                     raise  # abort the whole batch
+                else:
+                    # Roll back any partial mutations so the session stays valid
+                    # for subsequent records.
+                    await session.rollback()
 
     if atomic:
         try:
@@ -838,19 +845,20 @@ async def run_maintenance(session: AsyncSession, req: MaintenanceRequest, actor:
     # --- DEDUPLICATION (SQL GROUP BY — avoids O(n²) full table scan) ---
     if req.dedup_threshold > 0 and total > 1:
         dup_groups_stmt = (
-            select(Memory.content_hash, Memory.entity_type)
+            select(Memory.content_hash, Memory.entity_type, Memory.domain)
             .where(Memory.status == "active", Memory.content_hash.isnot(None))
-            .group_by(Memory.content_hash, Memory.entity_type)
+            .group_by(Memory.content_hash, Memory.entity_type, Memory.domain)
             .having(func.count(Memory.id) > 1)
         )
         dup_groups = (await session.execute(dup_groups_stmt)).all()
 
-        for content_hash, entity_type in dup_groups:
+        for content_hash, entity_type, domain in dup_groups:
             members_stmt = (
                 select(Memory)
                 .where(
                     Memory.content_hash == content_hash,
                     Memory.entity_type == entity_type,
+                    Memory.domain == domain,
                     Memory.status == "active",
                 )
                 .order_by(Memory.created_at.asc())  # keep oldest as canonical
@@ -919,6 +927,11 @@ async def run_maintenance(session: AsyncSession, req: MaintenanceRequest, actor:
         owners_normalized=owners_norm,
         links_fixed=links_fixed,
     )
+
+    if req.dry_run:
+        # Skip persisting the audit entry for dry runs — they must not pollute reports.
+        await session.commit()
+        return report
 
     audit_entry = AuditLog(
         operation="maintain",
