@@ -50,6 +50,61 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(ctx.exception.status_code, 422)
 
+    async def test_handle_memory_write_fails_corporate_without_match_key(self) -> None:
+        """Corporate domain must require match_key to prevent permanent un-dedupable duplicates."""
+        session = AsyncMock()
+        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
+
+        rec = MemoryWriteRecord(
+            content="important decision",
+            domain="corporate",
+            entity_type="Decision",
+            owner="alice",
+            # match_key intentionally omitted
+        )
+        result = await crud.handle_memory_write(
+            session, MemoryWriteRequest(record=rec, write_mode="upsert")
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertTrue(
+            any("match_key" in e for e in result.errors),
+            f"Expected match_key error, got: {result.errors}",
+        )
+
+    async def test_handle_memory_write_accepts_corporate_with_match_key(self) -> None:
+        """Corporate write with match_key and owner must succeed (create path)."""
+        from datetime import datetime, timezone as tz
+        now = datetime.now(tz.utc)
+
+        session = AsyncMock()
+        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
+
+        def _add(obj):
+            # Simulate DB setting server defaults after flush
+            obj.id = obj.id or "mem-corp-1"
+            obj.created_at = now
+            obj.updated_at = now
+
+        session.add = _add
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        rec = MemoryWriteRecord(
+            content="approved decision",
+            domain="corporate",
+            entity_type="Decision",
+            owner="alice",
+            match_key="corp:decision:approved-2026",
+        )
+        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+            result = await crud.handle_memory_write(
+                session, MemoryWriteRequest(record=rec, write_mode="upsert")
+            )
+
+        self.assertIn(result.status, {"created", "versioned"})
+
     async def test_handle_memory_write_sets_append_only_governance_for_policy_types(self) -> None:
         session = AsyncMock()
         session.execute.return_value = type("Result", (), {"scalar_one_or_none": lambda self: None})()

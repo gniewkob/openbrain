@@ -316,6 +316,8 @@ async def handle_memory_write(
             )
         if not rec.owner:
             return MemoryWriteResponse(status="failed", errors=["Owner is required for corporate domain."])
+        if not rec.match_key:
+            return MemoryWriteResponse(status="failed", errors=["match_key is required for corporate domain — ensures idempotency on append-only records."])
 
     # 2. Match existing record — lock the row to prevent concurrent versioning/update
     # races on the same match_key.  The INSERT gap (two concurrent creates) is
