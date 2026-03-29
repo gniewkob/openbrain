@@ -94,7 +94,7 @@ class MemoryWriteRecord(BaseModel):
     match_key: Optional[str] = None
     tenant_id: Optional[str] = None
     domain: Literal["corporate", "build", "personal"]
-    entity_type: str = "Note"
+    entity_type: str = Field(default="Note", max_length=64)
     title: Optional[str] = None
     content: str
     owner: str = ""
@@ -234,7 +234,7 @@ class MemoryGetContextResponse(BaseModel):
 class MemoryCreate(BaseModel):
     content: str
     domain: Literal["corporate", "build", "personal"] = "corporate"
-    entity_type: str = "Decision"
+    entity_type: str = Field(default="Decision", max_length=64)
     sensitivity: str = "internal"
     owner: str = ""
     created_by: str = "agent"
@@ -264,7 +264,7 @@ class MemoryUpdate(BaseModel):
 class MemoryUpsertItem(BaseModel):
     content: str
     domain: Literal["corporate", "build", "personal"] = "corporate"
-    entity_type: str = "Decision"
+    entity_type: str = Field(default="Decision", max_length=64)
     sensitivity: str = "internal"
     owner: str = ""
     created_by: str = "agent"

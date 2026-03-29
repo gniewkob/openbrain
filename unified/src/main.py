@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from typing import Any
 
@@ -329,9 +330,15 @@ def _enforce_memory_access(user: dict[str, Any], memory: MemoryOut) -> None:
     if not memory.owner or memory.owner != subject:
         raise HTTPException(status_code=404, detail="Memory not found")
 
+# Allowlist: UUID-like tokens only (alphanumeric + hyphens, 1-64 chars).
+# Anything else is replaced with a server-generated UUID to prevent log injection.
+_REQ_ID_RE = re.compile(r'^[a-zA-Z0-9\-]{1,64}$')
+
+
 class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        req_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        raw = request.headers.get("X-Request-ID", "")
+        req_id = raw if _REQ_ID_RE.match(raw) else str(uuid.uuid4())
         structlog.contextvars.bind_contextvars(request_id=req_id)
         response = await call_next(request)
         response.headers["X-Request-ID"] = req_id
@@ -403,6 +410,11 @@ async def v1_get_context(
 ) -> MemoryGetContextResponse:
     if req.domain:
         _enforce_domain_access(_user, req.domain, "read")
+    elif PUBLIC_MODE and _is_scoped_user(_user):
+        # domain=None → context spans all domains; ensure user has at least one read grant.
+        allowed = _effective_domain_scope(_user, "read")
+        if not allowed and not is_privileged_user(_user):
+            raise HTTPException(status_code=403, detail="Read access denied: no domain grants configured")
     owner = get_subject(_user) if _is_scoped_user(_user) and not get_tenant_id(_user) else None
     tenant_id = get_tenant_id(_user) if _is_scoped_user(_user) else None
     response = await get_grounding_pack(session, req, owner=owner, tenant_id=tenant_id)

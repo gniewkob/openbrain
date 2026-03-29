@@ -665,7 +665,7 @@ async def search_memories(session: AsyncSession, req: SearchRequest) -> list[tup
         stmt = stmt.where(Memory.owner == filters["owner"])
     stmt = stmt.order_by("distance").limit(req.top_k)
     result = await session.execute(stmt)
-    return [(_to_out(row.Memory), float(row.distance)) for row in result.all()]
+    return [(_to_out(row.Memory), 1.0 - float(row.distance)) for row in result.all()]
 
 async def update_memory(session: AsyncSession, memory_id: str, data: MemoryUpdate, actor: str = "agent") -> MemoryOut | None:
     stmt = select(Memory).where(Memory.id == memory_id)

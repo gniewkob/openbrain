@@ -90,7 +90,7 @@ def _record(**overrides) -> MemoryRecord:
 
 
 class BrainUrlEnvTest(unittest.TestCase):
-    """H5 — BRAIN_URL must be read from env, defaulting to port 7010."""
+    """H5 — BRAIN_URL must be read from env, defaulting to the internal port 80."""
 
     def test_brain_url_reads_from_env(self) -> None:
         with patch.dict(os.environ, {"BRAIN_URL": "http://testhost:9999"}):
@@ -104,15 +104,15 @@ class BrainUrlEnvTest(unittest.TestCase):
             # Restore
             importlib.reload(transport_mod)
 
-    def test_brain_url_default_is_7010_not_80(self) -> None:
+    def test_brain_url_default_is_internal_80(self) -> None:
         import src.mcp_transport as transport_mod
         # Remove env var to test default
         saved = os.environ.pop("BRAIN_URL", None)
         try:
             import importlib
             importlib.reload(transport_mod)
-            self.assertIn("7010", transport_mod.BRAIN_URL)
-            self.assertNotIn(":80", transport_mod.BRAIN_URL)
+            self.assertIn(":80", transport_mod.BRAIN_URL)
+            self.assertNotIn("7010", transport_mod.BRAIN_URL)
         finally:
             if saved:
                 os.environ["BRAIN_URL"] = saved
@@ -495,6 +495,113 @@ class DryRunAuditLogTest(unittest.IsolatedAsyncioTestCase):
 
         audit_entries = [o for o in added_objects if isinstance(o, AuditLog)]
         self.assertEqual(len(audit_entries), 1, "dry_run=False must persist exactly one AuditLog")
+
+
+class SearchScoreSemanticsTest(unittest.IsolatedAsyncioTestCase):
+    """Fix2 — search_memories must return similarity (1=similar), not raw distance (0=similar)."""
+
+    async def test_search_memories_returns_similarity_not_distance(self) -> None:
+        from src.crud import search_memories
+        from src.schemas import SearchRequest
+
+        # distance=0.1 means very similar → similarity should be 0.9
+        fake_memory = _mem()
+        fake_row = SimpleNamespace(Memory=fake_memory, distance=0.1)
+
+        async def _execute(stmt):
+            return SimpleNamespace(all=lambda: [fake_row])
+
+        session = SimpleNamespace(execute=_execute)
+
+        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+            results = await search_memories(session, SearchRequest(query="test", top_k=1))
+
+        self.assertEqual(len(results), 1)
+        _mem_out, score = results[0]
+        self.assertAlmostEqual(score, 0.9, places=5, msg="score must be 1.0 - distance (similarity)")
+        self.assertGreater(score, 0.5, "high-similarity result must score > 0.5")
+
+
+class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
+    """Fix4 — RequestIDMiddleware must reject malformed X-Request-ID headers."""
+
+    async def test_valid_uuid_header_is_preserved(self) -> None:
+        from tests.test_metrics import _import_main_with_fake_auth_deps
+        main = _import_main_with_fake_auth_deps()
+
+        captured: list[str] = []
+
+        async def fake_next(request):
+            from starlette.responses import Response
+            return Response()
+
+        from starlette.testclient import TestClient
+        from starlette.requests import Request as StarletteRequest
+
+        valid_id = "123e4567-e89b-12d3-a456-426614174000"
+        scope = {"type": "http", "method": "GET", "path": "/", "headers": [
+            (b"x-request-id", valid_id.encode()),
+        ], "query_string": b""}
+
+        middleware = main.RequestIDMiddleware(app=fake_next)
+
+        req_ids: list[str] = []
+
+        async def _next(request):
+            import structlog
+            req_ids.append(structlog.contextvars.get_contextvars().get("request_id", ""))
+            from starlette.responses import Response
+            return Response()
+
+        middleware.app = _next
+        from starlette.requests import Request as SR
+        request = SR(scope)
+        await middleware.dispatch(request, _next)
+
+        self.assertEqual(req_ids[0], valid_id)
+
+    def test_malformed_header_is_rejected(self) -> None:
+        from tests.test_metrics import _import_main_with_fake_auth_deps
+        main = _import_main_with_fake_auth_deps()
+        import re
+        self.assertFalse(bool(main._REQ_ID_RE.match("inject\nnewline")))
+        self.assertFalse(bool(main._REQ_ID_RE.match("x" * 65)))
+        self.assertFalse(bool(main._REQ_ID_RE.match("")))
+        self.assertTrue(bool(main._REQ_ID_RE.match("abc-123")))
+        self.assertTrue(bool(main._REQ_ID_RE.match("123e4567-e89b-12d3-a456-426614174000")))
+
+
+class EntityTypeMaxLengthTest(unittest.TestCase):
+    """Fix5 — entity_type must be rejected if longer than 64 characters."""
+
+    def test_entity_type_over_64_chars_raises(self) -> None:
+        from pydantic import ValidationError
+        long_type = "A" * 65
+        with self.assertRaises(ValidationError):
+            MemoryWriteRecord(content="x", domain="build", entity_type=long_type)
+
+    def test_entity_type_at_64_chars_is_valid(self) -> None:
+        rec = MemoryWriteRecord(content="x", domain="build", entity_type="A" * 64)
+        self.assertEqual(len(rec.entity_type), 64)
+
+    def test_entity_type_default_is_within_limit(self) -> None:
+        rec = MemoryWriteRecord(content="x", domain="build")
+        self.assertLessEqual(len(rec.entity_type), 64)
+
+
+class DbPoolConfigTest(unittest.TestCase):
+    """Fix6 — engine must have pool_recycle and statement_timeout configured."""
+
+    def test_engine_has_pool_recycle(self) -> None:
+        from src.db import engine
+        self.assertEqual(engine.pool._recycle, 1800)
+
+    def test_engine_has_statement_timeout_in_connect_args(self) -> None:
+        import src.db as db_module
+        import inspect
+        source = inspect.getsource(db_module)
+        self.assertIn("statement_timeout", source)
+        self.assertIn("server_settings", source)
 
 
 if __name__ == "__main__":

@@ -64,7 +64,7 @@ def downgrade() -> None:
     op.drop_index("ix_memories_match_key", table_name="memories")
     op.drop_index("ix_memories_status_entity", table_name="memories")
     op.drop_index("ix_memories_status", table_name="memories")
-    op.drop_constraint("fk_memories_superseded_by", "memories", type_="foreignkey")
+    # fk_memories_superseded_by was intentionally skipped in upgrade — nothing to drop
     op.drop_column("memories", "valid_from")
     op.drop_column("memories", "match_key")
     op.drop_column("memories", "tags")
