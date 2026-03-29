@@ -18,8 +18,8 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 log = structlog.get_logger()
 
-BRAIN_URL: str = "http://localhost:80"
-BACKEND_TIMEOUT: float = 30.0
+BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://127.0.0.1:7010")
+BACKEND_TIMEOUT: float = float(os.environ.get("BACKEND_TIMEOUT_S", "30"))
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
 ENABLE_HTTP_OBSIDIAN_TOOLS: bool = os.environ.get("ENABLE_HTTP_OBSIDIAN_TOOLS", "").lower() in {"1", "true", "yes"}
 # Source system tag stored with every brain_store call.

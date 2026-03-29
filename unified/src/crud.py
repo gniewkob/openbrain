@@ -288,11 +288,16 @@ def _export_record(record: dict[str, Any], sensitivity: str, role: str) -> dict[
 # ---------------------------------------------------------------------------
 
 async def handle_memory_write(
-    session: AsyncSession, 
-    request: MemoryWriteRequest, 
-    actor: str = "agent"
+    session: AsyncSession,
+    request: MemoryWriteRequest,
+    actor: str = "agent",
+    _commit: bool = True,
 ) -> MemoryWriteResponse:
-    """The canonical write engine for OpenBrain."""
+    """The canonical write engine for OpenBrain.
+
+    _commit controls whether the session is committed after each write.
+    Set to False when the caller manages the transaction (e.g. atomic batch).
+    """
     rec = request.record
     mode = request.write_mode
     domain = rec.domain
@@ -312,10 +317,17 @@ async def handle_memory_write(
         if not rec.owner:
             return MemoryWriteResponse(status="failed", errors=["Owner is required for corporate domain."])
 
-    # 2. Match existing record
+    # 2. Match existing record — lock the row to prevent concurrent versioning/update
+    # races on the same match_key.  The INSERT gap (two concurrent creates) is
+    # prevented by the UNIQUE(match_key) DB constraint; without it this reduces
+    # but does not eliminate races.
     existing = None
     if rec.match_key:
-        stmt = select(Memory).where(Memory.match_key == rec.match_key, Memory.status == "active")
+        stmt = (
+            select(Memory)
+            .where(Memory.match_key == rec.match_key, Memory.status == "active")
+            .with_for_update()
+        )
         res = await session.execute(stmt)
         existing = res.scalar_one_or_none()
 
@@ -370,9 +382,12 @@ async def handle_memory_write(
         
         if domain == "corporate":
             await _audit(session, "create", memory.id, actor=actor, tool_name="memory.write")
-            
-        await session.commit()
-        await session.refresh(memory)
+
+        if _commit:
+            await session.commit()
+            await session.refresh(memory)
+        else:
+            await session.flush()
         return MemoryWriteResponse(status="created", record=_to_record(memory))
 
     else:
@@ -424,11 +439,14 @@ async def handle_memory_write(
             existing.status = "superseded"
             existing.superseded_by = new_memory.id
             
-            await _audit(session, "version", new_memory.id, actor=actor, tool_name="memory.write", 
+            await _audit(session, "version", new_memory.id, actor=actor, tool_name="memory.write",
                           meta={"prev_id": existing.id, "reason": "content_update"})
-            
-            await session.commit()
-            await session.refresh(new_memory)
+
+            if _commit:
+                await session.commit()
+                await session.refresh(new_memory)
+            else:
+                await session.flush()
             return MemoryWriteResponse(status="versioned", record=_to_record(new_memory))
         else:
             # --- MUTATE IN PLACE (build/personal) ---
@@ -450,46 +468,75 @@ async def handle_memory_write(
             meta["updated_by"] = actor
             meta["source"] = rec.source.model_dump()
             existing.metadata_ = meta
-            
-            await session.commit()
-            await session.refresh(existing)
+
+            if _commit:
+                await session.commit()
+                await session.refresh(existing)
+            else:
+                await session.flush()
             return MemoryWriteResponse(status="updated", record=_to_record(existing))
 
 
 async def handle_memory_write_many(
-    session: AsyncSession, 
+    session: AsyncSession,
     request: MemoryWriteManyRequest,
-    actor: str = "agent"
+    actor: str = "agent",
 ) -> MemoryWriteManyResponse:
     results = []
     summary = {"received": len(request.records), "created": 0, "updated": 0, "versioned": 0, "skipped": 0, "failed": 0}
-    
-    for i, rec in enumerate(request.records):
-        try:
-            existing_id = None
-            if rec.match_key:
-                existing_stmt = select(Memory.id).where(Memory.match_key == rec.match_key, Memory.status == "active")
-                existing_res = await session.execute(existing_stmt)
-                existing_id = existing_res.scalar_one_or_none()
 
-            res = await handle_memory_write(session, MemoryWriteRequest(record=rec, write_mode=request.write_mode), actor=actor)
-            results.append(BatchResultItem(
-                input_index=i,
-                status=res.status,
-                operation_type=res.status,
-                record_id=res.record.id if res.record else None,
-                previous_record_id=existing_id if res.status in {"updated", "versioned", "skipped"} else None,
-                match_key=rec.match_key,
-                warnings=res.warnings,
-                error=res.errors[0] if res.errors else None
-            ))
-            summary[res.status] = summary.get(res.status, 0) + 1
-        except Exception as e:
-            results.append(BatchResultItem(input_index=i, status="failed", operation_type="failed", match_key=rec.match_key, error=str(e)))
-            summary["failed"] += 1
-            
-    status = "success" if summary["failed"] == 0 else ("partial_success" if summary["failed"] < len(request.records) else "failed")
-    return MemoryWriteManyResponse(status=status, summary=summary, results=results)
+    # Atomic mode: all writes share one transaction — any failure rolls back everything.
+    # Non-atomic (default): each write is committed independently; partial success is allowed.
+    atomic = request.atomic
+
+    async def _process_records(commit_each: bool) -> None:
+        for i, rec in enumerate(request.records):
+            try:
+                existing_id = None
+                if rec.match_key:
+                    existing_stmt = select(Memory.id).where(Memory.match_key == rec.match_key, Memory.status == "active")
+                    existing_res = await session.execute(existing_stmt)
+                    existing_id = existing_res.scalar_one_or_none()
+
+                res = await handle_memory_write(
+                    session,
+                    MemoryWriteRequest(record=rec, write_mode=request.write_mode),
+                    actor=actor,
+                    _commit=commit_each,
+                )
+                results.append(BatchResultItem(
+                    input_index=i,
+                    status=res.status,
+                    operation_type=res.status,
+                    record_id=res.record.id if res.record else None,
+                    previous_record_id=existing_id if res.status in {"updated", "versioned", "skipped"} else None,
+                    match_key=rec.match_key,
+                    warnings=res.warnings,
+                    error=res.errors[0] if res.errors else None,
+                ))
+                summary[res.status] = summary.get(res.status, 0) + 1
+            except Exception as e:
+                results.append(BatchResultItem(
+                    input_index=i, status="failed", operation_type="failed",
+                    match_key=rec.match_key, error=str(e),
+                ))
+                summary["failed"] += 1
+                if atomic:
+                    raise  # abort the whole batch
+
+    if atomic:
+        try:
+            await _process_records(commit_each=False)
+            await session.commit()  # single commit for the entire batch
+        except Exception:
+            await session.rollback()
+            overall = "failed"
+            return MemoryWriteManyResponse(status=overall, summary=summary, results=results)
+    else:
+        await _process_records(commit_each=True)
+
+    overall = "success" if summary["failed"] == 0 else ("partial_success" if summary["failed"] < len(request.records) else "failed")
+    return MemoryWriteManyResponse(status=overall, summary=summary, results=results)
 
 
 # ---------------------------------------------------------------------------
@@ -536,6 +583,8 @@ async def store_memories_bulk(session: AsyncSession, items: list[MemoryCreate]) 
             match_key=i.match_key,
             obsidian_ref=i.obsidian_ref,
             sensitivity=i.sensitivity,
+            custom_fields=i.custom_fields,
+            relations=MemoryRelations(**(i.relations or {})),
         )
         for i in items
     ]
@@ -639,6 +688,8 @@ async def update_memory(session: AsyncSession, memory_id: str, data: MemoryUpdat
         MemoryWriteRequest(record=write_rec, write_mode=write_mode),
         actor=actor,
     )
+    if res_v1.status == "failed":
+        raise ValueError(f"Update failed: {'; '.join(res_v1.errors)}")
     if res_v1.record:
         return await get_memory(session, res_v1.record.id)
     return None

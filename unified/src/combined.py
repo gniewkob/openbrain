@@ -7,10 +7,13 @@ This wrapper:
 3. Forwards everything else to FastMCP (authenticated in PUBLIC_MODE)
 """
 import hmac
+import logging
 
 from .auth import INTERNAL_API_KEY, PUBLIC_MODE, _oidc
 from .mcp_transport import mcp as mcp_server
 from .main import app as rest_app
+
+_log = logging.getLogger("openbrain.combined")
 
 # Base FastMCP app
 mcp_app = mcp_server.streamable_http_app()
@@ -57,8 +60,8 @@ async def app(scope, receive, send):
                 try:
                     await _oidc.verify_token(token)
                     authorized = True
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _log.warning("mcp_oidc_verification_failed", extra={"error": str(exc)})
         if not authorized:
             await send({
                 "type": "http.response.start",

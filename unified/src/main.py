@@ -542,7 +542,8 @@ async def readyz() -> dict:
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT 1"))
         return {"status": "ok", "service": "openbrain-unified", "db": "ok"}
-    except Exception:
+    except Exception as exc:
+        log.error("readyz_db_check_failed", error=str(exc))
         return JSONResponse(
             status_code=503,
             content={"status": "degraded", "service": "openbrain-unified", "db": "error"},
@@ -707,7 +708,10 @@ async def update(
     _enforce_memory_access(_user, existing)
     data.owner = _resolve_owner_for_write(_user, data.owner if data.owner is not None else existing.owner)
     data.tenant_id = _resolve_tenant_for_write(_user, data.tenant_id if data.tenant_id is not None else existing.tenant_id)
-    memory = await update_memory(session, memory_id, data, actor=_user.get("sub", "agent"))
+    try:
+        memory = await update_memory(session, memory_id, data, actor=_user.get("sub", "agent"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if memory is None:
         raise HTTPException(status_code=404, detail="Memory not found")
     if memory.version > 1:
