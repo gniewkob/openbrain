@@ -9,4 +9,14 @@ providers:
     editable: true
     updateIntervalSeconds: 30
     options:
-      path: /var/lib/grafana/dashboards
+      path: /var/lib/grafana/dashboards/openbrain
+
+  - name: mAiL
+    orgId: 1
+    folder: mAiL
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/mail

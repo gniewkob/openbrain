@@ -11,3 +11,9 @@ scrape_configs:
     static_configs:
       - targets:
           - unified-server:80
+
+  - job_name: mailai
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:9177
