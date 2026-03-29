@@ -282,6 +282,122 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(duplicate.superseded_by)
         self.assertTrue(any(action.action == "policy_skip" for action in report.actions))
 
+    async def test_maintenance_dedup_override_supersedes_append_only_exact_duplicates(self) -> None:
+        """allow_exact_dedup_override=True must supersede append-only exact duplicates (governance-safe)."""
+        now = datetime.now(timezone.utc)
+
+        def _make_mem(mem_id, match_key):
+            return Memory(
+                id=mem_id, domain=DomainEnum.corporate, entity_type="Decision",
+                content="same corporate content", embedding=[0.1, 0.2],
+                owner="owner-a", created_by="tester", status="active", version=1,
+                sensitivity="internal", superseded_by=None, tags=[], relations={},
+                metadata_={}, obsidian_ref=None, content_hash="hash-corp",
+                match_key=match_key, valid_from=None, created_at=now, updated_at=now,
+            )
+
+        canonical = _make_mem("corp-1", "corp:decision:1")
+        duplicate = _make_mem("corp-2", "corp:decision:2")
+
+        session = AsyncMock()
+        session.execute.side_effect = [
+            SimpleNamespace(scalar_one=lambda: 2),
+            SimpleNamespace(all=lambda: [("hash-corp", "Decision", DomainEnum.corporate)]),
+            SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [canonical, duplicate])),
+        ]
+        session.add = lambda obj: None
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+
+        report = await crud.run_maintenance(
+            session,
+            MaintenanceRequest(
+                dry_run=False, dedup_threshold=0.05,
+                fix_superseded_links=False, allow_exact_dedup_override=True,
+            ),
+            actor="tester",
+        )
+
+        # Duplicate must be superseded, canonical must stay active
+        self.assertEqual(duplicate.status, "superseded")
+        self.assertEqual(duplicate.superseded_by, "corp-1")
+        self.assertEqual(canonical.status, "active")
+        self.assertTrue(any(action.action == "dedup_override" for action in report.actions))
+        self.assertFalse(any(action.action == "policy_skip" for action in report.actions))
+
+    async def test_maintenance_dedup_override_false_still_skips_append_only(self) -> None:
+        """Without allow_exact_dedup_override, append-only duplicates must still get policy_skip."""
+        now = datetime.now(timezone.utc)
+        canonical = Memory(
+            id="corp-1", domain=DomainEnum.corporate, entity_type="Decision",
+            content="x", embedding=[0.1], owner="owner-a", created_by="tester",
+            status="active", version=1, sensitivity="internal", superseded_by=None,
+            tags=[], relations={}, metadata_={}, obsidian_ref=None, content_hash="h",
+            match_key="corp:1", valid_from=None, created_at=now, updated_at=now,
+        )
+        duplicate = Memory(
+            id="corp-2", domain=DomainEnum.corporate, entity_type="Decision",
+            content="x", embedding=[0.1], owner="owner-a", created_by="tester",
+            status="active", version=1, sensitivity="internal", superseded_by=None,
+            tags=[], relations={}, metadata_={}, obsidian_ref=None, content_hash="h",
+            match_key="corp:2", valid_from=None, created_at=now, updated_at=now,
+        )
+        session = AsyncMock()
+        session.execute.side_effect = [
+            SimpleNamespace(scalar_one=lambda: 2),
+            SimpleNamespace(all=lambda: [("h", "Decision", DomainEnum.corporate)]),
+            SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [canonical, duplicate])),
+        ]
+        session.add = lambda obj: None
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+
+        report = await crud.run_maintenance(
+            session,
+            MaintenanceRequest(dry_run=False, dedup_threshold=0.05,
+                               fix_superseded_links=False, allow_exact_dedup_override=False),
+            actor="tester",
+        )
+
+        self.assertEqual(duplicate.status, "active")  # must NOT be mutated
+        self.assertTrue(any(action.action == "policy_skip" for action in report.actions))
+
+    async def test_ingest_warns_on_missing_match_key_for_build_domain(self) -> None:
+        """build/personal writes without match_key must trigger a duplicate_risk_write warning."""
+        import logging
+        session = AsyncMock()
+        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
+        session.add = lambda obj: None
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        warning_events: list[str] = []
+
+        original_warning = crud.log.warning
+
+        def _capture_warning(event, **kw):
+            warning_events.append(event)
+
+        from unittest.mock import patch
+        with patch.object(crud.log, "warning", side_effect=_capture_warning):
+            with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1])):
+                rec = MemoryWriteRecord(
+                    content="no match key write",
+                    domain="build",
+                    entity_type="Note",
+                    # match_key intentionally absent
+                )
+                try:
+                    await crud.handle_memory_write(
+                        session, MemoryWriteRequest(record=rec, write_mode="upsert")
+                    )
+                except Exception:
+                    pass  # May fail without full DB; we only check the warning
+
+        self.assertIn("duplicate_risk_write", warning_events,
+                      "Expected duplicate_risk_write warning for build write without match_key")
+
 
 if __name__ == "__main__":
     unittest.main()

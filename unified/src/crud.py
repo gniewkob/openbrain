@@ -343,7 +343,20 @@ async def handle_memory_write(
 
     # 5. Determine Operation: CREATE or UPDATE/VERSION
     content_hash = compute_hash(rec.content)
-    
+
+    # Guardrail: warn on match_key-less writes for non-corporate domains.
+    # Corporate already enforces match_key above.  For build/personal the write
+    # proceeds, but without a match_key there is no idempotency key and repeated
+    # calls will silently accumulate duplicate records.
+    if not rec.match_key and rec.domain != "corporate":
+        log.warning(
+            "duplicate_risk_write",
+            domain=rec.domain,
+            entity_type=rec.entity_type,
+            owner=rec.owner,
+            hint="Provide match_key for idempotent writes",
+        )
+
     if not existing:
         # --- CREATE NEW ---
         embedding = await get_embedding(rec.content)
@@ -874,11 +887,24 @@ async def run_maintenance(session: AsyncSession, req: MaintenanceRequest, actor:
                 actions.append(MaintenanceAction(action="dedup", memory_id=dup.id, detail=f"Exact duplicate of {canonical.id}"))
                 if not req.dry_run:
                     if _requires_append_only(dup.domain, dup.entity_type):
-                        actions.append(MaintenanceAction(
-                            action="policy_skip",
-                            memory_id=dup.id,
-                            detail="Skipped dedup mutation for append-only memory",
-                        ))
+                        if req.allow_exact_dedup_override:
+                            # Governance-safe override for exact duplicates:
+                            # canonical record is preserved and stays active;
+                            # only the duplicate is superseded — no content is
+                            # changed or physically deleted.
+                            dup.status = "superseded"
+                            dup.superseded_by = canonical.id
+                            actions.append(MaintenanceAction(
+                                action="dedup_override",
+                                memory_id=dup.id,
+                                detail=f"Exact duplicate of {canonical.id} superseded via governance override (append-only)",
+                            ))
+                        else:
+                            actions.append(MaintenanceAction(
+                                action="policy_skip",
+                                memory_id=dup.id,
+                                detail="Skipped dedup mutation for append-only memory",
+                            ))
                     else:
                         dup.status = "superseded"
                         dup.superseded_by = canonical.id

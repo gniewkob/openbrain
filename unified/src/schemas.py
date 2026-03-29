@@ -293,6 +293,10 @@ class MaintenanceRequest(BaseModel):
     normalize_owners: dict[str, str] = Field(default_factory=dict)
     retype_rules: list[dict[str, str]] = Field(default_factory=list)
     fix_superseded_links: bool = True
+    allow_exact_dedup_override: bool = False
+    """When True, exact content-hash duplicates in append-only domains are superseded
+    (governance-safe: canonical record is preserved, no content is changed or deleted).
+    Requires explicit opt-in to prevent accidental mutation of audited records."""
 
 
 class MemoryOut(BaseModel):

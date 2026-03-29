@@ -360,6 +360,8 @@ async def v1_write(
     _enforce_domain_access(_user, req.record.domain, "write")
     req.record.owner = _resolve_owner_for_write(_user, req.record.owner)
     req.record.tenant_id = _resolve_tenant_for_write(_user, req.record.tenant_id)
+    if not req.record.match_key:
+        incr_metric("duplicate_risk_writes_total")
     result = await handle_memory_write(session, req, actor=_user.get("sub", "agent"))
     if result.status == "created":
         incr_metric("memories_created_total")
@@ -807,6 +809,7 @@ async def maintain(
     _require_admin(_user)
     report = await run_maintenance(session, req, actor=_user.get("sub", "agent"))
     policy_skip_count = sum(1 for action in report.actions if action.action == "policy_skip")
+    dedup_override_count = sum(1 for action in report.actions if action.action == "dedup_override")
     policy_skip_reasons = _count_policy_skips_by_reason(report.actions)
     incr_metric("maintain_runs_total")
     incr_metric("duplicate_candidates_total", report.dedup_found)
@@ -816,6 +819,7 @@ async def maintain(
     incr_metric("policy_skip_dedup_total", policy_skip_reasons["dedup"])
     incr_metric("policy_skip_owner_normalization_total", policy_skip_reasons["owner_normalization"])
     incr_metric("policy_skip_link_repair_total", policy_skip_reasons["link_repair"])
+    incr_metric("dedup_override_total", dedup_override_count)
     return report
 
 
