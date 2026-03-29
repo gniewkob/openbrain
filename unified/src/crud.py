@@ -507,7 +507,6 @@ async def handle_memory_write_many(
                 results.append(BatchResultItem(
                     input_index=i,
                     status=res.status,
-                    operation_type=res.status,
                     record_id=res.record.id if res.record else None,
                     previous_record_id=existing_id if res.status in {"updated", "versioned", "skipped"} else None,
                     match_key=rec.match_key,
@@ -517,7 +516,7 @@ async def handle_memory_write_many(
                 summary[res.status] = summary.get(res.status, 0) + 1
             except Exception as e:
                 results.append(BatchResultItem(
-                    input_index=i, status="failed", operation_type="failed",
+                    input_index=i, status="failed",
                     match_key=rec.match_key, error=str(e),
                 ))
                 summary["failed"] += 1

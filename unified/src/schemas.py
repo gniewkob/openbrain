@@ -204,8 +204,7 @@ class MemoryWriteResponse(BaseModel):
 
 class BatchResultItem(BaseModel):
     input_index: int
-    status: str
-    operation_type: Optional[Literal["created", "updated", "versioned", "skipped", "failed"]] = None
+    status: Literal["created", "updated", "versioned", "skipped", "failed"]
     record_id: Optional[str] = None
     previous_record_id: Optional[str] = None
     match_key: Optional[str] = None

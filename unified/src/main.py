@@ -669,6 +669,10 @@ async def read_memory(
 @app.get("/api/memories", response_model=list[MemoryOut])
 async def read_memories(
     domain: str | None = Query(None),
+    entity_type: str | None = Query(None),
+    status: str | None = Query(None),
+    sensitivity: str | None = Query(None),
+    owner: str | None = Query(None),
     tenant_id: str | None = Query(None),
     limit: int = Query(20, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
@@ -677,6 +681,14 @@ async def read_memories(
     filters: dict[str, Any] = {}
     if domain:
         filters["domain"] = domain
+    if entity_type:
+        filters["entity_type"] = entity_type
+    if status:
+        filters["status"] = status
+    if sensitivity:
+        filters["sensitivity"] = sensitivity
+    if owner:
+        filters["owner"] = owner
     if tenant_id:
         filters["tenant_id"] = tenant_id
     return await list_memories(session, _apply_owner_scope(_user, filters), limit)

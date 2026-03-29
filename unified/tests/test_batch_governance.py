@@ -9,7 +9,7 @@ from src.schemas import MemoryWriteManyRequest, MemoryWriteRecord
 
 
 class BatchGovernanceTests(unittest.IsolatedAsyncioTestCase):
-    async def test_handle_memory_write_many_exposes_operation_type_and_previous_record_id(self) -> None:
+    async def test_handle_memory_write_many_exposes_status_and_previous_record_id(self) -> None:
         session = AsyncMock()
         session.execute.side_effect = [
             SimpleNamespace(scalar_one_or_none=lambda: "mem-old-1"),
@@ -44,10 +44,10 @@ class BatchGovernanceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.summary["versioned"], 1)
         self.assertEqual(result.summary["created"], 1)
-        self.assertEqual(result.results[0].operation_type, "versioned")
+        self.assertEqual(result.results[0].status, "versioned")
         self.assertEqual(result.results[0].previous_record_id, "mem-old-1")
         self.assertEqual(result.results[0].record_id, "mem-new-1")
-        self.assertEqual(result.results[1].operation_type, "created")
+        self.assertEqual(result.results[1].status, "created")
         self.assertIsNone(result.results[1].previous_record_id)
         self.assertEqual(result.results[1].record_id, "mem-new-2")
 

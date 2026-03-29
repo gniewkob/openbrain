@@ -154,9 +154,28 @@ async def brain_capabilities() -> dict[str, Any]:
 
 @mcp.tool()
 @mcp_tool_guard
-async def brain_search(query: str, top_k: int = 5, domain: str | None = None) -> list[dict[str, Any]]:
-    """Primary tool for semantic retrieval. Finds information by topic or phrase."""
-    payload = {"query": query, "limit": top_k, "filters": {"domain": domain} if domain else {}}
+async def brain_search(
+    query: str,
+    top_k: int = 5,
+    domain: str | None = None,
+    entity_type: str | None = None,
+    owner: str | None = None,
+    sensitivity: str | None = None,
+) -> list[dict[str, Any]]:
+    """Primary tool for semantic retrieval. Finds information by topic or phrase.
+
+    Optionally filter by domain (corporate|build|personal), entity_type, owner, sensitivity.
+    """
+    filters: dict[str, Any] = {}
+    if domain:
+        filters["domain"] = domain
+    if entity_type:
+        filters["entity_type"] = entity_type
+    if owner:
+        filters["owner"] = owner
+    if sensitivity:
+        filters["sensitivity"] = sensitivity
+    payload = {"query": query, "limit": top_k, "filters": filters}
     return _normalize_search_hits(await _safe_req("POST", "/find", json=payload))
 
 @mcp.tool()
@@ -235,11 +254,33 @@ async def brain_update(
 
 @mcp.tool()
 @mcp_tool_guard
-async def brain_list(domain: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
-    """Browse memories with metadata filters."""
+async def brain_list(
+    domain: str | None = None,
+    entity_type: str | None = None,
+    status: str | None = None,
+    sensitivity: str | None = None,
+    owner: str | None = None,
+    tenant_id: str | None = None,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Browse memories with metadata filters.
+
+    status options: active | superseded (default: active only)
+    domain options: corporate | build | personal
+    """
     params: dict[str, Any] = {"limit": limit}
     if domain:
         params["domain"] = domain
+    if entity_type:
+        params["entity_type"] = entity_type
+    if status:
+        params["status"] = status
+    if sensitivity:
+        params["sensitivity"] = sensitivity
+    if owner:
+        params["owner"] = owner
+    if tenant_id:
+        params["tenant_id"] = tenant_id
     return await _safe_req("GET", "/api/memories", params=params)
 
 @mcp.tool()

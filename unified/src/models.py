@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Text,
     Enum,
+    text as sa_text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -92,7 +93,10 @@ class Memory(Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
     # --- Idempotent upsert ---
-    match_key: Mapped[str | None] = mapped_column(String(256), nullable=True, index=True)
+    # The plain index=True is kept for all-version history lookups.
+    # A partial unique index (status='active' AND match_key IS NOT NULL) is
+    # created by migration 003 to enforce at most one active record per match_key.
+    match_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     # --- Timestamps ---
     valid_from: Mapped[datetime | None] = mapped_column(
@@ -114,6 +118,20 @@ class Memory(Base):
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
         Index("ix_memories_status_entity", "status", "entity_type"),
+        # All-version history lookup (non-unique, skips NULLs)
+        Index(
+            "ix_memories_match_key_all",
+            "match_key",
+            postgresql_where=sa_text("match_key IS NOT NULL"),
+        ),
+        # Partial unique index: at most one *active* record per match_key.
+        # Created/enforced by migration 003. Declared here so autogenerate stays in sync.
+        Index(
+            "uq_memories_match_key_active",
+            "match_key",
+            unique=True,
+            postgresql_where=sa_text("status = 'active' AND match_key IS NOT NULL"),
+        ),
     )
 
 
