@@ -463,14 +463,16 @@ async def handle_memory_write(
             existing.entity_type = rec.entity_type
             existing.sensitivity = rec.sensitivity
             
-            # Update metadata
-            meta = existing.metadata_ or {}
-            meta["title"] = rec.title
-            meta["tenant_id"] = rec.tenant_id
-            meta["custom_fields"] = rec.custom_fields
-            meta["updated_by"] = actor
-            meta["source"] = rec.source.model_dump()
-            existing.metadata_ = meta
+            # Assign a new dict so SQLAlchemy detects the JSONB column as dirty.
+            # Mutating existing.metadata_ in-place is NOT tracked without MutableDict.
+            existing.metadata_ = {
+                **(existing.metadata_ or {}),
+                "title": rec.title,
+                "tenant_id": rec.tenant_id,
+                "custom_fields": rec.custom_fields,
+                "updated_by": actor,
+                "source": rec.source.model_dump(),
+            }
 
             if _commit:
                 await session.commit()
