@@ -320,12 +320,12 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(report.dedup_found, 1)
-        self.assertEqual(duplicate.status, "active")
-        self.assertIsNone(duplicate.superseded_by)
-        self.assertTrue(any(action.action == "policy_skip" for action in report.actions))
+        self.assertEqual(duplicate.status, "duplicate")
+        self.assertEqual(duplicate.metadata_["duplicate_of"], primary.id)
+        self.assertTrue(any(action.action == "dedup_remediate" for action in report.actions))
 
     async def test_maintenance_dedup_override_supersedes_append_only_exact_duplicates(self) -> None:
-        """allow_exact_dedup_override=True must supersede append-only exact duplicates (governance-safe)."""
+        """New behavior: exact duplicates in corporate are remediated via 'duplicate' status regardless of override."""
         now = datetime.now(timezone.utc)
 
         def _make_mem(mem_id, match_key):
@@ -360,15 +360,14 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             actor="tester",
         )
 
-        # Duplicate must be superseded, canonical must stay active
-        self.assertEqual(duplicate.status, "superseded")
-        self.assertEqual(duplicate.superseded_by, "corp-1")
+        # Duplicate must be remediated as duplicate, canonical must stay active
+        self.assertEqual(duplicate.status, "duplicate")
+        self.assertEqual(duplicate.metadata_["duplicate_of"], "corp-1")
         self.assertEqual(canonical.status, "active")
-        self.assertTrue(any(action.action == "dedup_override" for action in report.actions))
-        self.assertFalse(any(action.action == "policy_skip" for action in report.actions))
+        self.assertTrue(any(action.action == "dedup_remediate" for action in report.actions))
 
-    async def test_maintenance_dedup_override_false_still_skips_append_only(self) -> None:
-        """Without allow_exact_dedup_override, append-only duplicates must still get policy_skip."""
+    async def test_maintenance_dedup_override_false_still_remediates_append_only(self) -> None:
+        """New behavior: exact duplicates in corporate are remediated via 'duplicate' status without override."""
         now = datetime.now(timezone.utc)
         canonical = Memory(
             id="corp-1", domain=DomainEnum.corporate, entity_type="Decision",
@@ -401,8 +400,8 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             actor="tester",
         )
 
-        self.assertEqual(duplicate.status, "active")  # must NOT be mutated
-        self.assertTrue(any(action.action == "policy_skip" for action in report.actions))
+        self.assertEqual(duplicate.status, "duplicate")
+        self.assertTrue(any(action.action == "dedup_remediate" for action in report.actions))
 
     async def test_ingest_warns_on_missing_match_key_for_build_domain(self) -> None:
         """build/personal writes without match_key must trigger a duplicate_risk_write warning."""
