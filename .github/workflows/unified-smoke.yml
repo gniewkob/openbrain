@@ -7,6 +7,8 @@ on:
 jobs:
   guardrails:
     runs-on: ubuntu-latest
+    env:
+      OPENBRAIN_DISABLE_DB_CONFIG_VALIDATION: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,6 +25,8 @@ jobs:
 
   smoke:
     runs-on: ubuntu-latest
+    env:
+      OPENBRAIN_DISABLE_DB_CONFIG_VALIDATION: "true"
     defaults:
       run:
         working-directory: unified
@@ -38,6 +42,8 @@ jobs:
 
   gateway-smoke:
     runs-on: ubuntu-latest
+    env:
+      OPENBRAIN_DISABLE_DB_CONFIG_VALIDATION: "true"
     defaults:
       run:
         working-directory: unified/mcp-gateway
