@@ -32,3 +32,6 @@ backups/
 
 # MCP config (contains local paths)
 .mcp.json
+
+# Metrics bridge runtime logs (managed by launchd)
+monitoring/bridge-*.log
