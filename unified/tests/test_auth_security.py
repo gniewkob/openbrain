@@ -69,6 +69,20 @@ class AuthSecurityTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "forbids the dev default INTERNAL_API_KEY"):
                 self._reload_auth()
 
+    def test_public_base_url_requires_oidc_issuer(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "PUBLIC_MODE": "false",
+                "PUBLIC_BASE_URL": "https://example.ngrok-free.dev",
+                "OIDC_ISSUER_URL": "",
+                "INTERNAL_API_KEY": "super-secret",
+            },
+            clear=False,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "requires OIDC_ISSUER_URL"):
+                self._reload_auth()
+
     def test_policy_registry_json_must_be_valid(self) -> None:
         with patch.dict(
             os.environ,

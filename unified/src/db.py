@@ -1,7 +1,9 @@
 """
 Database connection and session management for OpenBrain Unified.
 """
+
 import os
+from urllib.parse import urlsplit
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -10,8 +12,30 @@ from sqlalchemy.orm import declarative_base
 # Unified Database URL
 DB_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/openbrain_unified"
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/openbrain_unified",
 )
+
+
+def _uses_dev_database_credentials(db_url: str) -> bool:
+    try:
+        sanitized = db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        parsed = urlsplit(sanitized)
+    except Exception:
+        return False
+    return parsed.username == "postgres" and parsed.password == "postgres"
+
+
+def validate_database_configuration() -> None:
+    public_mode = os.environ.get("PUBLIC_MODE", "").lower() == "true"
+    public_base_url = bool(os.environ.get("PUBLIC_BASE_URL", "").strip())
+    if (public_mode or public_base_url) and _uses_dev_database_credentials(DB_URL):
+        raise RuntimeError(
+            "PUBLIC_MODE=true or PUBLIC_BASE_URL set forbids dev default PostgreSQL "
+            "credentials. Configure DATABASE_URL with a unique password."
+        )
+
+
+validate_database_configuration()
 
 engine = create_async_engine(
     DB_URL,
@@ -36,6 +60,7 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 Base = declarative_base()
+
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a transactional scope around a series of operations."""

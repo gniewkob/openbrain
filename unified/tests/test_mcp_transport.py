@@ -48,6 +48,34 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             result = await mcp_transport._safe_req("DELETE", "/api/memories/x")
         self.assertEqual(result, {"status": "success"})
 
+    async def test_safe_req_redacts_content_in_logged_payload(self) -> None:
+        response = _FakeResponse(200, payload={"status": "ok"})
+        payload = {
+            "record": {
+                "content": "secret payload",
+                "domain": "build",
+                "custom_fields": {"nested": {"content": "nested secret"}},
+            },
+            "records": [
+                {"content": "bulk secret", "match_key": "mk-1"},
+            ],
+        }
+        with (
+            patch.object(mcp_transport, "_client", return_value=_FakeClient(response)),
+            patch.object(mcp_transport.log, "info") as log_info,
+        ):
+            await mcp_transport._safe_req("POST", "/write", json=payload)
+
+        _, kwargs = log_info.call_args
+        logged_payload = kwargs["payload"]
+        self.assertEqual(logged_payload["record"]["content"], "[REDACTED]")
+        self.assertEqual(
+            logged_payload["record"]["custom_fields"]["nested"]["content"], "[REDACTED]"
+        )
+        self.assertEqual(logged_payload["records"][0]["content"], "[REDACTED]")
+        self.assertEqual(payload["record"]["content"], "secret payload")
+        self.assertEqual(payload["records"][0]["content"], "bulk secret")
+
     async def test_brain_store_returns_record_payload(self) -> None:
         response = _FakeResponse(
             200,
@@ -83,7 +111,12 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         with patch.object(mcp_transport, "_client", return_value=_FakeClient(response)):
-            result = await mcp_transport.brain_store(content="x", domain="build", tenant_id="tenant-a", custom_fields={"priority": "high"})
+            result = await mcp_transport.brain_store(
+                content="x",
+                domain="build",
+                tenant_id="tenant-a",
+                custom_fields={"priority": "high"},
+            )
         self.assertNotIn("title", result)
         self.assertEqual(result["id"], "mem-1")
         self.assertEqual(result["tenant_id"], "tenant-a")
@@ -95,71 +128,86 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     async def test_brain_search_normalizes_v1_hits_to_memory_shape(self) -> None:
         response = _FakeResponse(
             200,
-            payload=[{
-                "record": {
-                    "id": "mem-1",
-                    "tenant_id": "tenant-a",
-                    "domain": "build",
-                    "entity_type": "Note",
-                    "content": "x",
-                    "owner": "",
-                    "status": "active",
-                    "version": 1,
-                    "sensitivity": "internal",
-                    "superseded_by": None,
-                    "tags": [],
-                    "relations": {},
-                    "obsidian_ref": None,
-                    "custom_fields": {"priority": "high"},
-                    "content_hash": "abc",
-                    "match_key": "mk",
-                    "previous_id": None,
-                    "root_id": "mem-1",
-                    "valid_from": None,
-                    "created_at": "2026-03-27T00:00:00Z",
-                    "updated_at": "2026-03-27T00:00:00Z",
-                    "created_by": "internal",
-                    "updated_by": "internal",
-                    "title": "Note",
-                    "governance": {"mutable": True},
-                },
-                "score": 0.9,
-            }],
+            payload=[
+                {
+                    "record": {
+                        "id": "mem-1",
+                        "tenant_id": "tenant-a",
+                        "domain": "build",
+                        "entity_type": "Note",
+                        "content": "x",
+                        "owner": "",
+                        "status": "active",
+                        "version": 1,
+                        "sensitivity": "internal",
+                        "superseded_by": None,
+                        "tags": [],
+                        "relations": {},
+                        "obsidian_ref": None,
+                        "custom_fields": {"priority": "high"},
+                        "content_hash": "abc",
+                        "match_key": "mk",
+                        "previous_id": None,
+                        "root_id": "mem-1",
+                        "valid_from": None,
+                        "created_at": "2026-03-27T00:00:00Z",
+                        "updated_at": "2026-03-27T00:00:00Z",
+                        "created_by": "internal",
+                        "updated_by": "internal",
+                        "title": "Note",
+                        "governance": {"mutable": True},
+                    },
+                    "score": 0.9,
+                }
+            ],
         )
         with patch.object(mcp_transport, "_client", return_value=_FakeClient(response)):
             result = await mcp_transport.brain_search(query="x", top_k=1)
         self.assertNotIn("title", result[0]["memory"])
-        self.assertEqual(result, [{"memory": {
-            "id": "mem-1",
-            "tenant_id": "tenant-a",
-            "domain": "build",
-            "entity_type": "Note",
-            "content": "x",
-            "owner": "",
-            "status": "active",
-            "version": 1,
-            "sensitivity": "internal",
-            "superseded_by": None,
-            "tags": [],
-            "relations": {},
-            "obsidian_ref": None,
-            "custom_fields": {"priority": "high"},
-            "content_hash": "abc",
-            "match_key": "mk",
-            "previous_id": None,
-            "root_id": "mem-1",
-            "valid_from": None,
-            "created_at": "2026-03-27T00:00:00Z",
-            "updated_at": "2026-03-27T00:00:00Z",
-            "created_by": "internal",
-            "updated_by": "internal",
-        }, "score": 0.9}])
+        self.assertEqual(
+            result,
+            [
+                {
+                    "memory": {
+                        "id": "mem-1",
+                        "tenant_id": "tenant-a",
+                        "domain": "build",
+                        "entity_type": "Note",
+                        "content": "x",
+                        "owner": "",
+                        "status": "active",
+                        "version": 1,
+                        "sensitivity": "internal",
+                        "superseded_by": None,
+                        "tags": [],
+                        "relations": {},
+                        "obsidian_ref": None,
+                        "custom_fields": {"priority": "high"},
+                        "content_hash": "abc",
+                        "match_key": "mk",
+                        "previous_id": None,
+                        "root_id": "mem-1",
+                        "valid_from": None,
+                        "created_at": "2026-03-27T00:00:00Z",
+                        "updated_at": "2026-03-27T00:00:00Z",
+                        "created_by": "internal",
+                        "updated_by": "internal",
+                    },
+                    "score": 0.9,
+                }
+            ],
+        )
 
     async def test_brain_update_passes_custom_fields(self) -> None:
         response = _FakeResponse(200, payload={"id": "mem-1"})
         fake_client = _FakeClient(response)
         with patch.object(mcp_transport, "_client", return_value=fake_client):
-            await mcp_transport.brain_update("mem-1", content="after", tenant_id="tenant-a", custom_fields={"priority": "critical"})
+            await mcp_transport.brain_update(
+                "mem-1",
+                content="after",
+                tenant_id="tenant-a",
+                custom_fields={"priority": "critical"},
+            )
         self.assertEqual(
             fake_client.last_request,
             (
@@ -193,7 +241,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, [{"id": "mem-1", "domain": "build"}])
 
     async def test_brain_sync_check_posts_json_payload(self) -> None:
-        response = _FakeResponse(200, payload={"status": "exists", "message": "Memory exists."})
+        response = _FakeResponse(
+            200, payload={"status": "exists", "message": "Memory exists."}
+        )
         fake_client = _FakeClient(response)
         with patch.object(mcp_transport, "_client", return_value=fake_client):
             result = await mcp_transport.brain_sync_check(match_key="mk-1")
@@ -215,10 +265,14 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_brain_upsert_bulk_calls_bulk_upsert_endpoint(self) -> None:
-        response = _FakeResponse(200, payload={"inserted": [], "updated": [], "skipped": []})
+        response = _FakeResponse(
+            200, payload={"inserted": [], "updated": [], "skipped": []}
+        )
         fake_client = _FakeClient(response)
         with patch.object(mcp_transport, "_client", return_value=fake_client):
-            result = await mcp_transport.brain_upsert_bulk([{"match_key": "mk-1", "content": "x"}])
+            result = await mcp_transport.brain_upsert_bulk(
+                [{"match_key": "mk-1", "content": "x"}]
+            )
         self.assertEqual(result, {"inserted": [], "updated": [], "skipped": []})
         self.assertEqual(
             fake_client.last_request,

@@ -4,12 +4,12 @@ Combined ASGI app — Industrial Grade Wrapper v2.
 This wrapper:
 1. Forwards REST API, health, OpenAPI docs, and OAuth discovery to FastAPI (rest_app)
 2. Redirects root (/) to /sse for ChatGPT convenience
-3. Forwards everything else to FastMCP (authenticated in PUBLIC_MODE)
+3. Forwards everything else to FastMCP (authenticated when public exposure is enabled)
 """
 import hmac
 import logging
 
-from .auth import INTERNAL_API_KEY, PUBLIC_MODE, _oidc
+from .auth import INTERNAL_API_KEY, PUBLIC_EXPOSURE, _oidc
 from .mcp_transport import mcp as mcp_server
 from .main import app as rest_app
 
@@ -47,7 +47,7 @@ async def app(scope, receive, send):
             return
 
     # Guard FastMCP transport with the same auth policy as the REST API.
-    if PUBLIC_MODE and scope["type"] == "http":
+    if PUBLIC_EXPOSURE and scope["type"] == "http":
         headers = {k.lower(): v for k, v in scope.get("headers", [])}
         authorized = False
         internal_key = headers.get(b"x-internal-key", b"").decode("latin-1")

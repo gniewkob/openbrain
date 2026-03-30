@@ -1,8 +1,9 @@
 """
 OIDC/Auth0 Validation for OpenBrain Unified v2.0.
 
-When PUBLIC_MODE=true, all mutating endpoints require a valid Auth0 JWT.
-When PUBLIC_MODE is unset/false (default), all requests pass through (local use).
+When PUBLIC_MODE=true or PUBLIC_BASE_URL is set, all protected endpoints require
+a valid Auth0 JWT or the trusted internal key. Otherwise all requests pass
+through for local use.
 """
 from __future__ import annotations
 
@@ -26,6 +27,8 @@ from jwt import PyJWKClient
 logger = logging.getLogger("openbrain.auth")
 
 PUBLIC_MODE = os.environ.get("PUBLIC_MODE", "").lower() == "true"
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip()
+PUBLIC_EXPOSURE = PUBLIC_MODE or bool(PUBLIC_BASE_URL)
 LOCAL_DEV_INTERNAL_API_KEY = "openbrain-local-dev"
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "").strip()
 
@@ -217,14 +220,23 @@ async def set_policy_registry(registry: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_security_configuration() -> None:
-    if not PUBLIC_MODE:
+    if not PUBLIC_EXPOSURE:
         return
     if not OIDC_ISSUER_URL:
-        raise RuntimeError("PUBLIC_MODE=true requires OIDC_ISSUER_URL. Refusing to start with local-dev auth fallback.")
+        raise RuntimeError(
+            "PUBLIC_MODE=true or PUBLIC_BASE_URL set requires OIDC_ISSUER_URL. "
+            "Refusing to start with local-dev auth fallback."
+        )
     if not INTERNAL_API_KEY:
-        raise RuntimeError("PUBLIC_MODE=true requires INTERNAL_API_KEY for trusted internal callers.")
+        raise RuntimeError(
+            "PUBLIC_MODE=true or PUBLIC_BASE_URL set requires INTERNAL_API_KEY "
+            "for trusted internal callers."
+        )
     if INTERNAL_API_KEY == LOCAL_DEV_INTERNAL_API_KEY:
-        raise RuntimeError("PUBLIC_MODE=true forbids the dev default INTERNAL_API_KEY. Configure a unique secret.")
+        raise RuntimeError(
+            "PUBLIC_MODE=true or PUBLIC_BASE_URL set forbids the dev default "
+            "INTERNAL_API_KEY. Configure a unique secret."
+        )
 
 
 validate_security_configuration()
@@ -298,7 +310,7 @@ def get_registry_domain_scope(subject: str, tenant_id: str, action: str) -> set[
 
 def is_privileged_user(claims: dict[str, Any]) -> bool:
     subject = get_subject(claims)
-    # "local-dev" is returned only when PUBLIC_MODE=false — always trusted.
+    # "local-dev" is returned only when public exposure is disabled — always trusted.
     # "internal" is privileged only when it arrived via X-Internal-Key, not via
     # a JWT whose sub field happens to contain "internal" (C2 fix).
     if subject == "local-dev":
@@ -325,11 +337,12 @@ async def require_auth(
     """FastAPI dependency. Returns JWT claims or local-dev stub.
 
     Auth is skipped when:
-    - PUBLIC_MODE is false (all local)
+    - public exposure is disabled (all local)
     - Request carries X-Internal-Key matching INTERNAL_API_KEY (MCP gateway)
-    When PUBLIC_MODE is true and no internal key: requires Auth0 JWT.
+    When PUBLIC_MODE is true or PUBLIC_BASE_URL is set and no internal key:
+    requires Auth0 JWT.
     """
-    if not PUBLIC_MODE:
+    if not PUBLIC_EXPOSURE:
         return {"sub": "local-dev"}
 
     # Allow MCP gateway (and curl) to bypass OIDC with internal key.

@@ -5,6 +5,22 @@ on:
   pull_request:
 
 jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Run syntax and undefined-name checks
+        run: ruff check --select E9,F63,F7,F82 unified unified/mcp-gateway scripts
+      - name: Scan tracked files for committed secrets
+        run: python scripts/check_no_committed_secrets.py
+      - name: Verify compose guardrails
+        run: python scripts/check_compose_guardrails.py
+
   smoke:
     runs-on: ubuntu-latest
     defaults:

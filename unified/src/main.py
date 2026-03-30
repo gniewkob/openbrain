@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .auth import (
-    PUBLIC_MODE,
+    PUBLIC_EXPOSURE,
     get_domain_scope,
     get_policy_registry,
     get_registry_domain_scope,
@@ -96,6 +96,10 @@ structlog.configure(
     logger_factory=structlog.stdlib.LoggerFactory(),
 )
 log = structlog.get_logger()
+
+# Backwards-compatible module alias used by existing tests and local patches.
+# Semantics now follow effective public exposure, not only PUBLIC_MODE=true.
+PUBLIC_MODE = PUBLIC_EXPOSURE
 
 # ---------------------------------------------------------------------------
 # App Initialization
@@ -233,10 +237,16 @@ def _is_scoped_user(user: dict[str, Any]) -> bool:
     return PUBLIC_MODE and not is_privileged_user(user)
 
 
+def _record_access_denied(reason: str) -> None:
+    incr_metric("access_denied_total")
+    incr_metric(f"access_denied_{reason}_total")
+
+
 def _require_admin(user: dict[str, Any]) -> None:
     if not PUBLIC_MODE:
         return
     if not is_privileged_user(user):
+        _record_access_denied("admin")
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
 
@@ -258,11 +268,13 @@ def _enforce_domain_access(user: dict[str, Any], domain: str, action: str) -> No
         # No domain scope configured — privileged users get full access, others are denied.
         if is_privileged_user(user):
             return
+        _record_access_denied("domain")
         raise HTTPException(status_code=403, detail=f"{action.capitalize()} access denied for domain '{domain}'")
     # Fail-closed: deny unless there is an explicit non-empty grant that includes
     # this domain. An empty allowed set means no grants were configured for this
     # user+action pair, not "all domains permitted" (C1 fix).
     if domain.lower() not in allowed:
+        _record_access_denied("domain")
         raise HTTPException(status_code=403, detail=f"{action.capitalize()} access denied for domain '{domain}'")
 
 
@@ -273,6 +285,7 @@ def _resolve_owner_for_write(user: dict[str, Any], owner: str | None) -> str:
         return owner or ""
     subject = get_subject(user)
     if owner and owner != subject:
+        _record_access_denied("owner")
         raise HTTPException(status_code=403, detail="Cannot write records for another owner")
     return subject
 
@@ -284,6 +297,7 @@ def _resolve_tenant_for_write(user: dict[str, Any], tenant_id: str | None) -> st
     if not scoped_tenant:
         return tenant_id
     if tenant_id and tenant_id != scoped_tenant:
+        _record_access_denied("tenant")
         raise HTTPException(status_code=403, detail="Cannot write records for another tenant")
     return scoped_tenant
 
@@ -304,6 +318,7 @@ def _apply_owner_scope(user: dict[str, Any], filters: dict[str, Any]) -> dict[st
                 requested_domains = requested if isinstance(requested, list) else [requested]
                 normalized = {str(domain).lower() for domain in requested_domains}
                 if not normalized.issubset(allowed_read_domains):
+                    _record_access_denied("domain")
                     raise HTTPException(status_code=403, detail="Read access denied for requested domain scope")
             # If no domain grants exist, we don't block the request — owner/tenant
             # scope below will still restrict the result set to the user's own records.
@@ -324,11 +339,19 @@ def _enforce_memory_access(user: dict[str, Any], memory: MemoryOut) -> None:
     scoped_tenant = get_tenant_id(user)
     if scoped_tenant:
         if not memory.tenant_id or memory.tenant_id != scoped_tenant:
+            _record_access_denied("tenant")
             raise HTTPException(status_code=404, detail="Memory not found")
         return
     subject = get_subject(user)
     if not memory.owner or memory.owner != subject:
+        _record_access_denied("owner")
         raise HTTPException(status_code=404, detail="Memory not found")
+
+
+def _hide_memory_access_denied(exc: HTTPException) -> HTTPException:
+    if exc.status_code in {403, 404}:
+        return HTTPException(status_code=404, detail="Memory not found")
+    return exc
 
 # Allowlist: UUID-like tokens only (alphanumeric + hyphens, 1-64 chars).
 # Anything else is replaced with a server-generated UUID to prevent log injection.
@@ -416,6 +439,7 @@ async def v1_get_context(
         # domain=None → context spans all domains; ensure user has at least one read grant.
         allowed = _effective_domain_scope(_user, "read")
         if not allowed and not is_privileged_user(_user):
+            _record_access_denied("domain")
             raise HTTPException(status_code=403, detail="Read access denied: no domain grants configured")
     owner = get_subject(_user) if _is_scoped_user(_user) and not get_tenant_id(_user) else None
     tenant_id = get_tenant_id(_user) if _is_scoped_user(_user) else None
@@ -797,6 +821,15 @@ async def check_sync_endpoint(
         obsidian_ref=resolved_req.obsidian_ref,
         file_hash=resolved_req.file_hash,
     )
+    if result["status"] != "missing" and result["memory_id"]:
+        memory = await get_memory(session, str(result["memory_id"]))
+        if memory is None:
+            raise HTTPException(status_code=404, detail="Memory not found")
+        try:
+            _enforce_domain_access(_user, memory.domain, "read")
+            _enforce_memory_access(_user, memory)
+        except HTTPException as exc:
+            raise _hide_memory_access_denied(exc) from exc
     incr_metric("sync_checks_total")
     incr_metric(f"sync_{result['status']}_total")
     return SyncCheckResponse(**result)
@@ -870,6 +903,15 @@ async def export(
     _user: dict = Depends(require_auth),
 ) -> Any:
     _require_admin(_user)
+    for memory_id in req.ids:
+        memory = await get_memory(session, memory_id)
+        if memory is None:
+            raise HTTPException(status_code=404, detail="Memory not found")
+        try:
+            _enforce_domain_access(_user, memory.domain, "read")
+            _enforce_memory_access(_user, memory)
+        except HTTPException as exc:
+            raise _hide_memory_access_denied(exc) from exc
     incr_metric("exports_total")
     # All callers that reach this point have passed _require_admin().
     # Both human admins and the internal service account get unredacted export access.

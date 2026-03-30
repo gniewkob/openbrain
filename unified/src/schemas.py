@@ -10,9 +10,36 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
+
+MAX_ENTITY_TYPE_LEN = 64
+MAX_TITLE_LEN = 256
+MAX_CONTENT_LEN = 20_000
+MAX_OWNER_LEN = 128
+MAX_TENANT_ID_LEN = 128
+MAX_TAG_LEN = 64
+MAX_TAGS = 32
+MAX_MATCH_KEY_LEN = 256
+MAX_QUERY_LEN = 2_000
+MAX_PATH_LEN = 1_024
+MAX_FILTER_LIMIT = 50
+MAX_CONTEXT_ITEMS = 20
+MAX_SYNC_LIMIT = 100
+MAX_BULK_RECORDS = 100
+MAX_EXPORT_IDS = 100
+MAX_POLICY_REWRITES = 100
+
+EntityTypeStr = Annotated[str, Field(max_length=MAX_ENTITY_TYPE_LEN)]
+TitleStr = Annotated[str, Field(max_length=MAX_TITLE_LEN)]
+ContentStr = Annotated[str, Field(max_length=MAX_CONTENT_LEN)]
+OwnerStr = Annotated[str, Field(max_length=MAX_OWNER_LEN)]
+TenantIdStr = Annotated[str, Field(max_length=MAX_TENANT_ID_LEN)]
+TagStr = Annotated[str, Field(max_length=MAX_TAG_LEN)]
+MatchKeyStr = Annotated[str, Field(max_length=MAX_MATCH_KEY_LEN)]
+QueryStr = Annotated[str, Field(max_length=MAX_QUERY_LEN)]
+PathStr = Annotated[str, Field(max_length=MAX_PATH_LEN)]
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +60,7 @@ class WriteMode(str, Enum):
 class SourceMetadata(BaseModel):
     type: Literal["manual", "agent", "sync", "import", "api"] = "agent"
     system: Literal["chatgpt", "obsidian", "notion", "slack", "github", "other"] = "chatgpt"
-    reference: Optional[str] = None
+    reference: Optional[PathStr] = None
 
 
 class GovernanceMetadata(BaseModel):
@@ -55,21 +82,21 @@ class MemoryRelations(BaseModel):
 
 class MemoryRecord(BaseModel):
     id: str
-    match_key: Optional[str] = None
-    tenant_id: Optional[str] = None
+    match_key: Optional[MatchKeyStr] = None
+    tenant_id: Optional[TenantIdStr] = None
     domain: Literal["corporate", "build", "personal"]
-    entity_type: str
-    title: Optional[str] = None
-    content: str
-    summary: Optional[str] = None
-    owner: str
-    tags: list[str] = Field(default_factory=list)
+    entity_type: EntityTypeStr
+    title: Optional[TitleStr] = None
+    content: ContentStr
+    summary: Optional[Annotated[str, Field(max_length=MAX_QUERY_LEN)]] = None
+    owner: OwnerStr
+    tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: MemoryRelations = Field(default_factory=MemoryRelations)
-    status: Literal["active", "archived", "superseded", "deleted"] = "active"
+    status: Literal["active", "archived", "superseded", "deleted", "duplicate"] = "active"
     sensitivity: Literal["public", "internal", "confidential", "restricted"] = "internal"
     source: SourceMetadata = Field(default_factory=SourceMetadata)
     governance: GovernanceMetadata = Field(default_factory=GovernanceMetadata)
-    obsidian_ref: Optional[str] = None
+    obsidian_ref: Optional[PathStr] = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
     content_hash: str
     version: int = 1
@@ -91,18 +118,18 @@ class MemoryRecord(BaseModel):
 
 class MemoryWriteRecord(BaseModel):
     """The data part of a write request."""
-    match_key: Optional[str] = None
-    tenant_id: Optional[str] = None
+    match_key: Optional[MatchKeyStr] = None
+    tenant_id: Optional[TenantIdStr] = None
     domain: Literal["corporate", "build", "personal"]
-    entity_type: str = Field(default="Note", max_length=64)
-    title: Optional[str] = None
-    content: str
-    owner: str = ""
-    tags: list[str] = Field(default_factory=list)
+    entity_type: EntityTypeStr = Field(default="Note", max_length=MAX_ENTITY_TYPE_LEN)
+    title: Optional[TitleStr] = None
+    content: ContentStr
+    owner: OwnerStr = ""
+    tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: MemoryRelations = Field(default_factory=MemoryRelations)
     sensitivity: Literal["public", "internal", "confidential", "restricted"] = "internal"
     source: SourceMetadata = Field(default_factory=SourceMetadata)
-    obsidian_ref: Optional[str] = None
+    obsidian_ref: Optional[PathStr] = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -113,64 +140,64 @@ class MemoryWriteRequest(BaseModel):
 
 
 class MemoryWriteManyRequest(BaseModel):
-    records: list[MemoryWriteRecord]
+    records: list[MemoryWriteRecord] = Field(max_length=MAX_BULK_RECORDS)
     write_mode: WriteMode = WriteMode.upsert
     atomic: bool = False
 
 
 class MemoryFindRequest(BaseModel):
-    query: Optional[str] = None
+    query: Optional[QueryStr] = None
     filters: dict[str, Any] = Field(default_factory=dict)
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_FILTER_LIMIT)
     sort: Literal["relevance", "updated_at_desc"] = "relevance"
 
 
 class MemoryGetContextRequest(BaseModel):
-    query: str
+    query: QueryStr
     domain: Optional[str] = None
-    max_items: int = 10
+    max_items: int = Field(default=10, ge=1, le=MAX_CONTEXT_ITEMS)
     output_mode: Literal["grounding_pack", "raw"] = "grounding_pack"
 
 
 class ObsidianReadRequest(BaseModel):
-    vault: str = "Documents"
-    path: str
+    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
+    path: PathStr
 
 
 class ObsidianNoteResponse(BaseModel):
-    vault: str
-    path: str
-    title: str
-    content: str
+    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)]
+    path: PathStr
+    title: TitleStr
+    content: ContentStr
     frontmatter: dict[str, Any] = Field(default_factory=dict)
-    tags: list[str] = Field(default_factory=list)
+    tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     file_hash: str
 
 
 class ObsidianSyncRequest(BaseModel):
-    vault: str = "Documents"
-    paths: list[str] = Field(default_factory=list)
-    folder: Optional[str] = None
-    limit: int = 50
+    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
+    paths: list[PathStr] = Field(default_factory=list, max_length=MAX_SYNC_LIMIT)
+    folder: Optional[PathStr] = None
+    limit: int = Field(default=50, ge=1, le=MAX_SYNC_LIMIT)
     domain: Literal["corporate", "build", "personal"] = "build"
-    entity_type: str = "Architecture"
-    owner: str = ""
-    tags: list[str] = Field(default_factory=list)
+    entity_type: EntityTypeStr = "Architecture"
+    owner: OwnerStr = ""
+    tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
 
 
 class ObsidianSyncResponse(BaseModel):
-    vault: str
-    resolved_paths: list[str] = Field(default_factory=list)
+    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)]
+    resolved_paths: list[PathStr] = Field(default_factory=list, max_length=MAX_SYNC_LIMIT)
     scanned: int
     summary: dict[str, int]
     results: list["BatchResultItem"] = Field(default_factory=list)
 
 
 class SyncCheckRequest(BaseModel):
-    memory_id: Optional[str] = None
-    match_key: Optional[str] = None
-    obsidian_ref: Optional[str] = None
-    file_hash: Optional[str] = None
+    memory_id: Optional[str] = Field(default=None, max_length=64)
+    match_key: Optional[MatchKeyStr] = None
+    obsidian_ref: Optional[PathStr] = None
+    file_hash: Optional[Annotated[str, Field(max_length=64)]] = None
 
     @model_validator(mode="after")
     def validate_identifier_count(self) -> "SyncCheckRequest":
@@ -232,66 +259,66 @@ class MemoryGetContextResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class MemoryCreate(BaseModel):
-    content: str
+    content: ContentStr
     domain: Literal["corporate", "build", "personal"] = "corporate"
-    entity_type: str = Field(default="Decision", max_length=64)
+    entity_type: EntityTypeStr = Field(default="Decision", max_length=MAX_ENTITY_TYPE_LEN)
     sensitivity: str = "internal"
-    owner: str = ""
+    owner: OwnerStr = ""
     created_by: str = "agent"
-    tags: list[str] = Field(default_factory=list)
+    tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: dict[str, Any] = Field(default_factory=dict)
-    obsidian_ref: str | None = None
-    match_key: str | None = None
-    tenant_id: str | None = None
+    obsidian_ref: PathStr | None = None
+    match_key: MatchKeyStr | None = None
+    tenant_id: TenantIdStr | None = None
     status: Literal["active", "draft", "deprecated"] = "active"
     valid_from: Optional[datetime] = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
 
 
 class MemoryUpdate(BaseModel):
-    content: Optional[str] = None
-    title: Optional[str] = None
+    content: Optional[ContentStr] = None
+    title: Optional[TitleStr] = None
     updated_by: str = "agent"
     sensitivity: Optional[str] = None
-    owner: Optional[str] = None
-    tags: Optional[list[str]] = None
+    owner: Optional[OwnerStr] = None
+    tags: Optional[list[TagStr]] = Field(default=None, max_length=MAX_TAGS)
     relations: Optional[dict[str, Any]] = None
-    obsidian_ref: Optional[str] = None
-    tenant_id: Optional[str] = None
+    obsidian_ref: Optional[PathStr] = None
+    tenant_id: Optional[TenantIdStr] = None
     custom_fields: Optional[dict[str, Any]] = None
 
 
 class MemoryUpsertItem(BaseModel):
-    content: str
+    content: ContentStr
     domain: Literal["corporate", "build", "personal"] = "corporate"
-    entity_type: str = Field(default="Decision", max_length=64)
+    entity_type: EntityTypeStr = Field(default="Decision", max_length=MAX_ENTITY_TYPE_LEN)
     sensitivity: str = "internal"
-    owner: str = ""
+    owner: OwnerStr = ""
     created_by: str = "agent"
-    tags: list[str] = Field(default_factory=list)
+    tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: dict[str, Any] = Field(default_factory=dict)
-    obsidian_ref: str | None = None
-    match_key: str | None = None
-    tenant_id: str | None = None
+    obsidian_ref: PathStr | None = None
+    match_key: MatchKeyStr | None = None
+    tenant_id: TenantIdStr | None = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
 
 
 class SearchRequest(BaseModel):
-    query: str
-    top_k: int = 5
+    query: QueryStr
+    top_k: int = Field(default=5, ge=1, le=MAX_FILTER_LIMIT)
     filters: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExportRequest(BaseModel):
-    ids: list[str]
+    ids: list[Annotated[str, Field(max_length=64)]] = Field(max_length=MAX_EXPORT_IDS)
     format: Literal["jsonl", "json"] = "json"
 
 
 class MaintenanceRequest(BaseModel):
     dry_run: bool = True
-    dedup_threshold: float = 0.05
-    normalize_owners: dict[str, str] = Field(default_factory=dict)
-    retype_rules: list[dict[str, str]] = Field(default_factory=list)
+    dedup_threshold: float = Field(default=0.05, ge=0.0, le=1.0)
+    normalize_owners: dict[str, str] = Field(default_factory=dict, max_length=MAX_POLICY_REWRITES)
+    retype_rules: list[dict[str, str]] = Field(default_factory=list, max_length=MAX_POLICY_REWRITES)
     fix_superseded_links: bool = True
     allow_exact_dedup_override: bool = False
     """When True, exact content-hash duplicates in append-only domains are superseded
@@ -301,21 +328,21 @@ class MaintenanceRequest(BaseModel):
 
 class MemoryOut(BaseModel):
     id: str
-    tenant_id: Optional[str] = None
+    tenant_id: Optional[TenantIdStr] = None
     domain: str
-    entity_type: str
-    content: str
-    owner: str
+    entity_type: EntityTypeStr
+    content: ContentStr
+    owner: OwnerStr
     status: str
     version: int
     sensitivity: str
     superseded_by: Optional[str] = None
-    tags: list[str] = Field(default_factory=list)
+    tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: dict[str, Any] = Field(default_factory=dict)
-    obsidian_ref: Optional[str] = None
+    obsidian_ref: Optional[PathStr] = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
     content_hash: str = ""
-    match_key: Optional[str] = None
+    match_key: Optional[MatchKeyStr] = None
     previous_id: Optional[str] = None
     root_id: Optional[str] = None
     valid_from: Optional[datetime] = None

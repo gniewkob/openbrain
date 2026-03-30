@@ -2,6 +2,7 @@ apiVersion: 1
 
 datasources:
   - name: OpenBrain Prometheus
+    uid: openbrain-prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090

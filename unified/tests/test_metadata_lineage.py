@@ -175,6 +175,36 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.custom_fields, {"priority": "high"})
         self.assertEqual(result.root_id, "mem-1")
 
+    async def test_to_out_prefers_tenant_column_with_metadata_fallback(self) -> None:
+        now = datetime.now(timezone.utc)
+        memory = Memory(
+            id="mem-1",
+            domain=DomainEnum.build,
+            entity_type="Note",
+            content="payload",
+            embedding=None,
+            owner="owner-a",
+            tenant_id="tenant-column",
+            created_by="tester",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=["alpha"],
+            relations={},
+            metadata_={"tenant_id": "tenant-meta", "root_id": "mem-1"},
+            obsidian_ref=None,
+            content_hash="hash-1",
+            match_key="mk-1",
+            valid_from=None,
+            created_at=now,
+            updated_at=now,
+        )
+
+        result = crud._to_out(memory)
+
+        self.assertEqual(result.tenant_id, "tenant-column")
+
 
 if __name__ == "__main__":
     unittest.main()
