@@ -37,6 +37,8 @@ jobs:
           python-version: "3.12"
       - name: Install package
         run: pip install -e .
+      - name: Install gateway package
+        run: pip install -e mcp-gateway
       - name: Run smoke tests
         run: python -m unittest discover -s tests -v
 
