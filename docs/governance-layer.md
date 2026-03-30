@@ -95,6 +95,9 @@ OpenBrain currently allows duplicates to enter the system and relies on `maintai
 - Exact duplicate:
   - same `content_hash`
   - same `entity_type`
+  - remediation path:
+    - mutable domains (`build`, `personal`): superseded by canonical record.
+    - append-only domains (`corporate`): marked as `status="duplicate"` with `duplicate_of` metadata. This is a governance-safe remediation that preserves audit trail without violating append-only constraints.
 - Pipeline duplicate:
   - same `match_key`
   - more than one active record
@@ -103,7 +106,7 @@ OpenBrain currently allows duplicates to enter the system and relies on `maintai
 
 ### Required response
 
-- Exact duplicates: safe to collapse automatically after dry-run review.
+- Exact duplicates: safe to collapse automatically after dry-run review. Append-only records are remediated logically via `duplicate` status.
 - Pipeline duplicates: treat as contract failure in the upstream ingestion path.
 - Semantic near-duplicates: do not auto-collapse without human review.
 
@@ -258,18 +261,17 @@ The following items from the original v2.1 backlog have been resolved in v2.2:
 - ~~Add `previous_record_id` for versioned writes.~~ ✅ Done — carried in `BatchResultItem.previous_record_id`.
 - ~~Expose duplicate and supersession metrics.~~ ✅ Done — metrics shipped in v2.1.
 - ~~Persist `maintain` execution reports.~~ ✅ Done — stored in `audit_log`, retrievable via `/api/admin/maintain/reports`.
+- ~~Move `tenant_id` from `metadata_` JSONB to a dedicated indexed column.~~ ✅ Done — added in v2.3.
+- ~~Implement governance-safe remediation for append-only duplicates.~~ ✅ Done — added in v2.3 via `duplicate` status.
 
 Remaining backlog:
-1. Move `tenant_id` from `metadata_` JSONB to a dedicated indexed column for scalable multi-tenant queries.
-2. Replace in-memory `TelemetryRegistry` with a shared counter backend for multi-worker deployments.
-3. Add regression test ensuring `brain_store(domain="corporate")` succeeds end-to-end via the MCP gateway.
-4. Add policy tests for domain-specific update semantics (corporate versioning, build in-place).
+1. Replace in-memory `TelemetryRegistry` with a shared counter backend for multi-worker deployments.
+2. Add regression test ensuring `brain_store(domain="corporate")` succeeds end-to-end via the MCP gateway.
+3. Add policy tests for domain-specific update semantics (corporate versioning, build in-place).
 
 ## Known Technical Debt
 
 These items are known architectural limitations, not current production blockers.
-
-- **`tenant_id` in JSONB**: currently persisted in `metadata_`, not in a dedicated relational column. Tenancy enforcement exists at the application layer, but if tenancy becomes a core scalability or compliance boundary, `tenant_id` should move to a first-class column with an index and a migration plan.
 
 - **Export redaction in application code**: The redaction rules in `_export_record` are implemented as application logic. This is acceptable while the policy surface is small, but a multi-tenant or compliance-heavy deployment should move redaction into a dedicated policy layer. Currently: admin and internal service accounts both receive unredacted export data.
 
