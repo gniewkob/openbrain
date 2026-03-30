@@ -32,6 +32,7 @@ test-unified: check-unified-venv
 	PYTHONPATH=.:unified "$(UNIFIED_PYTHON)" -m unittest \
 		unified.tests.test_access_control \
 		unified.tests.test_auth_security \
+		unified.tests.test_db_security \
 		unified.tests.test_batch_governance \
 		unified.tests.test_export_policy \
 		unified.tests.test_maintenance_reports \

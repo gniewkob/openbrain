@@ -40,7 +40,7 @@ By default the local stack binds service ports to `127.0.0.1`, not all interface
    - `OIDC_ISSUER_URL` must be set
    - `INTERNAL_API_KEY` must be set to a non-default secret
    - `/health` and `/metrics` require authentication
-   - use `/healthz` for unauthenticated liveness and `/readyz` for readiness probes
+   - use `/healthz` for liveness and `/readyz` for readiness probes
 3. Start the system:
    ```bash
    ./start_unified.sh start

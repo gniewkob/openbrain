@@ -24,7 +24,7 @@ class StartupSmokeTests(unittest.TestCase):
 
 
 class CombinedRoutingTests(unittest.IsolatedAsyncioTestCase):
-    async def test_health_is_forwarded_to_rest_app(self) -> None:
+    async def test_readyz_is_forwarded_to_rest_app(self) -> None:
         combined = _import_app_module("src.combined")
         calls: list[str] = []
 
@@ -45,14 +45,14 @@ class CombinedRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         try:
             await combined.app(
-                {"type": "http", "path": "/health", "method": "GET", "headers": []},
+                {"type": "http", "path": "/readyz", "method": "GET", "headers": []},
                 receive,
                 send,
             )
         finally:
             combined.rest_app = original_rest_app
 
-        self.assertEqual(calls, ["/health"])
+        self.assertEqual(calls, ["/readyz"])
         self.assertEqual(messages[0]["status"], 204)
 
     async def test_probe_endpoints_are_forwarded_to_rest_app(self) -> None:

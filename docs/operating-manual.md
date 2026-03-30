@@ -7,11 +7,12 @@ The system runs on Docker Compose. The primary entry point is `src.combined:app`
 - `db`: PostgreSQL with `pgvector` extension.
 - `unified-server`: Hybrid server (FastAPI for REST + Starlette for MCP).
 - `embedding-service`: Local Ollama instance (`nomic-embed-text`).
-- `ngrok`: Secure tunnel for external access (starts by default).
+- `ngrok`: Secure tunnel for external access (optional Compose `public` profile, disabled by default).
 
 ### Quick Start
 ```bash
 ./start_unified.sh start
+ENABLE_NGROK=1 ./start_unified.sh start   # enable external ngrok tunnel
 ```
 
 ## MCP Transport Mechanism
@@ -74,7 +75,7 @@ preventing phantom version creation on repeated identical writes.
 - `search_zero_hit_ratio`: `watch >= 0.05`, `elevated >= 0.15`
 - `/api/diagnostics/metrics` returns `summary.health` and `summary.health_status`
 - `/metrics` exposes `operational_health_status` and `*_watch_threshold` / `*_elevated_threshold` gauges for scrape-based alerting
-- `/health` and `/metrics` require authentication in public mode
+- use `/healthz` and `/readyz` for probes; `/health` and `/metrics` require authentication in public mode
 - example Prometheus rules are provided in [prometheus-alerts.yml](prometheus-alerts.yml)
 
 For the full production operating model, see [Governance Layer](governance-layer.md).

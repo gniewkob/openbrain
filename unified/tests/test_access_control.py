@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi import HTTPException
 
 from tests.test_metrics import _import_main_with_fake_auth_deps
-from src.schemas import ExportRequest, MemoryCreate, MemoryFindRequest, MemoryOut, MemoryUpdate, MemoryWriteRecord, MemoryWriteRequest
+from src.schemas import ExportRequest, MemoryCreate, MemoryFindRequest, MemoryOut, MemoryUpdate, MemoryWriteRecord, MemoryWriteRequest, SyncCheckRequest
 
 
 main = _import_main_with_fake_auth_deps()
@@ -203,6 +203,37 @@ class AccessControlTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as ctx:
                 await main.export(req=ExportRequest(ids=["mem-1"]), session=object(), _user={"sub": "user-1"})
         self.assertEqual(ctx.exception.status_code, 403)
+
+    async def test_export_hides_records_outside_admin_domain_scope(self) -> None:
+        with patch.object(main, "PUBLIC_MODE", True), patch.object(main, "is_privileged_user", return_value=True), patch.object(
+            main, "get_memory", new=AsyncMock(return_value=_memory_out())
+        ), patch.object(main, "get_domain_scope", return_value={"corporate"}):
+            with self.assertRaises(HTTPException) as ctx:
+                await main.export(req=ExportRequest(ids=["mem-1"]), session=object(), _user={"sub": "admin-user"})
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    async def test_sync_check_hides_records_outside_admin_domain_scope(self) -> None:
+        sync_result = {
+            "status": "exists",
+            "message": "Memory exists.",
+            "memory_id": "mem-1",
+            "match_key": "mk-1",
+            "obsidian_ref": None,
+            "stored_hash": "hash-1",
+            "provided_hash": None,
+        }
+        with patch.object(main, "PUBLIC_MODE", True), patch.object(main, "is_privileged_user", return_value=True), patch.object(
+            main, "sync_check", new=AsyncMock(return_value=sync_result)
+        ), patch.object(main, "get_memory", new=AsyncMock(return_value=_memory_out())), patch.object(
+            main, "get_domain_scope", return_value={"corporate"}
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await main.check_sync_endpoint(
+                    req=SyncCheckRequest(match_key="mk-1"),
+                    session=object(),
+                    _user={"sub": "admin-user"},
+                )
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 if __name__ == "__main__":

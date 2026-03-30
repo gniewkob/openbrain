@@ -4,6 +4,7 @@ MCP Streamable HTTP transport — Memory Platform V1.
 Implements the canonical Tiered Hierarchy.
 All tools now use the V1 API engine for consistent metadata handling.
 """
+
 from __future__ import annotations
 
 import os
@@ -18,21 +19,30 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 log = structlog.get_logger()
 
-BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://127.0.0.1:7010")
+# This transport runs inside the unified-server container, so its safe default
+# must target the app's internal listener on port 80 rather than the host-mapped
+# port 7010. External stdio gateways override BRAIN_URL explicitly.
+BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://127.0.0.1:80")
 BACKEND_TIMEOUT: float = float(os.environ.get("BACKEND_TIMEOUT_S", "30"))
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
-ENABLE_HTTP_OBSIDIAN_TOOLS: bool = os.environ.get("ENABLE_HTTP_OBSIDIAN_TOOLS", "").lower() in {"1", "true", "yes"}
+ENABLE_HTTP_OBSIDIAN_TOOLS: bool = os.environ.get(
+    "ENABLE_HTTP_OBSIDIAN_TOOLS", ""
+).lower() in {"1", "true", "yes"}
 # Source system tag stored with every brain_store call.
 # Override via MCP_SOURCE_SYSTEM env var when running from a non-ChatGPT host.
 MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
 
 _public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-_ngrok_host = _public_base.replace("https://", "").replace("http://", "") if _public_base else ""
+_ngrok_host = (
+    _public_base.replace("https://", "").replace("http://", "") if _public_base else ""
+)
 
 _transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=True,
-    allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"] + ([f"{_ngrok_host}:*", _ngrok_host] if _ngrok_host else []),
-    allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"] + ([f"https://{_ngrok_host}"] if _ngrok_host else []),
+    allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"]
+    + ([f"{_ngrok_host}:*", _ngrok_host] if _ngrok_host else []),
+    allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"]
+    + ([f"https://{_ngrok_host}"] if _ngrok_host else []),
 )
 
 mcp = FastMCP(
@@ -42,8 +52,9 @@ mcp = FastMCP(
     instructions=(
         "OpenBrain is a unified memory platform with 3 domains: 'corporate' (work), 'build' (projects), 'personal' (ideas).\n"
         "Always use brain_capabilities to check feature status. Use Tier 1 tools for daily interactions."
-    )
+    ),
 )
+
 
 def _client() -> httpx.AsyncClient:
     headers = {}
@@ -55,6 +66,7 @@ def _client() -> httpx.AsyncClient:
         headers=headers,
     )
 
+
 def mcp_tool_guard(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
@@ -63,7 +75,9 @@ def mcp_tool_guard(func):
         except Exception as e:
             log.error("mcp_tool_error", tool=func.__name__, error=str(e))
             raise ValueError(f"Tool execution failed: {str(e)}") from e
+
     return wrapper
+
 
 def _extract_record_from_write_response(payload: dict[str, Any]) -> dict[str, Any]:
     record = payload.get("record")
@@ -105,10 +119,29 @@ def _normalize_search_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for hit in hits:
         if isinstance(hit, dict) and "record" in hit and "score" in hit:
-            normalized.append({"memory": _to_legacy_memory_shape(hit["record"]), "score": hit["score"]})
+            normalized.append(
+                {
+                    "memory": _to_legacy_memory_shape(hit["record"]),
+                    "score": hit["score"],
+                }
+            )
         else:
             normalized.append(hit)
     return normalized
+
+
+def _redact_logged_payload(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        redacted = {}
+        for key, value in payload.items():
+            if key == "content":
+                redacted[key] = "[REDACTED]"
+            else:
+                redacted[key] = _redact_logged_payload(value)
+        return redacted
+    if isinstance(payload, list):
+        return [_redact_logged_payload(item) for item in payload]
+    return payload
 
 
 async def _safe_req(method: str, path: str, **kwargs) -> dict[str, Any]:
@@ -116,25 +149,34 @@ async def _safe_req(method: str, path: str, **kwargs) -> dict[str, Any]:
         full_path = f"/api/v1/memory{path}" if not path.startswith("/api") else path
         if "json" in kwargs:
             # Redact record content to avoid PII/secrets leaking into log stores.
-            _safe_payload = {
-                k: ({**v, "record": {**v["record"], "content": "[REDACTED]"}} if isinstance(v, dict) and "content" in v.get("record", {}) else v)
-                for k, v in kwargs["json"].items()
-            } if isinstance(kwargs["json"], dict) else kwargs["json"]
-            log.info("mcp_v1_request", method=method, path=full_path, payload=_safe_payload)
-        
+            _safe_payload = _redact_logged_payload(kwargs["json"])
+            log.info(
+                "mcp_v1_request", method=method, path=full_path, payload=_safe_payload
+            )
+
         r = await c.request(method, full_path, **kwargs)
         if r.is_error:
             try:
                 detail = r.json()
             except Exception:
                 detail = r.text
-            log.error("mcp_v1_error", method=method, path=full_path, code=r.status_code, detail=detail)
-            raise ValueError(f"Backend {r.status_code}: {json.dumps(detail, ensure_ascii=False) if isinstance(detail, (dict, list)) else detail}")
+            log.error(
+                "mcp_v1_error",
+                method=method,
+                path=full_path,
+                code=r.status_code,
+                detail=detail,
+            )
+            raise ValueError(
+                f"Backend {r.status_code}: {json.dumps(detail, ensure_ascii=False) if isinstance(detail, (dict, list)) else detail}"
+            )
         return r.json() if r.status_code != 204 else {"status": "success"}
+
 
 # ===========================================================================
 # TIER 0: DIAGNOSTICS
 # ===========================================================================
+
 
 @mcp.tool()
 @mcp_tool_guard
@@ -145,17 +187,25 @@ async def brain_capabilities() -> dict[str, Any]:
         tier_2_tools.extend(["obsidian_vaults", "obsidian_read_note", "obsidian_sync"])
     return {
         "platform": "OpenBrain V1 (Industrial)",
-        "tier_1_core": {"status": "stable", "tools": ["search", "get", "store", "update"]},
+        "tier_1_core": {
+            "status": "stable",
+            "tools": ["search", "get", "store", "update"],
+        },
         "tier_2_advanced": {
             "status": "active",
             "tools": tier_2_tools,
         },
-        "tier_3_admin": {"status": "guarded", "tools": ["store_bulk", "upsert_bulk", "maintain"]}
+        "tier_3_admin": {
+            "status": "guarded",
+            "tools": ["store_bulk", "upsert_bulk", "maintain"],
+        },
     }
+
 
 # ===========================================================================
 # TIER 1: CORE (PREFER THESE)
 # ===========================================================================
+
 
 @mcp.tool()
 @mcp_tool_guard
@@ -183,17 +233,19 @@ async def brain_search(
     payload = {"query": query, "limit": top_k, "filters": filters}
     return _normalize_search_hits(await _safe_req("POST", "/find", json=payload))
 
+
 @mcp.tool()
 @mcp_tool_guard
 async def brain_get(memory_id: str) -> dict[str, Any]:
     """Retrieve a single memory by its exact ID. Returns canonical V1 MemoryRecord shape."""
     return await _safe_req("GET", f"/api/v1/memory/{memory_id}")
 
+
 @mcp.tool()
 @mcp_tool_guard
 async def brain_store(
-    content: str, 
-    domain: Literal["corporate", "build", "personal"] = "corporate", 
+    content: str,
+    domain: Literal["corporate", "build", "personal"] = "corporate",
     entity_type: str = "Note",
     title: Optional[str] = None,
     owner: str = "",
@@ -202,7 +254,9 @@ async def brain_store(
     custom_fields: Optional[dict[str, Any]] = None,
     match_key: Optional[str] = None,
     obsidian_ref: Optional[str] = None,
-    sensitivity: Literal["public", "internal", "confidential", "restricted"] = "internal"
+    sensitivity: Literal[
+        "public", "internal", "confidential", "restricted"
+    ] = "internal",
 ) -> dict[str, Any]:
     """
     Save a new memory to the platform.
@@ -221,12 +275,13 @@ async def brain_store(
             "match_key": match_key,
             "obsidian_ref": obsidian_ref,
             "sensitivity": sensitivity,
-            "source": {"type": "agent", "system": MCP_SOURCE_SYSTEM}
+            "source": {"type": "agent", "system": MCP_SOURCE_SYSTEM},
         },
-        "write_mode": "upsert"
+        "write_mode": "upsert",
     }
     result = await _safe_req("POST", "/write", json=payload)
     return _extract_record_from_write_response(result)
+
 
 @mcp.tool()
 @mcp_tool_guard
@@ -242,20 +297,26 @@ async def brain_update(
     sensitivity: Optional[str] = None,
 ) -> dict[str, Any]:
     """Update an existing memory. Corporate records are versioned automatically (append-only)."""
-    return await _safe_req("PUT", f"/api/memories/{memory_id}", json={
-        "content": content,
-        "title": title,
-        "owner": owner,
-        "tenant_id": tenant_id,
-        "tags": tags,
-        "custom_fields": custom_fields,
-        "obsidian_ref": obsidian_ref,
-        "sensitivity": sensitivity,
-    })
+    return await _safe_req(
+        "PUT",
+        f"/api/memories/{memory_id}",
+        json={
+            "content": content,
+            "title": title,
+            "owner": owner,
+            "tenant_id": tenant_id,
+            "tags": tags,
+            "custom_fields": custom_fields,
+            "obsidian_ref": obsidian_ref,
+            "sensitivity": sensitivity,
+        },
+    )
+
 
 # ===========================================================================
 # TIER 2: ADVANCED
 # ===========================================================================
+
 
 @mcp.tool()
 @mcp_tool_guard
@@ -288,12 +349,14 @@ async def brain_list(
         params["tenant_id"] = tenant_id
     return await _safe_req("GET", "/api/memories", params=params)
 
+
 @mcp.tool()
 @mcp_tool_guard
 async def brain_get_context(query: str, domain: Optional[str] = None) -> dict[str, Any]:
     """Synthesize a grounding pack for the current conversation topic."""
     payload = {"query": query, "domain": domain, "max_items": 10}
     return await _safe_req("POST", "/get-context", json=payload)
+
 
 @mcp.tool()
 @mcp_tool_guard
@@ -302,11 +365,13 @@ async def brain_delete(memory_id: str) -> dict[str, Any]:
     await _safe_req("DELETE", f"/api/memories/{memory_id}")
     return {"deleted": True, "id": memory_id}
 
+
 @mcp.tool()
 @mcp_tool_guard
 async def brain_export(ids: list[str]) -> list[dict[str, Any]]:
     """Export raw memory records for external use."""
     return await _safe_req("POST", f"/api/memories/export", json={"ids": ids})
+
 
 @mcp.tool()
 @mcp_tool_guard
@@ -317,28 +382,35 @@ async def brain_sync_check(
     file_hash: str | None = None,
 ) -> dict[str, Any]:
     """Check whether a memory exists or matches a provided content hash."""
-    return await _safe_req("POST", "/api/memories/sync-check", json={
-        "memory_id": memory_id,
-        "match_key": match_key,
-        "obsidian_ref": obsidian_ref,
-        "file_hash": file_hash,
-    })
+    return await _safe_req(
+        "POST",
+        "/api/memories/sync-check",
+        json={
+            "memory_id": memory_id,
+            "match_key": match_key,
+            "obsidian_ref": obsidian_ref,
+            "file_hash": file_hash,
+        },
+    )
 
 
 if ENABLE_HTTP_OBSIDIAN_TOOLS:
+
     @mcp.tool()
     @mcp_tool_guard
     async def brain_obsidian_vaults() -> Any:
         """List local Obsidian vaults available to the backend."""
         return await _safe_req("GET", "/api/v1/obsidian/vaults")
 
-
     @mcp.tool()
     @mcp_tool_guard
-    async def brain_obsidian_read_note(path: str, vault: str = "Documents") -> dict[str, Any]:
+    async def brain_obsidian_read_note(
+        path: str, vault: str = "Documents"
+    ) -> dict[str, Any]:
         """Read a note from a local Obsidian vault with parsed frontmatter and tags."""
-        return await _safe_req("POST", "/api/v1/obsidian/read-note", json={"vault": vault, "path": path})
-
+        return await _safe_req(
+            "POST", "/api/v1/obsidian/read-note", json={"vault": vault, "path": path}
+        )
 
     @mcp.tool()
     @mcp_tool_guard
@@ -372,6 +444,7 @@ if ENABLE_HTTP_OBSIDIAN_TOOLS:
 # TIER 3: ADMIN
 # ===========================================================================
 
+
 @mcp.tool()
 @mcp_tool_guard
 async def brain_store_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
@@ -379,11 +452,13 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
     payload = {"records": items, "write_mode": "upsert"}
     return await _safe_req("POST", "/write-many", json=payload)
 
+
 @mcp.tool()
 @mcp_tool_guard
 async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
     """Idempotent bulk synchronization using match_key."""
     return await _safe_req("POST", "/api/memories/bulk-upsert", json=items)
+
 
 @mcp.tool()
 @mcp_tool_guard

@@ -12,7 +12,7 @@ from typing import Any
 from datetime import datetime
 
 import structlog
-from sqlalchemy import select, func, delete as sa_delete
+from sqlalchemy import select, func, delete as sa_delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .embed import get_embedding
@@ -161,10 +161,11 @@ def _to_record(m: Memory) -> MemoryRecord:
     source = meta.get("source", {})
     gov = meta.get("governance", {})
     
+    tenant_id = m.tenant_id or meta.get("tenant_id")
     return MemoryRecord(
         id=m.id,
         match_key=m.match_key,
-        tenant_id=meta.get("tenant_id"),
+        tenant_id=tenant_id,
         domain=m.domain.value if isinstance(m.domain, DomainEnum) else m.domain,
         entity_type=m.entity_type,
         title=meta.get("title") or m.entity_type, # fallback
@@ -194,9 +195,10 @@ def _to_record(m: Memory) -> MemoryRecord:
 def _to_out(m: Memory) -> MemoryOut:
     """Legacy helper for backward compatibility."""
     meta = m.metadata_ or {}
+    tenant_id = m.tenant_id or meta.get("tenant_id")
     return MemoryOut(
         id=m.id,
-        tenant_id=meta.get("tenant_id"),
+        tenant_id=tenant_id,
         domain=m.domain.value if isinstance(m.domain, DomainEnum) else m.domain,
         entity_type=m.entity_type,
         content=m.content,
@@ -271,9 +273,18 @@ def _export_record(record: dict[str, Any], sensitivity: str, role: str) -> dict[
     return exported
 
 
-# ---------------------------------------------------------------------------
-# V1 UNIFIED ENGINE
-# ---------------------------------------------------------------------------
+def _tenant_filter_expr(tenant_ids: list[str]):
+    return or_(
+        Memory.tenant_id.in_(tenant_ids),
+        Memory.metadata_["tenant_id"].astext.in_(tenant_ids),
+    )
+
+
+# Status Constants
+STATUS_ACTIVE = "active"
+STATUS_SUPERSEDED = "superseded"
+STATUS_DUPLICATE = "duplicate"
+
 
 async def handle_memory_write(
     session: AsyncSession,
@@ -354,6 +365,7 @@ async def handle_memory_write(
             content=rec.content,
             embedding=embedding,
             owner=rec.owner,
+            tenant_id=rec.tenant_id,
             created_by=actor,
             status="active",
             version=1,
@@ -417,6 +429,7 @@ async def handle_memory_write(
                 content=rec.content,
                 embedding=new_embedding,
                 owner=rec.owner or existing.owner,
+                tenant_id=rec.tenant_id or existing.tenant_id or existing.metadata_.get("tenant_id"),
                 created_by=existing.created_by,
                 status="active",
                 version=existing.version + 1,
@@ -428,7 +441,7 @@ async def handle_memory_write(
                 match_key=existing.match_key,
                 metadata_={
                     "title": rec.title,
-                    "tenant_id": rec.tenant_id or existing.metadata_.get("tenant_id"),
+                    "tenant_id": rec.tenant_id or existing.tenant_id or existing.metadata_.get("tenant_id"),
                     "custom_fields": rec.custom_fields or existing.metadata_.get("custom_fields", {}),
                     "updated_by": actor,
                     "previous_id": existing.id,
@@ -460,6 +473,7 @@ async def handle_memory_write(
             existing.content_hash = content_hash
             existing.embedding = new_embedding
             existing.owner = rec.owner
+            existing.tenant_id = rec.tenant_id
             existing.tags = rec.tags
             existing.relations = rec.relations.model_dump()
             existing.obsidian_ref = rec.obsidian_ref
@@ -641,13 +655,14 @@ async def list_memories(session: AsyncSession, filters: dict[str, Any], limit: i
     if "status" in filters:
         stmt = stmt.where(Memory.status == filters["status"])
     else:
-        stmt = stmt.where(Memory.status != "superseded")
+        # Default view excludes both superseded and remediation duplicates
+        stmt = stmt.where(Memory.status.notin_([STATUS_SUPERSEDED, STATUS_DUPLICATE]))
     if "sensitivity" in filters:
         stmt = stmt.where(Memory.sensitivity == filters["sensitivity"])
     if "owner" in filters:
         stmt = stmt.where(Memory.owner == filters["owner"])
     if "tenant_id" in filters:
-        stmt = stmt.where(Memory.metadata_["tenant_id"].astext == filters["tenant_id"])
+        stmt = stmt.where(_tenant_filter_expr([filters["tenant_id"]]))
 
     stmt = stmt.order_by(Memory.updated_at.desc()).limit(limit)
     result = await session.execute(stmt)
@@ -665,7 +680,7 @@ async def search_memories(session: AsyncSession, req: SearchRequest) -> list[tup
     if "sensitivity" in filters:
         stmt = stmt.where(Memory.sensitivity == filters["sensitivity"])
     if "tenant_id" in filters:
-        stmt = stmt.where(Memory.metadata_["tenant_id"].astext == filters["tenant_id"])
+        stmt = stmt.where(_tenant_filter_expr([filters["tenant_id"]]))
     if "owner" in filters:
         stmt = stmt.where(Memory.owner == filters["owner"])
     stmt = stmt.order_by("distance").limit(req.top_k)
@@ -686,7 +701,7 @@ async def update_memory(session: AsyncSession, memory_id: str, data: MemoryUpdat
         entity_type=m.entity_type,
         title=data.title if data.title is not None else metadata.get("title"),
         owner=data.owner if data.owner is not None else m.owner,
-        tenant_id=data.tenant_id if data.tenant_id is not None else metadata.get("tenant_id"),
+        tenant_id=data.tenant_id if data.tenant_id is not None else (m.tenant_id or metadata.get("tenant_id")),
         tags=data.tags if data.tags is not None else m.tags,
         relations=MemoryRelations(**(data.relations if data.relations is not None else (m.relations or {}))),
         obsidian_ref=data.obsidian_ref if data.obsidian_ref is not None else m.obsidian_ref,
@@ -724,7 +739,7 @@ async def delete_memory(session: AsyncSession, memory_id: str, actor: str = "age
             "domain": m.domain.value if isinstance(m.domain, DomainEnum) else m.domain,
             "entity_type": m.entity_type,
             "owner": m.owner,
-            "tenant_id": (m.metadata_ or {}).get("tenant_id"),
+            "tenant_id": m.tenant_id or (m.metadata_ or {}).get("tenant_id"),
             "version": m.version,
         },
     )
@@ -877,26 +892,22 @@ async def run_maintenance(session: AsyncSession, req: MaintenanceRequest, actor:
                 actions.append(MaintenanceAction(action="dedup", memory_id=dup.id, detail=f"Exact duplicate of {canonical.id}"))
                 if not req.dry_run:
                     if _requires_append_only(dup.domain, dup.entity_type):
-                        if req.allow_exact_dedup_override:
-                            # Governance-safe override for exact duplicates:
-                            # canonical record is preserved and stays active;
-                            # only the duplicate is superseded — no content is
-                            # changed or physically deleted.
-                            dup.status = "superseded"
-                            dup.superseded_by = canonical.id
-                            actions.append(MaintenanceAction(
-                                action="dedup_override",
-                                memory_id=dup.id,
-                                detail=f"Exact duplicate of {canonical.id} superseded via governance override (append-only)",
-                            ))
-                        else:
-                            actions.append(MaintenanceAction(
-                                action="policy_skip",
-                                memory_id=dup.id,
-                                detail="Skipped dedup mutation for append-only memory",
-                            ))
+                        # Governance-safe remediation for exact duplicates in append-only domains:
+                        # canonical record is preserved and stays active;
+                        # only the duplicate is marked as duplicate — no content is changed or deleted.
+                        dup.status = STATUS_DUPLICATE
+                        dup.metadata_ = {
+                            **(dup.metadata_ or {}),
+                            "duplicate_of": canonical.id,
+                            "remediated_at": datetime.now().isoformat(),
+                        }
+                        actions.append(MaintenanceAction(
+                            action="dedup_remediate",
+                            memory_id=dup.id,
+                            detail=f"Exact duplicate of {canonical.id} marked as duplicate via governance-safe remediation (append-only)",
+                        ))
                     else:
-                        dup.status = "superseded"
+                        dup.status = STATUS_SUPERSEDED
                         dup.superseded_by = canonical.id
 
     # --- OWNER NORMALIZATION (targeted query — only loads affected records) ---
@@ -1087,7 +1098,7 @@ async def find_memories_v1(
         stmt = stmt.where(Memory.owner.in_(owners))
     if "tenant_id" in filters:
         tenant_ids = filters["tenant_id"] if isinstance(filters["tenant_id"], list) else [filters["tenant_id"]]
-        stmt = stmt.where(Memory.metadata_["tenant_id"].astext.in_(tenant_ids))
+        stmt = stmt.where(_tenant_filter_expr(tenant_ids))
     if "tags_any" in filters:
         stmt = stmt.where(Memory.tags.overlap(filters["tags_any"]))
 

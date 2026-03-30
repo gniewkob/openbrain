@@ -17,6 +17,55 @@ warn() { echo -e "${YELLOW}⚠${NC}  $*"; }
 err()  { echo -e "${RED}✗${NC}  $*" >&2; }
 info() { echo -e "${CYAN}→${NC}  $*"; }
 
+is_true() {
+    case "${1:-}" in
+        1|true|TRUE|yes|YES|on|ON) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+compose_cmd() {
+    local args=(-f docker-compose.unified.yml)
+    if is_true "${ENABLE_NGROK:-false}"; then
+        args+=(--profile public)
+    fi
+    docker compose "${args[@]}" "$@"
+}
+
+validate_runtime_security() {
+    local public_mode="${PUBLIC_MODE:-false}"
+    local public_base_url="${PUBLIC_BASE_URL:-}"
+    local postgres_user="${POSTGRES_USER:-postgres}"
+    local postgres_password="${POSTGRES_PASSWORD:-postgres}"
+    local grafana_user="${GRAFANA_ADMIN_USER:-admin}"
+    local grafana_password="${GRAFANA_ADMIN_PASSWORD:-admin}"
+
+    local shared_or_public=false
+    if is_true "$public_mode" || [ -n "$public_base_url" ]; then
+        shared_or_public=true
+    fi
+
+    if [ "$shared_or_public" = true ]; then
+        if [ "$postgres_user" = "postgres" ] && [ "$postgres_password" = "postgres" ]; then
+            err "PUBLIC_MODE/public exposure forbids default PostgreSQL credentials (postgres/postgres)."
+            err "Set POSTGRES_USER/POSTGRES_PASSWORD in .env before starting."
+            exit 1
+        fi
+        if [ "$grafana_user" = "admin" ] && [ "$grafana_password" = "admin" ]; then
+            err "PUBLIC_MODE/public exposure forbids default Grafana credentials (admin/admin)."
+            err "Set GRAFANA_ADMIN_USER/GRAFANA_ADMIN_PASSWORD in .env before starting."
+            exit 1
+        fi
+    else
+        if [ "$postgres_user" = "postgres" ] && [ "$postgres_password" = "postgres" ]; then
+            warn "Using default PostgreSQL credentials for local dev only."
+        fi
+        if [ "$grafana_user" = "admin" ] && [ "$grafana_password" = "admin" ]; then
+            warn "Using default Grafana credentials for local dev only."
+        fi
+    fi
+}
+
 # Load .env if it exists
 if [ -f .env ]; then
     set -a
@@ -27,31 +76,41 @@ if [ -f .env ]; then
 fi
 
 compose_up() {
+    validate_runtime_security
     info "Starting Unified OpenBrain (PostgreSQL + FastMCP) ..."
-    docker compose -f docker-compose.unified.yml up -d --build
+    if is_true "${ENABLE_NGROK:-false}"; then
+        info "Public tunnel enabled via ENABLE_NGROK=1 (Compose profile: public)."
+    else
+        info "Ngrok profile disabled; starting local-only stack."
+    fi
+    compose_cmd up -d --build
     ok "Containers started."
     info "Note: MCP Gateway runs on port 80 inside the unified-server container."
 }
 
 compose_down() {
     info "Stopping Unified OpenBrain ..."
-    docker compose -f docker-compose.unified.yml down
+    compose_cmd down
     ok "All services stopped."
 }
 
 cmd_status() {
     echo ""
     echo -e "${CYAN}─── OpenBrain Unified Status ───────────────────────────${NC}"
-    docker compose -f docker-compose.unified.yml ps
+    compose_cmd ps
     echo ""
     
-    local public_url="(waiting for ngrok...)"
+    local public_url="${YELLOW}(ngrok profile disabled; set ENABLE_NGROK=1)${NC}"
+    local public_url_plain="(ngrok profile disabled; set ENABLE_NGROK=1)"
     if [ "$(docker ps -q -f name=openbrain-unified-ngrok)" ]; then
+        public_url="${PUBLIC_BASE_URL:-"(waiting for ngrok...)"}"
+        public_url_plain="$public_url"
         # Try fetching via internal Docker API from unified-server container
         public_url=$(docker exec openbrain-unified-server curl -s http://ngrok:4040/api/tunnels | python3 -c "import sys, json; print(json.load(sys.stdin)['tunnels'][0]['public_url'])" 2>/dev/null || \
                      curl -s http://localhost:4040/api/tunnels | python3 -c "import sys, json; print(json.load(sys.stdin)['tunnels'][0]['public_url'])" 2>/dev/null || \
                      docker logs openbrain-unified-ngrok 2>&1 | grep -o 'https://[a-zA-Z0-9.-]*\.ngrok-free.app' | tail -n 1 || \
-                     echo -e "${YELLOW}(waiting for ngrok...)${NC}")
+                     echo "${PUBLIC_BASE_URL:-${YELLOW}(waiting for ngrok...)${NC}}")
+        public_url_plain=$(printf '%s' "$public_url" | sed $'s/\033\\[[0-9;]*m//g')
     fi
 
     echo -e "${GREEN}Local (Claude Desktop):${NC}   http://localhost:7010"
@@ -61,7 +120,7 @@ cmd_status() {
     echo ""
     echo -e "${CYAN}─── MCP Configuration Guide ────────────────────────────${NC}"
     echo "1. Claude Desktop (local): Use http://localhost:7010"
-    echo "2. ChatGPT/Custom (external): Use ${public_url}"
+    echo "2. ChatGPT/Custom (external): Use ${public_url_plain}"
     echo ""
     echo -e "Available Domains: ${YELLOW}corporate, build, personal${NC}"
     echo -e "Capabilities:      ${YELLOW}brain_capabilities (RUN THIS FIRST)${NC}"
@@ -69,12 +128,12 @@ cmd_status() {
     echo -e "                   ${YELLOW}brain_get_context, brain_sync_check, brain_store_bulk,${NC}"
     echo -e "                   ${YELLOW}brain_upsert_bulk, brain_export, brain_maintain${NC}"
     echo -e "Local-only Tools:  ${YELLOW}brain_obsidian_vaults, brain_obsidian_read_note, brain_obsidian_sync${NC}"
-    echo -e "Grafana Login:     ${YELLOW}${GRAFANA_ADMIN_USER:-admin} / ${GRAFANA_ADMIN_PASSWORD:-admin}${NC}"
+    echo -e "Grafana Login:     ${YELLOW}${GRAFANA_ADMIN_USER:-admin} / [hidden]${NC}"
     echo ""
 }
 
 cmd_logs() {
-    docker compose -f docker-compose.unified.yml logs -f --tail 50
+    compose_cmd logs -f --tail 50
 }
 
 MODE="${1:-start}"

@@ -71,6 +71,7 @@ class Memory(Base):
 
     # --- Governance (from old work-brain) ---
     owner: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    tenant_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     created_by: Mapped[str] = mapped_column(String(128), nullable=False, default="agent")
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="active", index=True

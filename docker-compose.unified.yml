@@ -7,15 +7,16 @@ volumes:
   openbrain_unified_data:
   openbrain_ollama:
   openbrain_grafana_data:
+  openbrain_prometheus_data:
 
 services:
   db:
     image: ankane/pgvector:v0.5.1
     container_name: openbrain-unified-db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: openbrain_unified
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-openbrain_unified}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -23,7 +24,7 @@ services:
     networks:
       - net_unified
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d openbrain_unified"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-openbrain_unified}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -35,7 +36,7 @@ services:
     working_dir: /app
     command: ["alembic", "upgrade", "head"]
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-openbrain_unified}
     networks:
       - net_unified
     depends_on:
@@ -49,8 +50,9 @@ services:
     volumes:
       - ./unified:/app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-openbrain_unified}
       - OLLAMA_URL=http://embedding-service:11434
+      - BRAIN_URL=http://127.0.0.1:80
       - PUBLIC_MODE=${PUBLIC_MODE:-false}
       - OIDC_ISSUER_URL=${OIDC_ISSUER_URL:-}
       - OIDC_AUDIENCE=${OIDC_AUDIENCE:-https://openbrain-mcp}
@@ -77,6 +79,7 @@ services:
   ngrok:
     image: ngrok/ngrok:latest
     container_name: openbrain-unified-ngrok
+    profiles: ["public"]
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     command:
@@ -95,6 +98,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
     volumes:
+      - openbrain_prometheus_data:/prometheus
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./docs/prometheus-alerts.yml:/etc/prometheus/openbrain-alerts.yml:ro
     ports:

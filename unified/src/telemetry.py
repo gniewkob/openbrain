@@ -35,6 +35,11 @@ KNOWN_COUNTERS: tuple[str, ...] = (
     "policy_skip_link_repair_total",
     "dedup_override_total",
     "duplicate_risk_writes_total",
+    "access_denied_total",
+    "access_denied_admin_total",
+    "access_denied_domain_total",
+    "access_denied_owner_total",
+    "access_denied_tenant_total",
 )
 
 
@@ -65,6 +70,7 @@ class TelemetryRegistry:
     def reset(self) -> None:
         with self._lock:
             self._counters.clear()
+            self._counters.update({name: 0 for name in KNOWN_COUNTERS})
             self._gauges.clear()
 
 

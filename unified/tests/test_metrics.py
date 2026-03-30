@@ -82,7 +82,30 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
             "obsidian_ref": None,
             "stored_hash": "abc",
             "provided_hash": None,
-        })):
+        })), patch.object(main, "get_memory", new=AsyncMock(return_value=main.MemoryOut(
+            id="mem-1",
+            tenant_id=None,
+            domain="build",
+            entity_type="Note",
+            content="payload",
+            owner="tester",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=[],
+            relations={},
+            obsidian_ref=None,
+            custom_fields={},
+            content_hash="abc",
+            match_key="mk-1",
+            previous_id=None,
+            root_id="mem-1",
+            valid_from=None,
+            created_at="2026-03-28T00:00:00Z",
+            updated_at="2026-03-28T00:00:00Z",
+            created_by="tester",
+        ))):
             response = await main.check_sync_endpoint(
                 req=main.SyncCheckRequest(match_key="mk-1"),
                 memory_id=None,
@@ -242,6 +265,26 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snapshot["counters"]["policy_skip_delete_total"], 1)
         self.assertEqual(snapshot["summary"]["health"], "normal")
         self.assertEqual(snapshot["summary"]["health_status"], 0.0)
+
+    async def test_admin_access_denied_counts_metrics(self) -> None:
+        with patch.object(main, "PUBLIC_MODE", True), patch.object(main, "is_privileged_user", return_value=False):
+            with self.assertRaises(HTTPException):
+                await main.export(req=main.ExportRequest(ids=["mem-1"]), session=object(), _user={"sub": "tester"})
+
+        with patch.object(main, "get_memory_status_counts", new=AsyncMock(return_value={
+            "active": 0,
+            "superseded": 0,
+            "archived": 0,
+            "deleted": 0,
+        })), patch.object(main, "get_memory_domain_status_counts", new=AsyncMock(return_value={
+            "corporate": {"active": 0, "superseded": 0, "archived": 0, "deleted": 0},
+            "build": {"active": 0, "superseded": 0, "archived": 0, "deleted": 0},
+            "personal": {"active": 0, "superseded": 0, "archived": 0, "deleted": 0},
+        })):
+            snapshot = await main.diagnostics_metrics(session=object(), _user={"sub": "tester"})
+
+        self.assertEqual(snapshot["counters"]["access_denied_total"], 1)
+        self.assertEqual(snapshot["counters"]["access_denied_admin_total"], 1)
 
     async def test_diagnostics_metrics_includes_live_gauges(self) -> None:
         with patch.object(main, "get_memory_status_counts", new=AsyncMock(return_value={

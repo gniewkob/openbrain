@@ -12,7 +12,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "grafana"
+        "uid": "openbrain-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -64,7 +64,7 @@
       "id": 1,
       "options": {
         "colorMode": "value",
-        "graphMode": "none",
+        "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
@@ -80,7 +80,8 @@
       "targets": [
         {
           "expr": "operational_health_status",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "operational_health"
         }
       ],
       "title": "Operational Health",
@@ -89,7 +90,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "grafana"
+        "uid": "openbrain-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -124,7 +125,8 @@
       "targets": [
         {
           "expr": "policy_skip_per_maintain_run_ratio",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "policy_skip_ratio"
         }
       ],
       "title": "Policy Skip / Maintain",
@@ -133,7 +135,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "grafana"
+        "uid": "openbrain-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -168,7 +170,8 @@
       "targets": [
         {
           "expr": "duplicate_candidates_per_maintain_run_ratio",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "duplicate_pressure"
         }
       ],
       "title": "Duplicate Pressure",
@@ -177,7 +180,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "grafana"
+        "uid": "openbrain-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -212,7 +215,8 @@
       "targets": [
         {
           "expr": "search_zero_hit_ratio",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "search_zero_hit_ratio"
         }
       ],
       "title": "Search Zero-Hit Ratio",
@@ -221,7 +225,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "grafana"
+        "uid": "openbrain-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -276,7 +280,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "grafana"
+        "uid": "openbrain-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -331,7 +335,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "grafana"
+        "uid": "openbrain-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -381,7 +385,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "grafana"
+        "uid": "openbrain-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -446,6 +450,6 @@
   "timezone": "",
   "title": "OpenBrain Overview",
   "uid": "openbrain-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

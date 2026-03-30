@@ -23,11 +23,12 @@ Remote Clients (ChatGPT) ────────┤          ↑ (SSE / JSON-RP
 
 ```bash
 cd ~/Repos/openbrain
-./start_unified.sh start     # Starts all services: DB + Ollama + Server + Ngrok
+./start_unified.sh start     # Starts local-only services: DB + Ollama + Server + Monitoring
+ENABLE_NGROK=1 ./start_unified.sh start   # Also enables the public ngrok profile
 ./start_unified.sh status    # Check status and view current URLs
 ```
 
-**Note:** ngrok starts **by default**. The public URL for ChatGPT changes on every restart (unless you have a static ngrok domain).
+**Note:** ngrok is now **disabled by default**. Enable it only for explicit public/remote use with `ENABLE_NGROK=1`. The public URL for ChatGPT changes on every restart unless you use a static ngrok domain.
 
 ### Monitoring Endpoints
 
@@ -36,9 +37,10 @@ cd ~/Repos/openbrain
 - Grafana: `http://localhost:3001` by default, or `http://localhost:$GRAFANA_PORT`
 - Unauthenticated liveness probe: `http://localhost:7010/healthz`
 - Readiness probe: `http://localhost:7010/readyz`
-- Auth-gated health summary: `http://localhost:7010/health`
+- Auth-gated health summary for operators: `http://localhost:7010/health`
 - Default Grafana login: `admin / admin` unless overridden with `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD`
 - Default Grafana credentials are dev-only. Replace them in any shared or public deployment.
+- When `PUBLIC_MODE=true` or `PUBLIC_BASE_URL` is set, `./start_unified.sh start` now refuses to start with default PostgreSQL or Grafana credentials.
 
 ---
 
@@ -86,12 +88,15 @@ Use a local `stdio` server, not the HTTP `/sse` URL. In project `.mcp.json` or i
       "args": ["-m", "src.main"],
       "cwd": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway",
       "env": {
-        "BRAIN_URL": "http://127.0.0.1:7010"
+        "BRAIN_URL": "http://127.0.0.1:7010",
+        "ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"
       }
     }
   }
 }
 ```
+
+`ENABLE_LOCAL_OBSIDIAN_TOOLS=1` should be set only for a trusted local `stdio` gateway on a machine that is allowed to read local Obsidian vaults. Leave it unset for generic MCP clients.
 
 If Codex returns `404`, first verify that the `brain` server uses the `stdio` gateway above and not `url = "http://localhost:7010/sse"`.
 
@@ -119,7 +124,7 @@ In your `claude_desktop_config.json`:
 - `OIDC_ISSUER_URL` is mandatory.
 - `INTERNAL_API_KEY` must be explicitly configured and must not use the dev default. The key is compared with `hmac.compare_digest` — timing attacks against the key are not viable.
 - `/health` and `/metrics` require authentication in public mode.
-- For containerized infrastructure probes, prefer `/healthz` and `/readyz` instead of `/health`.
+- For infrastructure probes and uptime checks, use `/healthz` and `/readyz`, not `/health`.
 
 ### Optional Environment Variables
 | Variable | Default | Description |
@@ -128,6 +133,9 @@ In your `claude_desktop_config.json`:
 | `ENABLE_HTTP_OBSIDIAN_TOOLS` | `false` | Expose Obsidian sync tools via the HTTP MCP transport |
 | `BACKEND_TIMEOUT_S` | `30` | Timeout (seconds) for MCP gateway → backend HTTP calls |
 | `OIDC_DISCOVERY_CACHE_S` | `600` | OIDC discovery document cache TTL |
+| `POSTGRES_USER` | `postgres` | PostgreSQL username for the local compose stack |
+| `POSTGRES_PASSWORD` | _empty_ | Set this explicitly for any shared or public deployment |
+| `POSTGRES_DB` | `openbrain_unified` | PostgreSQL database name for the local compose stack |
 
 ---
 

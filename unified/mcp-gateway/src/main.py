@@ -36,6 +36,7 @@ from .obsidian_cli import ObsidianCliAdapter, ObsidianCliError, note_to_write_pa
 BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://localhost:7010")
 BACKEND_TIMEOUT: float = float(os.environ.get("BACKEND_TIMEOUT_S", "30"))
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
+OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"
 
 mcp = FastMCP(
     name="OpenBrain",
@@ -98,6 +99,19 @@ def _raise(r: httpx.Response) -> None:
         raise ValueError(f"Backend {r.status_code}: {detail}")
 
 
+def _obsidian_local_tools_enabled() -> bool:
+    return os.environ.get(OBSIDIAN_LOCAL_TOOLS_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _require_obsidian_local_tools_enabled() -> None:
+    if _obsidian_local_tools_enabled():
+        return
+    raise ValueError(
+        "Local Obsidian tools are disabled by default. "
+        f"Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1 only on a trusted local stdio gateway."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
@@ -106,12 +120,15 @@ def _raise(r: httpx.Response) -> None:
 @mcp.tool()
 async def brain_capabilities() -> dict:
     """Check the operational status of the Memory Platform V1."""
+    tier_2_tools = ["list", "get_context", "delete", "export", "sync_check"]
+    if _obsidian_local_tools_enabled():
+        tier_2_tools.extend(["obsidian_vaults", "obsidian_read_note", "obsidian_sync"])
     return {
         "platform": "OpenBrain V1 (Gateway)",
         "tier_1_core": {"status": "stable", "tools": ["search", "get", "store", "update"]},
         "tier_2_advanced": {
             "status": "active",
-            "tools": ["list", "get_context", "delete", "export", "sync_check", "obsidian_vaults", "obsidian_read_note", "obsidian_sync"],
+            "tools": tier_2_tools,
         },
         "tier_3_admin": {"status": "guarded", "tools": ["store_bulk", "upsert_bulk", "maintain"]},
     }
@@ -385,6 +402,7 @@ async def brain_sync_check(
 @mcp.tool()
 async def brain_obsidian_vaults() -> list[str]:
     """List local Obsidian vaults available to the backend."""
+    _require_obsidian_local_tools_enabled()
     adapter = ObsidianCliAdapter()
     try:
         return await adapter.list_vaults()
@@ -395,6 +413,7 @@ async def brain_obsidian_vaults() -> list[str]:
 @mcp.tool()
 async def brain_obsidian_read_note(path: str, vault: str = "Documents") -> dict:
     """Read a note from a local Obsidian vault with parsed frontmatter and tags."""
+    _require_obsidian_local_tools_enabled()
     adapter = ObsidianCliAdapter()
     try:
         note = await adapter.read_note(vault, path)
@@ -426,6 +445,7 @@ async def brain_obsidian_sync(
     One-way sync from an Obsidian vault into OpenBrain using deterministic match keys.
     Use paths for explicit notes or folder for a bounded folder sync.
     """
+    _require_obsidian_local_tools_enabled()
     adapter = ObsidianCliAdapter()
     try:
         resolved_paths = (paths or [])[:limit] if paths else await adapter.list_files(vault, folder=folder, limit=limit)
