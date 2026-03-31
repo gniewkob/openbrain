@@ -39,10 +39,14 @@ validate_runtime_security() {
     p_def+="gres"
     local a_def="ad"
     a_def+="min"
-    local postgres_user="${POSTGRES_USER:-$p_def}"
-    local postgres_password="${POSTGRES_PASSWORD:-$p_def}"
-    local grafana_user="${GRAFANA_ADMIN_USER:-$a_def}"
-    local grafana_password="${GRAFANA_ADMIN_PASSWORD:-$a_def}"
+    local db_def="openbrain_unified"
+
+    # Export defaults if missing from environment
+    export POSTGRES_USER="${POSTGRES_USER:-$p_def}"
+    export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$p_def}"
+    export POSTGRES_DB="${POSTGRES_DB:-$db_def}"
+    export GRAFANA_ADMIN_USER="${GRAFANA_ADMIN_USER:-$a_def}"
+    export GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-$a_def}"
 
     local shared_or_public=false
     if is_true "$public_mode" || [ -n "$public_base_url" ]; then
@@ -50,21 +54,21 @@ validate_runtime_security() {
     fi
 
     if [ "$shared_or_public" = true ]; then
-        if [ "$postgres_user" = "$p_def" ] && [ "$postgres_password" = "$p_def" ]; then
+        if [ "$POSTGRES_USER" = "$p_def" ] && [ "$POSTGRES_PASSWORD" = "$p_def" ]; then
             err "PUBLIC_MODE/public exposure forbids default PostgreSQL credentials."
             err "Set POSTGRES_USER/POSTGRES_PASSWORD in .env before starting."
             exit 1
         fi
-        if [ "$grafana_user" = "$a_def" ] && [ "$grafana_password" = "$a_def" ]; then
+        if [ "$GRAFANA_ADMIN_USER" = "$a_def" ] && [ "$GRAFANA_ADMIN_PASSWORD" = "$a_def" ]; then
             err "PUBLIC_MODE/public exposure forbids default Grafana credentials."
             err "Set GRAFANA_ADMIN_USER/GRAFANA_ADMIN_PASSWORD in .env before starting."
             exit 1
         fi
     else
-        if [ "$postgres_user" = "$p_def" ] && [ "$postgres_password" = "$p_def" ]; then
+        if [ "$POSTGRES_USER" = "$p_def" ] && [ "$POSTGRES_PASSWORD" = "$p_def" ]; then
             warn "Using default PostgreSQL credentials for local dev only."
         fi
-        if [ "$grafana_user" = "$a_def" ] && [ "$grafana_password" = "$a_def" ]; then
+        if [ "$GRAFANA_ADMIN_USER" = "$a_def" ] && [ "$GRAFANA_ADMIN_PASSWORD" = "$a_def" ]; then
             warn "Using default Grafana credentials for local dev only."
         fi
     fi
