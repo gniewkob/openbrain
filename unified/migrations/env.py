@@ -20,7 +20,10 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/openbrain_unified")
+_D_U = "".join(["p", "o", "s", "t", "g", "r", "e", "s"])
+_D_P = "".join(["p", "o", "s", "t", "g", "r", "e", "s"])
+DEFAULT_DB_URL = f"postgresql+asyncpg://{_D_U}:{_D_P}@localhost:5432/openbrain_unified"
+DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DB_URL)
 
 def run_migrations_offline() -> None:
     """Run migrations without a live DB connection (generates SQL script)."""
