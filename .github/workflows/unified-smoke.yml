@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OPENBRAIN_DISABLE_DB_CONFIG_VALIDATION: "true"
+      PYTHONPATH: "."
     defaults:
       run:
         working-directory: unified
