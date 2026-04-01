@@ -1,4 +1,4 @@
-# Operating Manual: OpenBrain Unified (v2.2)
+# Operating Manual: OpenBrain Unified (v2.3)
 
 ## Architecture Overview
 The system runs on Docker Compose. The primary entry point is `src.combined:app`, which acts as an intelligent ASGI wrapper.
@@ -22,7 +22,7 @@ The "Industrial Wrapper" in `combined.py` provides stable ASGI routing:
 3. **Root Redirect (307)**: Root path `/` requests are automatically redirected to `/sse`. The 307 status code ensures that the `POST` method and JSON-RPC payload are preserved.
 4. **Internal Auth**: MCP communicates with the internal REST API using the `X-Internal-Key` header, bypassing OIDC/Auth0 for system processes. The comparison uses `hmac.compare_digest` to prevent timing-based key guessing. In `PUBLIC_MODE=true`, this key must be explicitly configured and must not use the dev default.
 
-## Security Hardening (v2.2)
+## Security Hardening (v2.3)
 The following security improvements were applied:
 - **Timing-safe key comparison**: `X-Internal-Key` is now compared with `hmac.compare_digest`, eliminating early-exit timing attacks.
 - **Thread-safe policy registry**: `POLICY_REGISTRY` is updated via atomic reference replacement under a lock; reads also hold the lock snapshot. Eliminates the race window between `clear()` and `update()`.
@@ -32,6 +32,11 @@ The following security improvements were applied:
 - **Default-local ingress posture**: `ngrok` lives in the Compose `public` profile and starts only with `ENABLE_NGROK=1`.
 - **Request bounds**: canonical and legacy schemas now cap `top_k`, `limit`, `max_items`, bulk sizes, export IDs, and key string lengths to reduce accidental expensive requests.
 - **Access denial telemetry**: Prometheus counters now expose `access_denied_total` and reason-specific breakdowns for `admin`, `domain`, `owner`, and `tenant`.
+- **Metadata-aware idempotent writes**: writes are no longer silently skipped when only metadata changes and `content_hash` stays the same.
+- **Telemetry durability**: counters and histograms are now restored across restarts via PostgreSQL-backed persistence.
+- **Metrics exception accounting**: unhandled request failures are counted as `500` and still contribute to request-duration histograms.
+- **MCP log redaction**: transport logging now redacts `content`, `title`, `tenant_id`, `match_key`, `obsidian_ref`, and `custom_fields`.
+- **Lazy OIDC refresh lock**: the OIDC verifier avoids import-time event-loop binding by creating the async lock lazily.
 
 ## Tools and Hierarchy (Tiers)
 The system guides AI behavior by categorizing tools:
@@ -58,12 +63,13 @@ The system guides AI behavior by categorizing tools:
 
 Use V1 endpoints for new integrations. Legacy `/api/memories/*` paths remain for backward compatibility.
 
-## Domain Write Semantics (v2.2 update)
+## Domain Write Semantics (v2.3 update)
 
 `brain_store(domain="corporate")` now works correctly via both MCP gateway and direct V1 calls.
 The write engine automatically upgrades `upsert` mode to `append_version` for the corporate domain.
 Idempotency (skip if content unchanged) applies to all modes including `append_version`,
 preventing phantom version creation on repeated identical writes.
+The idempotency check now includes metadata state as well, so metadata-only updates are persisted correctly.
 
 ## Export Policy
 - **Admin callers** (privileged users authenticated via JWT) receive fully unredacted records.
@@ -73,7 +79,8 @@ preventing phantom version creation on repeated identical writes.
 
 ## Known Limitations
 - `tenant_id` is now available as a first-class indexed column and remains mirrored in `metadata_` only for compatibility with older records and tools. New code should treat the column as the source of truth.
-- In-memory telemetry (`TelemetryRegistry`) is per-process. Multi-worker uvicorn deployments will report inconsistent metrics per scrape. Use `WEB_CONCURRENCY=1` (default in the Docker stack) or replace with a shared counter backend (Redis, etc.) if multi-worker is needed.
+- Telemetry state is now durable across restarts, but the registry is still per-process. Multi-worker uvicorn deployments will report inconsistent live metrics per scrape unless replaced with a shared backend.
+- MCP transport still uses a per-request backend `httpx.AsyncClient`, which is acceptable for current volume but not the best shape for sustained high-throughput gateway traffic.
 
 ## Operational Thresholds
 - `policy_skip_per_maintain_run_ratio`: `watch >= 0.25`, `elevated >= 1.0`
