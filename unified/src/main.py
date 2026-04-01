@@ -12,7 +12,7 @@ import os
 import re
 import time
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 
 import structlog
@@ -167,6 +167,8 @@ async def lifespan(app: FastAPI):
 
     # 3. Shutdown: Final flush and cleanup
     sync_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await sync_task
     try:
         snapshot = get_metrics_snapshot()
         async with AsyncSessionLocal() as session:

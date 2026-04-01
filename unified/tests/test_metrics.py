@@ -286,7 +286,9 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
             patch.object(main.asyncio, "create_task") as create_task,
         ):
             session_factory.return_value.__aenter__.return_value = object()
-            fake_task = types.SimpleNamespace(cancel=lambda: None)
+            loop = main.asyncio.get_running_loop()
+            fake_task = loop.create_future()
+            fake_task.set_result(None)
             create_task.side_effect = lambda coro: (coro.close(), fake_task)[1]
 
             async with main.lifespan(main.app):

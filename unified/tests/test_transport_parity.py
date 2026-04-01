@@ -18,6 +18,14 @@ from helpers import load_gateway_main
 gateway = load_gateway_main()
 
 
+def _drop_none(value):
+    if isinstance(value, dict):
+        return {key: _drop_none(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [_drop_none(item) for item in value]
+    return value
+
+
 LEGACY_MEMORY = {
     "id": "mem-1",
     "tenant_id": None,
@@ -84,7 +92,7 @@ class _GatewayClient:
         if path == "/api/memories":
             return _FakeResponse(200, [LEGACY_MEMORY])
         if path.startswith("/api/v1/memory/"):
-            return _FakeResponse(200, LEGACY_MEMORY)
+            return _FakeResponse(200, V1_RECORD)
         raise AssertionError(f"Unexpected GET path: {path}")
 
     async def put(self, path: str, json=None):
@@ -113,6 +121,8 @@ class _TransportClient:
             if payload.get("sort") == "updated_at_desc":
                 return _FakeResponse(200, [LEGACY_MEMORY])
             return _FakeResponse(200, [{"record": V1_RECORD, "score": 0.9}])
+        if method == "GET" and path == "/api/v1/memory/mem-1":
+            return _FakeResponse(200, V1_RECORD)
         if method == "PUT" and path == "/api/memories/mem-1":
             return _FakeResponse(200, LEGACY_MEMORY)
         if method == "GET" and path == "/api/memories":
@@ -127,9 +137,11 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         with patch("_gateway_src.main._client", return_value=_GatewayClient()), patch.object(
             mcp_transport, "_client", return_value=_TransportClient()
         ):
-            gateway_result = (await gateway.brain_store(content="payload", domain="build", match_key="mk-1")).model_dump()
+            gateway_result = (
+                await gateway.brain_store(content="payload", domain="build", match_key="mk-1")
+            ).model_dump(exclude_none=True)
             transport_result = await mcp_transport.brain_store(content="payload", domain="build", match_key="mk-1")
-        self.assertEqual(transport_result, gateway_result)
+        self.assertEqual(_drop_none(transport_result), _drop_none(gateway_result))
 
     async def test_list_parity_between_stdio_and_http(self) -> None:
         with patch("_gateway_src.main._client", return_value=_GatewayClient()), patch.object(
@@ -138,6 +150,14 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             gateway_result = await gateway.brain_list(domain="build", limit=1)
             transport_result = await mcp_transport.brain_list(domain="build", limit=1)
         self.assertEqual(transport_result, gateway_result)
+
+    async def test_get_parity_between_stdio_and_http(self) -> None:
+        with patch("_gateway_src.main._client", return_value=_GatewayClient()), patch.object(
+            mcp_transport, "_client", return_value=_TransportClient()
+        ):
+            gateway_result = (await gateway.brain_get("mem-1")).model_dump(exclude_none=True)
+            transport_result = await mcp_transport.brain_get("mem-1")
+        self.assertEqual(_drop_none(transport_result), _drop_none(gateway_result))
 
     async def test_search_parity_between_stdio_and_http(self) -> None:
         with patch("_gateway_src.main._client", return_value=_GatewayClient()), patch.object(
@@ -153,9 +173,9 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         ):
             gateway_result = (
                 await gateway.brain_update(memory_id="mem-1", content="payload", title="Note")
-            ).model_dump()
+            ).model_dump(exclude_none=True)
             transport_result = await mcp_transport.brain_update(memory_id="mem-1", content="payload", title="Note")
-        self.assertEqual(transport_result, gateway_result)
+        self.assertEqual(_drop_none(transport_result), _drop_none(gateway_result))
 
     async def test_delete_parity_between_stdio_and_http(self) -> None:
         with patch("_gateway_src.main._client", return_value=_GatewayClient()), patch.object(

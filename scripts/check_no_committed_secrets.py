@@ -15,8 +15,16 @@ IGNORED_SUFFIXES = {
     ".pdf",
     ".pyc",
 }
-IGNORED_NAMES = {
-    ".env.example",
+URL_SCAN_SUFFIXES = {
+    ".env",
+    ".example",
+    ".ini",
+    ".json",
+    ".md",
+    ".toml",
+    ".txt",
+    ".yaml",
+    ".yml",
 }
 LINE_PATTERNS = {
     "ngrok token": re.compile(r"^\s*(?:-\s*)?NGROK_AUTHTOKEN\s*[:=]\s*(?P<value>.+)$"),
@@ -29,9 +37,26 @@ LINE_PATTERNS = {
     "grafana admin password": re.compile(
         r"^\s*(?:-\s*)?GRAFANA_ADMIN_PASSWORD\s*[:=]\s*(?P<value>.+)$"
     ),
+    "postgres password": re.compile(
+        r"^\s*(?:-\s*)?POSTGRES_PASSWORD\s*[:=]\s*(?P<value>.+)$"
+    ),
+    "generic token": re.compile(
+        r"^\s*(?:-\s*)?[A-Z0-9_]*TOKEN[A-Z0-9_]*\s*[:=]\s*(?P<value>.+)$"
+    ),
+    "generic secret": re.compile(
+        r"^\s*(?:-\s*)?[A-Z0-9_]*SECRET[A-Z0-9_]*\s*[:=]\s*(?P<value>.+)$"
+    ),
+    "bearer authorization": re.compile(
+        r"^\s*Authorization\s*:\s*Bearer\s+(?P<value>.+)$",
+        re.IGNORECASE,
+    ),
 }
 PRIVATE_KEY_PATTERN = re.compile(
     r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----"
+)
+URL_CREDENTIAL_PATTERN = re.compile(
+    r"\b[a-z][a-z0-9+.-]*://(?P<value>[^/\s:@]+:[^/\s@]+)@",
+    re.IGNORECASE,
 )
 
 
@@ -48,7 +73,7 @@ def tracked_files() -> list[Path]:
         path = ROOT / raw
         if not path.is_file():
             continue
-        if path.name in IGNORED_NAMES or path.suffix.lower() in IGNORED_SUFFIXES:
+        if path.suffix.lower() in IGNORED_SUFFIXES:
             continue
         result.append(path)
     return result
@@ -66,6 +91,8 @@ def _is_placeholder(value: str) -> bool:
         return True
     if normalized.startswith("your-"):
         return True
+    if normalized in {"...", "<redacted>", "<hidden>"}:
+        return True
     if "os.environ.get(" in normalized or "env.get(" in normalized:
         return True
     return False
@@ -81,6 +108,11 @@ def main() -> int:
         rel = path.relative_to(ROOT)
         if PRIVATE_KEY_PATTERN.search(content):
             findings.append(f"{rel}: private key block")
+        if path.suffix.lower() in URL_SCAN_SUFFIXES or path.name.startswith(".env"):
+            for match in URL_CREDENTIAL_PATTERN.finditer(content):
+                if _is_placeholder(match.group("value")):
+                    continue
+                findings.append(f"{rel}: embedded URL credentials")
         for line_no, line in enumerate(content.splitlines(), start=1):
             for label, pattern in LINE_PATTERNS.items():
                 match = pattern.search(line)

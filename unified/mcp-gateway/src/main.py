@@ -59,6 +59,8 @@ class BrainMemory(BaseModel):
     tenant_id: str | None = None
     domain: str
     entity_type: str
+    title: str | None = None
+    summary: str | None = None
     content: str
     owner: str = ""
     status: str
@@ -78,6 +80,8 @@ class BrainMemory(BaseModel):
     updated_at: str
     created_by: str
     updated_by: str | None = None
+    source: dict[str, Any] | None = None
+    governance: dict[str, Any] | None = None
 
 
 def _client() -> httpx.AsyncClient:
