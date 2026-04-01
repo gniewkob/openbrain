@@ -48,7 +48,7 @@ def _load_env_file(path: Path) -> dict[str, str]:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        result[key.strip()] = value.strip()
+        result[key.strip()] = value.strip().strip('"').strip("'")
     return result
 
 

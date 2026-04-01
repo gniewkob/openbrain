@@ -15,15 +15,6 @@ IGNORED_SUFFIXES = {
     ".pdf",
     ".pyc",
 }
-SCANNED_SUFFIXES = {
-    ".env",
-    ".example",
-    ".ini",
-    ".json",
-    ".toml",
-    ".yaml",
-    ".yml",
-}
 IGNORED_NAMES = {
     ".env.example",
 }
@@ -59,10 +50,6 @@ def tracked_files() -> list[Path]:
             continue
         if path.name in IGNORED_NAMES or path.suffix.lower() in IGNORED_SUFFIXES:
             continue
-        if path.suffix.lower() not in SCANNED_SUFFIXES and not path.name.startswith(
-            ".env"
-        ):
-            continue
         result.append(path)
     return result
 
@@ -78,6 +65,8 @@ def _is_placeholder(value: str) -> bool:
     if normalized.lower() in {"[hidden]", "[redacted]", "changeme", "your-secret-here"}:
         return True
     if normalized.startswith("your-"):
+        return True
+    if "os.environ.get(" in normalized or "env.get(" in normalized:
         return True
     return False
 

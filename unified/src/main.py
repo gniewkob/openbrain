@@ -461,10 +461,12 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         raw = request.headers.get("X-Request-ID", "")
         req_id = raw if _REQ_ID_RE.match(raw) else str(uuid.uuid4())
         structlog.contextvars.bind_contextvars(request_id=req_id)
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = req_id
-        structlog.contextvars.clear_contextvars()
-        return response
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = req_id
+            return response
+        finally:
+            structlog.contextvars.clear_contextvars()
 
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestIDMiddleware)

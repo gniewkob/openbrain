@@ -7,13 +7,13 @@ on:
 jobs:
   guardrails:
     runs-on: ubuntu-latest
-    env:
-      OPENBRAIN_DISABLE_DB_CONFIG_VALIDATION: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install unified package for security tests
+        run: pip install -e ./unified
       - name: Install ruff
         run: pip install ruff
       - name: Run syntax and undefined-name checks
@@ -22,12 +22,11 @@ jobs:
         run: python scripts/check_no_committed_secrets.py
       - name: Verify compose guardrails
         run: python scripts/check_compose_guardrails.py
+      - name: Verify public-mode startup guardrails
+        run: python -m unittest unified.tests.test_auth_security unified.tests.test_db_security
 
   smoke:
     runs-on: ubuntu-latest
-    env:
-      OPENBRAIN_DISABLE_DB_CONFIG_VALIDATION: "true"
-      PYTHONPATH: "."
     defaults:
       run:
         working-directory: unified
@@ -45,8 +44,6 @@ jobs:
 
   gateway-smoke:
     runs-on: ubuntu-latest
-    env:
-      OPENBRAIN_DISABLE_DB_CONFIG_VALIDATION: "true"
     defaults:
       run:
         working-directory: unified/mcp-gateway

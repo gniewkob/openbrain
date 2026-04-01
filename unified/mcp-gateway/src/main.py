@@ -37,6 +37,7 @@ BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://localhost:7010")
 BACKEND_TIMEOUT: float = float(os.environ.get("BACKEND_TIMEOUT_S", "30"))
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
 OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"
+MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
 
 mcp = FastMCP(
     name="OpenBrain",
@@ -181,7 +182,7 @@ async def brain_store(
                 "custom_fields": custom_fields or {},
                 "obsidian_ref": obsidian_ref,
                 "match_key": match_key,
-                "source": {"type": "agent", "system": "other"},
+                "source": {"type": "agent", "system": MCP_SOURCE_SYSTEM},
             },
             "write_mode": "upsert",
         })
@@ -211,9 +212,10 @@ async def brain_list(
     limit: int = 20,
 ) -> list[dict]:
     """
-    List memories with optional filters.
-    status options: active | draft | deprecated (superseded excluded by default).
-    domain options: corporate | build | personal.
+    Browse memories with metadata filters.
+
+    status options: active | superseded (default: active only)
+    domain options: corporate | build | personal
     """
     params: dict[str, Any] = {"limit": limit}
     if domain:

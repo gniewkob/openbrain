@@ -241,6 +241,31 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snapshot["counters"]["http_requests_total_500"], 1)
         self.assertEqual(snapshot["histograms"]["http_request_duration_seconds"]["count"], 1)
 
+    async def test_request_id_middleware_clears_context_on_exception(self) -> None:
+        middleware = main.RequestIDMiddleware(app=main.app)
+        request = Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/api/memories/fail",
+                "headers": [(b"x-request-id", b"req-123")],
+                "query_string": b"",
+                "scheme": "http",
+                "client": ("127.0.0.1", 12345),
+                "server": ("testserver", 80),
+                "http_version": "1.1",
+            }
+        )
+
+        async def _boom(_request):
+            self.assertEqual(main.structlog.contextvars.get_contextvars().get("request_id"), "req-123")
+            raise RuntimeError("boom")
+
+        with self.assertRaisesRegex(RuntimeError, "boom"):
+            await middleware.dispatch(request, _boom)
+
+        self.assertNotIn("request_id", main.structlog.contextvars.get_contextvars())
+
     async def test_lifespan_restores_histograms_from_persistence(self) -> None:
         counters = {"http_requests_total_200": 7}
         histograms = {

@@ -28,7 +28,7 @@ The bridge follows the same pattern as the `mailai` exporter on port 9177.
 (gitignored — never committed).
 
 The bridge reads it automatically at startup. To rotate:
-1. Update `INTERNAL_API_KEY` in `.env` and in `docker-compose.unified.yml` env
+1. Update `INTERNAL_API_KEY` in `.env` (the compose stack already consumes it from the environment; do not hardcode it in `docker-compose.unified.yml`)
 2. Restart the bridge: `launchctl kickstart -k gui/$(id -u)/com.openbrain.metrics.bridge`
 3. Restart unified-server: `docker compose -f docker-compose.unified.yml restart unified-server`
 
