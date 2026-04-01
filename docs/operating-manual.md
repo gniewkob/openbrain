@@ -37,6 +37,11 @@ The following security improvements were applied:
 - **Metrics exception accounting**: unhandled request failures are counted as `500` and still contribute to request-duration histograms.
 - **MCP log redaction**: transport logging now redacts `content`, `title`, `tenant_id`, `match_key`, `obsidian_ref`, and `custom_fields`.
 - **Lazy OIDC refresh lock**: the OIDC verifier avoids import-time event-loop binding by creating the async lock lazily.
+- **Request tracing cleanup**: `RequestIDMiddleware` now clears `structlog` context even when a request raises before response creation.
+- **Guardrail CI refresh**: the smoke workflow now installs `unified`, runs public-mode startup security tests directly, and no longer carries the removed `OPENBRAIN_DISABLE_DB_CONFIG_VALIDATION` flag.
+- **Gateway/HTTP parity**: stdio gateway records now carry the same V1 provenance fields (`title`, `summary`, `source`, `governance`) needed for parity with the HTTP MCP transport.
+- **Secret scanner expansion**: committed-secret checks now cover tracked text files more broadly, including `.env.example`, generic `*_TOKEN` / `*_SECRET` patterns, bearer headers, and URL-embedded credentials in config-like files.
+- **Telemetry shutdown hygiene**: the periodic telemetry sync task is now cancelled and awaited cleanly during FastAPI lifespan shutdown.
 
 ## Tools and Hierarchy (Tiers)
 The system guides AI behavior by categorizing tools:
@@ -81,6 +86,7 @@ The idempotency check now includes metadata state as well, so metadata-only upda
 - `tenant_id` is now available as a first-class indexed column and remains mirrored in `metadata_` only for compatibility with older records and tools. New code should treat the column as the source of truth.
 - Telemetry state is now durable across restarts, but the registry is still per-process. Multi-worker uvicorn deployments will report inconsistent live metrics per scrape unless replaced with a shared backend.
 - MCP transport still uses a per-request backend `httpx.AsyncClient`, which is acceptable for current volume but not the best shape for sustained high-throughput gateway traffic.
+- The metrics bridge still uses Python's basic `HTTPServer`, which is sufficient for the current single-scrape local topology but not intended as a hardened multi-client ingress component.
 
 ## Operational Thresholds
 - `policy_skip_per_maintain_run_ratio`: `watch >= 0.25`, `elevated >= 1.0`
