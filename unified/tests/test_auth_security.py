@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import os
 import sys
@@ -7,15 +8,16 @@ import types
 import unittest
 from unittest.mock import patch
 
+from starlette.requests import Request
+
 
 AUTH_MODULE = "src.auth"
 
 
 class AuthSecurityTests(unittest.TestCase):
     def _reload_auth(self):
-        fake_jose = types.ModuleType("jose")
-        fake_jose.jwt = types.SimpleNamespace(decode=lambda *args, **kwargs: {})
         fake_jwt = types.ModuleType("jwt")
+        fake_jwt.decode = lambda *args, **kwargs: {}
 
         class FakePyJWKClient:
             def __init__(self, *args, **kwargs) -> None:
@@ -26,18 +28,12 @@ class AuthSecurityTests(unittest.TestCase):
 
         fake_jwt.PyJWKClient = FakePyJWKClient
 
-        existing_jose = sys.modules.get("jose")
         existing_jwt = sys.modules.get("jwt")
         sys.modules.pop(AUTH_MODULE, None)
-        sys.modules["jose"] = fake_jose
         sys.modules["jwt"] = fake_jwt
         try:
             return importlib.import_module(AUTH_MODULE)
         finally:
-            if existing_jose is not None:
-                sys.modules["jose"] = existing_jose
-            else:
-                sys.modules.pop("jose", None)
             if existing_jwt is not None:
                 sys.modules["jwt"] = existing_jwt
             else:
@@ -94,6 +90,18 @@ class AuthSecurityTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, "not valid JSON"):
                 self._reload_auth()
+
+    def test_local_mode_logs_warning_once_when_auth_is_disabled(self) -> None:
+        auth = self._reload_auth()
+        request = Request({"type": "http", "headers": []})
+
+        with patch.object(auth.logger, "warning") as warning:
+            result_one = asyncio.run(auth.require_auth(request=request, credentials=None))
+            result_two = asyncio.run(auth.require_auth(request=request, credentials=None))
+
+        self.assertEqual(result_one, {"sub": "local-dev"})
+        self.assertEqual(result_two, {"sub": "local-dev"})
+        warning.assert_called_once()
 
 
 if __name__ == "__main__":

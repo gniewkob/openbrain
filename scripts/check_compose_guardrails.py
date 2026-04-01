@@ -13,8 +13,8 @@ COMPOSE_PATH = Path(__file__).resolve().parents[1] / "docker-compose.unified.yml
 def main() -> int:
     content = COMPOSE_PATH.read_text(encoding="utf-8")
 
-    # We now require variables to be provided by the environment (e.g. via start_unified.sh)
-    # to avoid hardcoding even default "postgres" strings which trigger GitGuardian.
+    # Variables must be provided by the environment (e.g. via start_unified.sh)
+    # so shared/public runs cannot silently inherit compose-level credential defaults.
     required_snippets = [
         'POSTGRES_USER: ${POSTGRES_USER}',
         'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}',

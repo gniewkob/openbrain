@@ -12,9 +12,8 @@ from src.schemas import MaintenanceAction, MemoryWriteRecord, MemoryWriteRequest
 
 
 def _import_main_with_fake_auth_deps():
-    fake_jose = types.ModuleType("jose")
-    fake_jose.jwt = types.SimpleNamespace(decode=lambda *args, **kwargs: {})
     fake_jwt = types.ModuleType("jwt")
+    fake_jwt.decode = lambda *args, **kwargs: {}
 
     class FakePyJWKClient:
         def __init__(self, *args, **kwargs) -> None:
@@ -25,18 +24,12 @@ def _import_main_with_fake_auth_deps():
 
     fake_jwt.PyJWKClient = FakePyJWKClient
 
-    existing_jose = sys.modules.get("jose")
     existing_jwt = sys.modules.get("jwt")
-    sys.modules["jose"] = fake_jose
     sys.modules["jwt"] = fake_jwt
     try:
         from src import main
         return main
     finally:
-        if existing_jose is not None:
-            sys.modules["jose"] = existing_jose
-        else:
-            sys.modules.pop("jose", None)
         if existing_jwt is not None:
             sys.modules["jwt"] = existing_jwt
         else:

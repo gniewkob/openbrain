@@ -19,9 +19,9 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 import httpx
+import jwt
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import jwt as jose_jwt
 from jwt import PyJWKClient
 
 logger = logging.getLogger("openbrain.auth")
@@ -41,6 +41,7 @@ POLICY_REGISTRY_JSON = os.environ.get("OPENBRAIN_POLICY_REGISTRY_JSON", "").stri
 POLICY_REGISTRY_PATH = os.environ.get("OPENBRAIN_POLICY_REGISTRY_PATH", "").strip()
 
 _bearer_scheme = HTTPBearer(auto_error=False)
+_local_auth_warning_emitted = False
 
 
 @dataclass
@@ -111,7 +112,7 @@ class OIDCVerifier:
                 self._jwk_client.get_signing_key_from_jwt,  # type: ignore[union-attr]
                 token,
             )
-            claims = jose_jwt.decode(
+            claims = jwt.decode(
                 token,
                 signing_key.key,
                 algorithms=["RS256"],
@@ -343,6 +344,13 @@ async def require_auth(
     requires Auth0 JWT.
     """
     if not PUBLIC_EXPOSURE:
+        global _local_auth_warning_emitted
+        if not _local_auth_warning_emitted:
+            logger.warning(
+                "Authentication is disabled because PUBLIC_MODE and PUBLIC_BASE_URL are unset; "
+                "local-only access is permitted for this process."
+            )
+            _local_auth_warning_emitted = True
         return {"sub": "local-dev"}
 
     # Allow MCP gateway (and curl) to bypass OIDC with internal key.
