@@ -16,7 +16,7 @@ from sqlalchemy import select, func, delete as sa_delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .embed import get_embedding
-from .models import AuditLog, DomainEnum, Memory, compute_hash
+from .models import AuditLog, DomainEnum, Memory, TelemetryCounter, compute_hash
 from .schemas import (
     BatchResultItem,
     BulkUpsertResult,
@@ -1159,3 +1159,26 @@ async def get_grounding_pack(
         themes=list(themes)[:10],
         risks=risks[:5]
     )
+
+
+# ---------------------------------------------------------------------------
+# Telemetry Persistence
+# ---------------------------------------------------------------------------
+
+async def get_telemetry_counters(session: AsyncSession) -> dict[str, int]:
+    """Load all persisted counters from the database."""
+    result = await session.execute(select(TelemetryCounter))
+    return {c.name: c.value for c in result.scalars().all()}
+
+
+async def upsert_telemetry_counter(session: AsyncSession, name: str, value: int) -> None:
+    """Save a single counter value to the database."""
+    stmt = select(TelemetryCounter).where(TelemetryCounter.name == name)
+    result = await session.execute(stmt)
+    counter = result.scalar_one_or_none()
+    if counter:
+        counter.value = value
+    else:
+        counter = TelemetryCounter(name=name, value=value)
+        session.add(counter)
+    await session.commit()

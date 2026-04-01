@@ -27,6 +27,11 @@ The following security improvements were applied:
 - **Timing-safe key comparison**: `X-Internal-Key` is now compared with `hmac.compare_digest`, eliminating early-exit timing attacks.
 - **Thread-safe policy registry**: `POLICY_REGISTRY` is updated via atomic reference replacement under a lock; reads also hold the lock snapshot. Eliminates the race window between `clear()` and `update()`.
 - **MCP source tagging**: `brain_store` tags records with `MCP_SOURCE_SYSTEM` (env var, default `other`). Override in your env to identify the calling agent (e.g., `claude`, `codex`, `chatgpt`).
+- **Per-record authorization for `export` and `sync-check`**: both flows now reuse record-level access gates; unauthorized lookups are masked as `404` for `sync-check`.
+- **Local Obsidian opt-in**: `brain_obsidian_*` tools in the local stdio gateway require `ENABLE_LOCAL_OBSIDIAN_TOOLS=1` and are no longer exposed by default.
+- **Default-local ingress posture**: `ngrok` lives in the Compose `public` profile and starts only with `ENABLE_NGROK=1`.
+- **Request bounds**: canonical and legacy schemas now cap `top_k`, `limit`, `max_items`, bulk sizes, export IDs, and key string lengths to reduce accidental expensive requests.
+- **Access denial telemetry**: Prometheus counters now expose `access_denied_total` and reason-specific breakdowns for `admin`, `domain`, `owner`, and `tenant`.
 
 ## Tools and Hierarchy (Tiers)
 The system guides AI behavior by categorizing tools:
@@ -64,9 +69,10 @@ preventing phantom version creation on repeated identical writes.
 - **Admin callers** (privileged users authenticated via JWT) receive fully unredacted records.
 - **Service account callers** (`X-Internal-Key` subject = `internal`) also receive full records since they have already passed `_require_admin()`.
 - Format: pass `"format": "jsonl"` in the request body to receive newline-delimited JSON (`application/x-ndjson`) instead of a JSON array.
+- `export` now validates every requested record against the same record-level access rules as `read_memory`; a privileged caller still needs matching domain/tenant/owner scope where applicable.
 
 ## Known Limitations
-- `tenant_id` is currently stored in `metadata_` rather than a dedicated indexed column. This is an accepted interim design, but if tenancy becomes a hard operational boundary the field should move into the relational model with an index.
+- `tenant_id` is now available as a first-class indexed column and remains mirrored in `metadata_` only for compatibility with older records and tools. New code should treat the column as the source of truth.
 - In-memory telemetry (`TelemetryRegistry`) is per-process. Multi-worker uvicorn deployments will report inconsistent metrics per scrape. Use `WEB_CONCURRENCY=1` (default in the Docker stack) or replace with a shared counter backend (Redis, etc.) if multi-worker is needed.
 
 ## Operational Thresholds
@@ -83,6 +89,7 @@ For the full production operating model, see [Governance Layer](governance-layer
 ## Troubleshooting
 - **404 Not Found in ChatGPT**: Ensure you are using the base ngrok URL without any suffix. The server handles all routing.
 - **401 Unauthorized**: Check OIDC config in public mode, or verify that `INTERNAL_API_KEY` in your `.env` file matches the server configuration for trusted internal callers.
+- **Python `httpx`/`urllib` probes fail while `curl` to `localhost` works**: In the Codex CLI sandbox, Python socket connections to `127.0.0.1` can be blocked with `[Errno 1] Operation not permitted`. This is a sandbox restriction, not an OpenBrain or MCP bug. Validate local MCP connectivity with `curl`, or run the Python probe outside the sandbox when you need to exercise the HTTP client code path.
 - **Ollama Issues**: If search returns errors, verify that the model is loaded: `docker exec openbrain-unified-ollama ollama list`.
 - **Swagger UI not loading**: Access `/docs` directly via the REST port (`http://localhost:7010/docs`). The combined ASGI wrapper now correctly routes `/docs` to FastAPI.
 - **corporate domain writes returning "failed"**: This was a bug in v2.1. Upgrade to v2.2. The write engine now auto-upgrades `upsert` mode to `append_version` for corporate domain.

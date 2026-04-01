@@ -76,19 +76,41 @@ The system uses intent-based descriptions ("Use when / Do not use when") to guid
 
 ## 3. Client Configuration
 
-### Codex CLI (Local)
-Use a local `stdio` server, not the HTTP `/sse` URL. In project `.mcp.json` or in `~/.codex/config.toml`:
+### Codex CLI / Gemini CLI (Local)
+Use a local `stdio` server for maximum performance and reliable authentication. In project `.mcp.json`, `~/.codex/config.toml`, or `~/.gemini/settings.json`:
 
 ```json
 {
   "mcpServers": {
-    "brain": {
+    "openbrain": {
       "type": "stdio",
       "command": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway/.venv/bin/python",
       "args": ["-m", "src.main"],
       "cwd": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway",
       "env": {
         "BRAIN_URL": "http://127.0.0.1:7010",
+        "INTERNAL_API_KEY": "set-a-unique-local-key-if-public-mode-is-enabled",
+        "ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"
+      }
+    }
+  }
+}
+```
+
+### Claude Desktop (Local)
+If `PUBLIC_MODE=true` is active, Claude Desktop must also provide the `INTERNAL_API_KEY`. Since the standard SSE config doesn't support custom headers, **stdio** is the recommended configuration for Claude Desktop as well:
+
+**File**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+```json
+{
+  "mcpServers": {
+    "openbrain": {
+      "command": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway/.venv/bin/python",
+      "args": ["-m", "src.main"],
+      "cwd": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway",
+      "env": {
+        "BRAIN_URL": "http://127.0.0.1:7010",
+        "INTERNAL_API_KEY": "set-a-unique-local-key-if-public-mode-is-enabled",
         "ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"
       }
     }
@@ -100,17 +122,7 @@ Use a local `stdio` server, not the HTTP `/sse` URL. In project `.mcp.json` or i
 
 If Codex returns `404`, first verify that the `brain` server uses the `stdio` gateway above and not `url = "http://localhost:7010/sse"`.
 
-### Claude Desktop (Local)
-In your `claude_desktop_config.json`:
-```json
-{
-  "mcpServers": {
-    "openbrain": {
-      "url": "http://localhost:7010/sse"
-    }
-  }
-}
-```
+Only use the direct local `http://localhost:7010/sse` endpoint for clients that can attach the required auth headers themselves. Claude Desktop cannot do that reliably in `PUBLIC_MODE=true`, which is why `stdio` is the recommended local configuration there.
 
 ### ChatGPT (Remote)
 1. Check the URL using `./start_unified.sh status`.

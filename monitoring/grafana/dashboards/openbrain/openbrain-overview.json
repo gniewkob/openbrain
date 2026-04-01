@@ -1,14 +1,40 @@
 {
   "annotations": {
-    "list": []
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "panels": [],
+      "title": "System Status & Health",
+      "type": "row"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -23,13 +49,19 @@
             {
               "options": {
                 "0": {
-                  "text": "normal"
+                  "color": "green",
+                  "index": 0,
+                  "text": "HEALTHY"
                 },
                 "1": {
-                  "text": "watch"
+                  "color": "orange",
+                  "index": 1,
+                  "text": "WATCH"
                 },
                 "2": {
-                  "text": "elevated"
+                  "color": "red",
+                  "index": 2,
+                  "text": "ELEVATED"
                 }
               },
               "type": "value"
@@ -56,12 +88,56 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "operational_health_status",
+          "refId": "A"
+        }
+      ],
+      "title": "Operational Health Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openbrain-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 11,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -76,15 +152,13 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "operational_health_status",
-          "refId": "A",
-          "legendFormat": "operational_health"
+          "expr": "active_memories_total",
+          "refId": "A"
         }
       ],
-      "title": "Operational Health",
+      "title": "Total Active Memories",
       "type": "stat"
     },
     {
@@ -95,67 +169,35 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 0
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.1.5",
-      "targets": [
-        {
-          "expr": "policy_skip_per_maintain_run_ratio",
-          "refId": "A",
-          "legendFormat": "policy_skip_ratio"
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
         }
-      ],
-      "title": "Policy Skip / Maintain",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "openbrain-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 12,
-        "y": 0
+        "y": 1
       },
-      "id": 3,
+      "id": 12,
       "options": {
-        "colorMode": "background",
+        "colorMode": "value",
         "graphMode": "area",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -166,15 +208,13 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "duplicate_candidates_per_maintain_run_ratio",
-          "refId": "A",
-          "legendFormat": "duplicate_pressure"
+          "expr": "sum(increase(http_requests_total_500[5m])) or vector(0)",
+          "refId": "A"
         }
       ],
-      "title": "Duplicate Pressure",
+      "title": "Errors (Last 5m)",
       "type": "stat"
     },
     {
@@ -186,41 +226,52 @@
         "defaults": {
           "color": {
             "mode": "palette-classic"
-          }
-        },
-        "overrides": []
+          },
+          "unit": "s"
+        }
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 18,
-        "y": 0
+        "y": 1
       },
-      "id": 4,
+      "id": 13,
       "options": {
-        "colorMode": "background",
+        "colorMode": "value",
         "graphMode": "area",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean"
           ],
           "fields": "",
           "values": false
         },
         "textMode": "auto"
       },
-      "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "search_zero_hit_ratio",
-          "refId": "A",
-          "legendFormat": "search_zero_hit_ratio"
+          "expr": "rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])",
+          "refId": "A"
         }
       ],
-      "title": "Search Zero-Hit Ratio",
+      "title": "Avg Latency (5m)",
       "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 101,
+      "panels": [],
+      "title": "Traffic & Performance",
+      "type": "row"
     },
     {
       "datasource": {
@@ -231,50 +282,52 @@
         "defaults": {
           "color": {
             "mode": "palette-classic"
-          }
-        },
-        "overrides": []
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2
+          },
+          "unit": "reqps"
+        }
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 5
+        "y": 6
       },
-      "id": 5,
+      "id": 21,
       "options": {
         "legend": {
-          "displayMode": "list",
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
           "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single"
         }
       },
-      "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "memories_created_total",
-          "legendFormat": "created",
+          "expr": "sum by (status) (rate(http_requests_total_200[5m]))",
+          "legendFormat": "2xx Success",
           "refId": "A"
         },
         {
-          "expr": "memories_updated_total",
-          "legendFormat": "updated",
+          "expr": "sum by (status) (rate(http_requests_total_401[5m])) + sum by (status) (rate(http_requests_total_403[5m]))",
+          "legendFormat": "4xx Auth/Forbidden",
           "refId": "B"
         },
         {
-          "expr": "memories_versioned_total",
-          "legendFormat": "versioned",
+          "expr": "sum by (status) (rate(http_requests_total_404[5m]))",
+          "legendFormat": "404 Not Found",
           "refId": "C"
         },
         {
-          "expr": "memories_deleted_total",
-          "legendFormat": "deleted",
+          "expr": "sum by (status) (rate(http_requests_total_500[5m])) + sum by (status) (rate(http_requests_total_502[5m])) + sum by (status) (rate(http_requests_total_503[5m]))",
+          "legendFormat": "5xx Errors",
           "refId": "D"
         }
       ],
-      "title": "Write Lifecycle Counters",
+      "title": "Request Rate by Status",
       "type": "timeseries"
     },
     {
@@ -286,50 +339,98 @@
         "defaults": {
           "color": {
             "mode": "palette-classic"
-          }
-        },
-        "overrides": []
+          },
+          "unit": "s"
+        }
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 5
+        "y": 6
       },
-      "id": 6,
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50 (median)",
+          "refId": "C"
+        }
+      ],
+      "title": "Request Latency Quantiles",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 102,
+      "panels": [],
+      "title": "Memory Lifecycle & Content",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openbrain-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "id": 31,
       "options": {
         "legend": {
           "displayMode": "list",
           "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single"
         }
       },
-      "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "policy_skip_delete_total",
-          "legendFormat": "delete",
+          "expr": "rate(memories_created_total[5m])",
+          "legendFormat": "Created",
           "refId": "A"
         },
         {
-          "expr": "policy_skip_dedup_total",
-          "legendFormat": "dedup",
+          "expr": "rate(memories_updated_total[5m])",
+          "legendFormat": "Updated (In-place)",
           "refId": "B"
         },
         {
-          "expr": "policy_skip_owner_normalization_total",
-          "legendFormat": "owner normalization",
+          "expr": "rate(memories_versioned_total[5m])",
+          "legendFormat": "Versioned (Corporate)",
           "refId": "C"
         },
         {
-          "expr": "policy_skip_link_repair_total",
-          "legendFormat": "link repair",
+          "expr": "rate(memories_deleted_total[5m])",
+          "legendFormat": "Deleted",
           "refId": "D"
         }
       ],
-      "title": "Policy Skip Reasons",
+      "title": "Write Activity (Rate/s)",
       "type": "timeseries"
     },
     {
@@ -337,49 +438,83 @@
         "type": "prometheus",
         "uid": "openbrain-prometheus"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 13
+        "x": 12,
+        "y": 15
       },
-      "id": 7,
+      "id": 32,
       "options": {
         "legend": {
           "displayMode": "list",
           "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single"
         }
       },
-      "pluginVersion": "11.1.5",
       "targets": [
         {
           "expr": "active_memories_corporate_total",
-          "legendFormat": "corporate active",
+          "legendFormat": "Corporate",
           "refId": "A"
         },
         {
           "expr": "active_memories_build_total",
-          "legendFormat": "build active",
+          "legendFormat": "Build",
           "refId": "B"
         },
         {
           "expr": "active_memories_personal_total",
-          "legendFormat": "personal active",
+          "legendFormat": "Personal",
           "refId": "C"
         }
       ],
-      "title": "Active Memories by Domain",
+      "title": "Active Memories Distribution",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 103,
+      "panels": [],
+      "title": "Maintenance & Governance",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openbrain-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 41,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "policy_skip_per_maintain_run_ratio",
+          "legendFormat": "Policy Skip Ratio",
+          "refId": "A"
+        },
+        {
+          "expr": "duplicate_candidates_per_maintain_run_ratio",
+          "legendFormat": "Duplicate Candidate Ratio",
+          "refId": "B"
+        }
+      ],
+      "title": "Maintenance Ratios",
       "type": "timeseries"
     },
     {
@@ -387,49 +522,37 @@
         "type": "prometheus",
         "uid": "openbrain-prometheus"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 13
+        "y": 24
       },
-      "id": 8,
+      "id": 42,
       "options": {
         "legend": {
           "displayMode": "list",
           "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single"
         }
       },
-      "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "sync_missing_total",
-          "legendFormat": "missing",
+          "expr": "policy_skip_delete_total",
+          "legendFormat": "Delete Blocked",
           "refId": "A"
         },
         {
-          "expr": "sync_outdated_total",
-          "legendFormat": "outdated",
+          "expr": "policy_skip_dedup_total",
+          "legendFormat": "Dedup Blocked",
           "refId": "B"
         },
         {
-          "expr": "sync_synced_total",
-          "legendFormat": "synced",
+          "expr": "policy_skip_owner_normalization_total",
+          "legendFormat": "Normalization Blocked",
           "refId": "C"
         }
       ],
-      "title": "Sync Outcomes",
+      "title": "Policy Skip Reasons (Cumulative)",
       "type": "timeseries"
     }
   ],
@@ -448,8 +571,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "OpenBrain Overview",
+  "title": "OpenBrain Professional Overview",
   "uid": "openbrain-overview",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
