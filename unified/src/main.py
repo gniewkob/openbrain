@@ -44,6 +44,7 @@ from .crud import (
     get_memory_status_counts,
     get_maintenance_report,
     get_telemetry_counters,
+    get_telemetry_histograms,
     handle_memory_write,
     handle_memory_write_many,
     list_memories,
@@ -55,7 +56,7 @@ from .crud import (
     sync_check,
     update_memory,
     upsert_memories_bulk,
-    upsert_telemetry_counter,
+    upsert_telemetry_metrics,
 )
 from .db import AsyncSessionLocal, get_session
 from .embed import close_embedding_client
@@ -90,6 +91,7 @@ from .schemas import (
     SyncCheckResponse,
 )
 from .telemetry import (
+    bulk_load_histograms,
     bulk_load_metrics,
     get_metrics_snapshot,
     incr_metric,
@@ -119,28 +121,42 @@ PUBLIC_MODE = PUBLIC_EXPOSURE
 # ---------------------------------------------------------------------------
 
 async def _periodic_telemetry_sync():
-    """Periodically flush in-memory counters to PostgreSQL."""
+    """Periodically flush in-memory telemetry to PostgreSQL."""
     while True:
         await asyncio.sleep(60) # Sync every minute
         try:
-            snapshot = get_metrics_snapshot()["counters"]
+            snapshot = get_metrics_snapshot()
             async with AsyncSessionLocal() as session:
-                for name, value in snapshot.items():
-                    # We use a slightly more optimized approach here for the background task
-                    await upsert_telemetry_counter(session, name, value)
-                log.info("telemetry_counters_synced", count=len(snapshot))
+                await upsert_telemetry_metrics(
+                    session,
+                    counters=snapshot["counters"],
+                    histograms=snapshot["histograms"],
+                )
+                log.info(
+                    "telemetry_state_synced",
+                    counter_count=len(snapshot["counters"]),
+                    histogram_count=len(snapshot["histograms"]),
+                )
         except Exception as e:
             log.error("telemetry_sync_failed", error=str(e))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Startup: Load counters from DB
+    # 1. Startup: Load telemetry from DB
     try:
         async with AsyncSessionLocal() as session:
-            persisted = await get_telemetry_counters(session)
-            if persisted:
-                bulk_load_metrics(persisted)
-                log.info("telemetry_counters_loaded", count=len(persisted))
+            persisted_counters = await get_telemetry_counters(session)
+            persisted_histograms = await get_telemetry_histograms(session)
+            if persisted_counters:
+                bulk_load_metrics(persisted_counters)
+            if persisted_histograms:
+                bulk_load_histograms(persisted_histograms)
+            if persisted_counters or persisted_histograms:
+                log.info(
+                    "telemetry_state_loaded",
+                    counter_count=len(persisted_counters),
+                    histogram_count=len(persisted_histograms),
+                )
     except Exception as e:
         log.error("telemetry_load_failed", error=str(e))
 
@@ -152,10 +168,13 @@ async def lifespan(app: FastAPI):
     # 3. Shutdown: Final flush and cleanup
     sync_task.cancel()
     try:
-        snapshot = get_metrics_snapshot()["counters"]
+        snapshot = get_metrics_snapshot()
         async with AsyncSessionLocal() as session:
-            for name, value in snapshot.items():
-                await upsert_telemetry_counter(session, name, value)
+            await upsert_telemetry_metrics(
+                session,
+                counters=snapshot["counters"],
+                histograms=snapshot["histograms"],
+            )
             log.info("telemetry_final_flush_complete")
     except Exception as e:
         log.error("telemetry_final_flush_failed", error=str(e))
@@ -426,27 +445,15 @@ _REQ_ID_RE = re.compile(r'^[a-zA-Z0-9\-]{1,64}$')
 class MetricsMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         start_time = time.perf_counter()
-        response = await call_next(request)
-        duration = time.perf_counter() - start_time
-        
-        status_code = response.status_code
-        # We don't have easy access to path parameters here, so we use request.url.path
-        # But we want to avoid high cardinality, so we normalize some common paths.
-        path = request.url.path
-        if path.startswith("/api/memories/"):
-            # Simple normalization for memory IDs
-            parts = path.split("/")
-            if len(parts) > 3 and not parts[3].startswith("bulk") and not parts[3] == "search":
-                 path = "/api/memories/{id}"
-        
-        # Increments a counter for status codes (e.g., http_requests_total{status="200"})
-        # Since our custom TelemetryRegistry doesn't support labels yet, we'll use name suffixes.
-        # This is a bit hacky but works with our simple registry.
-        incr_metric(f"http_requests_total_{status_code}")
-        # Observe the duration in a histogram
-        observe_metric("http_request_duration_seconds", duration)
-        
-        return response
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            duration = time.perf_counter() - start_time
+            incr_metric(f"http_requests_total_{status_code}")
+            observe_metric("http_request_duration_seconds", duration)
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):

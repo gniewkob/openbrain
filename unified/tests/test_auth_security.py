@@ -103,6 +103,11 @@ class AuthSecurityTests(unittest.TestCase):
         self.assertEqual(result_two, {"sub": "local-dev"})
         warning.assert_called_once()
 
+    def test_oidc_verifier_creates_refresh_lock_lazily(self) -> None:
+        auth = self._reload_auth()
+        verifier = auth.OIDCVerifier("https://issuer.example.com")
+        self.assertIsNone(verifier._refresh_lock)
+
 
 if __name__ == "__main__":
     unittest.main()

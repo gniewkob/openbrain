@@ -6,8 +6,9 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
+from starlette.requests import Request
 
-from src.telemetry import reset_metrics
+from src.telemetry import get_metrics_snapshot, reset_metrics
 from src.schemas import MaintenanceAction, MemoryWriteRecord, MemoryWriteRequest
 
 
@@ -213,6 +214,63 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("# TYPE operational_health_status gauge", payload)
         self.assertIn("operational_health_status 2.0", payload)
         self.assertIn("policy_skip_per_maintain_run_ratio_watch_threshold 0.25", payload)
+
+    async def test_metrics_middleware_counts_unhandled_exceptions_as_500(self) -> None:
+        middleware = main.MetricsMiddleware(app=main.app)
+        request = Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/api/memories/fail",
+                "headers": [],
+                "query_string": b"",
+                "scheme": "http",
+                "client": ("127.0.0.1", 12345),
+                "server": ("testserver", 80),
+                "http_version": "1.1",
+            }
+        )
+
+        async def _boom(_request):
+            raise RuntimeError("boom")
+
+        with self.assertRaisesRegex(RuntimeError, "boom"):
+            await middleware.dispatch(request, _boom)
+
+        snapshot = get_metrics_snapshot()
+        self.assertEqual(snapshot["counters"]["http_requests_total_500"], 1)
+        self.assertEqual(snapshot["histograms"]["http_request_duration_seconds"]["count"], 1)
+
+    async def test_lifespan_restores_histograms_from_persistence(self) -> None:
+        counters = {"http_requests_total_200": 7}
+        histograms = {
+            "http_request_duration_seconds": {
+                "sum": 1.5,
+                "count": 3,
+                "buckets": [0.1, 1.0, "inf"],
+                "counts": [1, 2, 3],
+            }
+        }
+
+        with (
+            patch.object(main, "AsyncSessionLocal") as session_factory,
+            patch.object(main, "get_telemetry_counters", new=AsyncMock(return_value=counters)),
+            patch.object(main, "get_telemetry_histograms", new=AsyncMock(return_value=histograms)),
+            patch.object(main, "close_embedding_client", new=AsyncMock()),
+            patch.object(main, "upsert_telemetry_metrics", new=AsyncMock()),
+            patch.object(main.asyncio, "create_task") as create_task,
+        ):
+            session_factory.return_value.__aenter__.return_value = object()
+            fake_task = types.SimpleNamespace(cancel=lambda: None)
+            create_task.side_effect = lambda coro: (coro.close(), fake_task)[1]
+
+            async with main.lifespan(main.app):
+                snapshot = get_metrics_snapshot()
+                self.assertEqual(snapshot["counters"]["http_requests_total_200"], 7)
+                self.assertEqual(
+                    snapshot["histograms"]["http_request_duration_seconds"]["count"],
+                    3,
+                )
 
     async def test_delete_policy_skip_counts_reason_specific_metric(self) -> None:
         with patch.object(main, "get_memory", new=AsyncMock(return_value=main.MemoryOut(

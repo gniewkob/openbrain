@@ -62,7 +62,12 @@ class OIDCVerifier:
         self._metadata: OIDCMetadata | None = None
         self._metadata_fetched_at = 0.0
         self._jwk_client: PyJWKClient | None = None
-        self._refresh_lock: asyncio.Lock = asyncio.Lock()
+        self._refresh_lock: asyncio.Lock | None = None
+
+    def _get_refresh_lock(self) -> asyncio.Lock:
+        if self._refresh_lock is None:
+            self._refresh_lock = asyncio.Lock()
+        return self._refresh_lock
 
     async def metadata(self) -> OIDCMetadata:
         now = time.time()
@@ -70,7 +75,7 @@ class OIDCVerifier:
             return self._metadata
 
         # Lock prevents concurrent requests from all issuing discovery calls.
-        async with self._refresh_lock:
+        async with self._get_refresh_lock():
             # Re-check inside lock — another coroutine may have refreshed first.
             now = time.time()
             if self._metadata and (now - self._metadata_fetched_at) < self.discovery_cache_s:

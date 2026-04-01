@@ -71,6 +71,33 @@ class Histogram:
             if value <= bucket:
                 self.counts[i] += 1
 
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "sum": self.sum,
+            "count": self.count,
+            "buckets": [
+                "inf" if bucket == float("inf") else bucket for bucket in self.buckets
+            ],
+            "counts": list(self.counts),
+        }
+
+    @classmethod
+    def from_snapshot(cls, name: str, data: dict[str, Any]) -> "Histogram":
+        raw_buckets = list(data.get("buckets") or [])
+        finite_buckets = tuple(
+            float(bucket)
+            for bucket in raw_buckets
+            if bucket not in {"inf", float("inf")}
+        )
+        histogram = cls(name, finite_buckets or DEFAULT_BUCKETS)
+        counts = [int(value) for value in list(data.get("counts") or [])]
+        if len(counts) != len(histogram.buckets):
+            raise ValueError(f"Invalid persisted histogram shape for {name}")
+        histogram.counts = counts
+        histogram.sum = float(data.get("sum", 0.0))
+        histogram.count = int(data.get("count", 0))
+        return histogram
+
 
 class TelemetryRegistry:
     def __init__(self) -> None:
@@ -96,6 +123,11 @@ class TelemetryRegistry:
                 if name in KNOWN_COUNTERS or name.startswith("http_requests_total_"):
                     self._counters[name] = val
 
+    def bulk_load_histograms(self, values: dict[str, dict[str, Any]]) -> None:
+        with self._lock:
+            for name, payload in values.items():
+                self._histograms[name] = Histogram.from_snapshot(name, payload)
+
     def set_gauge(self, name: str, value: float) -> None:
         with self._lock:
             self._gauges[name] = value
@@ -112,8 +144,10 @@ class TelemetryRegistry:
 
     def histograms_snapshot(self) -> dict[str, Histogram]:
         with self._lock:
-            # Return copies to avoid thread issues during rendering
-            return {name: hist for name, hist in self._histograms.items()}
+            return {
+                name: Histogram.from_snapshot(name, hist.snapshot())
+                for name, hist in self._histograms.items()
+            }
 
     def reset(self) -> None:
         with self._lock:
@@ -134,11 +168,17 @@ def bulk_load_metrics(values: dict[str, int]) -> None:
     registry.bulk_load_counters(values)
 
 
+def bulk_load_histograms(values: dict[str, dict[str, Any]]) -> None:
+    registry.bulk_load_histograms(values)
+
+
 def get_metrics_snapshot() -> dict[str, Any]:
     return {
         "counters": registry.snapshot(),
         "gauges": registry.gauges_snapshot(),
-        "histograms": {name: {"sum": h.sum, "count": h.count} for name, h in registry.histograms_snapshot().items()},
+        "histograms": {
+            name: hist.snapshot() for name, hist in registry.histograms_snapshot().items()
+        },
     }
 
 
@@ -185,4 +225,3 @@ def render_prometheus_metrics() -> str:
         lines.append(f"{metric_name}_sum {hist.sum}")
 
     return "\n".join(lines) + ("\n" if lines else "")
-

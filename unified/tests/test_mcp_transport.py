@@ -54,6 +54,10 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             "record": {
                 "content": "secret payload",
                 "domain": "build",
+                "tenant_id": "tenant-a",
+                "match_key": "mk-1",
+                "obsidian_ref": "Vault/Private.md",
+                "title": "Quarterly payroll notes",
                 "custom_fields": {"nested": {"content": "nested secret"}},
             },
             "records": [
@@ -69,9 +73,12 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         _, kwargs = log_info.call_args
         logged_payload = kwargs["payload"]
         self.assertEqual(logged_payload["record"]["content"], "[REDACTED]")
-        self.assertEqual(
-            logged_payload["record"]["custom_fields"]["nested"]["content"], "[REDACTED]"
-        )
+        self.assertEqual(logged_payload["record"]["tenant_id"], "[REDACTED]")
+        self.assertEqual(logged_payload["record"]["match_key"], "[REDACTED]")
+        self.assertEqual(logged_payload["record"]["obsidian_ref"], "[REDACTED]")
+        self.assertEqual(logged_payload["record"]["title"], "[REDACTED]")
+        self.assertEqual(logged_payload["record"]["custom_fields"], "[REDACTED]")
+        self.assertEqual(logged_payload["records"][0]["match_key"], "[REDACTED]")
         self.assertEqual(logged_payload["records"][0]["content"], "[REDACTED]")
         self.assertEqual(payload["record"]["content"], "secret payload")
         self.assertEqual(payload["records"][0]["content"], "bulk secret")

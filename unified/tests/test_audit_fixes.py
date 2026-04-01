@@ -411,6 +411,48 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotEqual(result.status, "skipped", "sensitivity-only change must not be skipped")
 
+    async def test_metadata_only_change_is_not_skipped(self) -> None:
+        existing = _mem(
+            content="same",
+            content_hash="hash-same",
+            relations={"parent": "mem-0"},
+            metadata_={
+                "title": "Before",
+                "root_id": "mem-1",
+                "custom_fields": {"priority": "low"},
+                "source": {"type": "agent", "system": "other"},
+                "tenant_id": "tenant-a",
+            },
+            tenant_id="tenant-a",
+        )
+
+        async def _execute(stmt):
+            return SimpleNamespace(scalar_one_or_none=lambda: existing)
+
+        session = SimpleNamespace(execute=_execute)
+        session.add = lambda obj: None
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        record = MemoryWriteRecord(
+            content="same",
+            domain="build",
+            entity_type="Task",
+            match_key="mk-1",
+            title="After",
+            tenant_id="tenant-b",
+            relations=MemoryRelations(parent=["mem-9"]),
+            custom_fields={"priority": "critical"},
+            source=SourceMetadata(type="agent", system="other"),
+        )
+        req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
+
+        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+            result = await crud.handle_memory_write(session, req)
+
+        self.assertNotEqual(result.status, "skipped", "metadata-only change must not be skipped")
+
 
 class NonAtomicSessionRollbackTest(unittest.IsolatedAsyncioTestCase):
     """A3 — non-atomic batch must rollback session after each per-record failure."""

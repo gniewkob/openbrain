@@ -55,6 +55,15 @@ mcp = FastMCP(
     ),
 )
 
+_SENSITIVE_LOG_FIELDS = {
+    "content",
+    "custom_fields",
+    "match_key",
+    "obsidian_ref",
+    "tenant_id",
+    "title",
+}
+
 
 def _client() -> httpx.AsyncClient:
     headers = {}
@@ -134,7 +143,7 @@ def _redact_logged_payload(payload: Any) -> Any:
     if isinstance(payload, dict):
         redacted = {}
         for key, value in payload.items():
-            if key == "content":
+            if key in _SENSITIVE_LOG_FIELDS:
                 redacted[key] = "[REDACTED]"
             else:
                 redacted[key] = _redact_logged_payload(value)

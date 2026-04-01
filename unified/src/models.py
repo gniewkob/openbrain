@@ -11,20 +11,21 @@ import hashlib
 import uuid
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
+from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     ARRAY,
     DateTime,
-    ForeignKey,
     Index,
     Integer,
+    Float,
     String,
     Text,
     Enum,
     text as sa_text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -163,6 +164,21 @@ class TelemetryCounter(Base):
 
     name: Mapped[str] = mapped_column(String(128), primary_key=True)
     value: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_now, onupdate=_now
+    )
+
+
+class TelemetryHistogram(Base):
+    """Persists Prometheus histogram state across server restarts."""
+
+    __tablename__ = "telemetry_histograms"
+
+    name: Mapped[str] = mapped_column(String(128), primary_key=True)
+    sum: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    buckets: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    counts: Mapped[list[int]] = mapped_column(JSONB, nullable=False, default=list)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_now, onupdate=_now
     )

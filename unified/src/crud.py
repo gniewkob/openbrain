@@ -16,7 +16,14 @@ from sqlalchemy import select, func, delete as sa_delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .embed import get_embedding
-from .models import AuditLog, DomainEnum, Memory, TelemetryCounter, compute_hash
+from .models import (
+    AuditLog,
+    DomainEnum,
+    Memory,
+    TelemetryCounter,
+    TelemetryHistogram,
+    compute_hash,
+)
 from .schemas import (
     BatchResultItem,
     BulkUpsertResult,
@@ -280,6 +287,23 @@ def _tenant_filter_expr(tenant_ids: list[str]):
     )
 
 
+def _record_matches_existing(existing: Memory, rec: MemoryWriteRecord, content_hash: str) -> bool:
+    metadata = existing.metadata_ or {}
+    return (
+        existing.content_hash == content_hash
+        and existing.owner == rec.owner
+        and (existing.tenant_id or metadata.get("tenant_id")) == rec.tenant_id
+        and existing.tags == rec.tags
+        and (existing.relations or {}) == rec.relations.model_dump()
+        and existing.obsidian_ref == rec.obsidian_ref
+        and existing.entity_type == rec.entity_type
+        and existing.sensitivity == rec.sensitivity
+        and metadata.get("title") == rec.title
+        and (metadata.get("custom_fields") or {}) == rec.custom_fields
+        and (metadata.get("source") or {}) == rec.source.model_dump()
+    )
+
+
 # Status Constants
 STATUS_ACTIVE = "active"
 STATUS_SUPERSEDED = "superseded"
@@ -410,15 +434,8 @@ async def handle_memory_write(
         # Skip if content and key metadata are unchanged — applies to both upsert
         # (build/personal) and append_version (corporate).  For corporate this prevents
         # a new audit version being created on every idempotent brain_store call.
-        if existing.content_hash == content_hash:
-            changed = (
-                existing.owner != rec.owner
-                or existing.tags != rec.tags
-                or existing.obsidian_ref != rec.obsidian_ref
-                or existing.sensitivity != rec.sensitivity
-            )
-            if not changed:
-                return MemoryWriteResponse(status="skipped", record=_to_record(existing))
+        if _record_matches_existing(existing, rec, content_hash):
+            return MemoryWriteResponse(status="skipped", record=_to_record(existing))
 
         if mode == WriteMode.append_version or append_only_policy:
             # --- CREATE NEW VERSION ---
@@ -1171,14 +1188,71 @@ async def get_telemetry_counters(session: AsyncSession) -> dict[str, int]:
     return {c.name: c.value for c in result.scalars().all()}
 
 
-async def upsert_telemetry_counter(session: AsyncSession, name: str, value: int) -> None:
-    """Save a single counter value to the database."""
-    stmt = select(TelemetryCounter).where(TelemetryCounter.name == name)
-    result = await session.execute(stmt)
-    counter = result.scalar_one_or_none()
-    if counter:
-        counter.value = value
-    else:
-        counter = TelemetryCounter(name=name, value=value)
-        session.add(counter)
+async def get_telemetry_histograms(session: AsyncSession) -> dict[str, dict[str, Any]]:
+    """Load all persisted histograms from the database."""
+    result = await session.execute(select(TelemetryHistogram))
+    return {
+        histogram.name: {
+            "sum": histogram.sum,
+            "count": histogram.count,
+            "buckets": histogram.buckets,
+            "counts": histogram.counts,
+        }
+        for histogram in result.scalars().all()
+    }
+
+
+async def upsert_telemetry_metrics(
+    session: AsyncSession,
+    counters: dict[str, int],
+    histograms: dict[str, dict[str, Any]],
+) -> None:
+    """Persist telemetry state with a single transaction per flush."""
+    counter_rows = (
+        await session.execute(
+            select(TelemetryCounter).where(TelemetryCounter.name.in_(list(counters.keys())))
+        )
+        if counters
+        else None
+    )
+    existing_counters = {
+        counter.name: counter for counter in counter_rows.scalars().all()
+    } if counter_rows else {}
+
+    for name, value in counters.items():
+        counter = existing_counters.get(name)
+        if counter is None:
+            session.add(TelemetryCounter(name=name, value=value))
+        else:
+            counter.value = value
+
+    histogram_rows = (
+        await session.execute(
+            select(TelemetryHistogram).where(TelemetryHistogram.name.in_(list(histograms.keys())))
+        )
+        if histograms
+        else None
+    )
+    existing_histograms = {
+        histogram.name: histogram for histogram in histogram_rows.scalars().all()
+    } if histogram_rows else {}
+
+    for name, payload in histograms.items():
+        histogram = existing_histograms.get(name)
+        if histogram is None:
+            session.add(
+                TelemetryHistogram(
+                    name=name,
+                    sum=float(payload["sum"]),
+                    count=int(payload["count"]),
+                    buckets=list(payload["buckets"]),
+                    counts=list(payload["counts"]),
+                )
+            )
+        else:
+            histogram.sum = float(payload["sum"])
+            histogram.count = int(payload["count"])
+            histogram.buckets = list(payload["buckets"])
+            histogram.counts = list(payload["counts"])
+
     await session.commit()
