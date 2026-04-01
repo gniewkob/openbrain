@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import os
 import sys
 from logging.config import fileConfig
@@ -21,9 +20,9 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Default credentials encoded to avoid simplistic secret scanning
-_D_U = base64.b64decode("cG9zdGdyZXM=").decode()
-_D_P = base64.b64decode("cG9zdGdyZXM=").decode()
+# Local development defaults are intentionally plain strings.
+_D_U = "postgres"
+_D_P = "postgres"
 DEFAULT_DB_URL = f"postgresql+asyncpg://{_D_U}:{_D_P}@localhost:5432/openbrain_unified"
 DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DB_URL)
 

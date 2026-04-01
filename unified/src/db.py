@@ -10,9 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import declarative_base
 
 # Unified Database URL
-# Default credentials hex-encoded to avoid simplistic secret scanning
-_D_U = bytes.fromhex("706f737467726573").decode()
-_D_P = bytes.fromhex("706f737467726573").decode()
+# Local development defaults are intentionally plain strings.
+_D_U = "postgres"
+_D_P = "postgres"
 
 DB_URL = os.environ.get(
     "DATABASE_URL",
@@ -30,8 +30,6 @@ def _uses_dev_database_credentials(db_url: str) -> bool:
 
 
 def validate_database_configuration() -> None:
-    if os.environ.get("OPENBRAIN_DISABLE_DB_CONFIG_VALIDATION", "").lower() == "true":
-        return
     public_mode = os.environ.get("PUBLIC_MODE", "").lower() == "true"
     public_base_url = bool(os.environ.get("PUBLIC_BASE_URL", "").strip())
     if (public_mode or public_base_url) and _uses_dev_database_credentials(DB_URL):

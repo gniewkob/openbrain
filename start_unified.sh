@@ -35,10 +35,8 @@ compose_cmd() {
 validate_runtime_security() {
     local public_mode="${PUBLIC_MODE:-false}"
     local public_base_url="${PUBLIC_BASE_URL:-}"
-    local p_def="post"
-    p_def+="gres"
-    local a_def="ad"
-    a_def+="min"
+    local p_def="postgres"
+    local a_def="admin"
     local db_def="openbrain_unified"
 
     # Export defaults if missing from environment

@@ -40,9 +40,8 @@ class PolicyRegistryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved.subjects["admin@example.com"].admin_domains, ["corporate", "build", "personal"])
 
     def test_auth_loads_registry_from_file(self) -> None:
-        fake_jose = types.ModuleType("jose")
-        fake_jose.jwt = types.SimpleNamespace(decode=lambda *args, **kwargs: {})
         fake_jwt = types.ModuleType("jwt")
+        fake_jwt.decode = lambda *args, **kwargs: {}
 
         class FakePyJWKClient:
             def __init__(self, *args, **kwargs) -> None:
@@ -57,10 +56,8 @@ class PolicyRegistryTests(unittest.IsolatedAsyncioTestCase):
             registry_path = Path(tmpdir) / "policy-registry.json"
             registry_path.write_text(json.dumps({"tenants": {"tenant-a": {"read_domains": ["build"]}}}), encoding="utf-8")
 
-            existing_jose = sys.modules.get("jose")
             existing_jwt = sys.modules.get("jwt")
             sys.modules.pop(AUTH_MODULE, None)
-            sys.modules["jose"] = fake_jose
             sys.modules["jwt"] = fake_jwt
             try:
                 with patch.dict(
@@ -74,10 +71,6 @@ class PolicyRegistryTests(unittest.IsolatedAsyncioTestCase):
                 ):
                     auth = importlib.import_module(AUTH_MODULE)
             finally:
-                if existing_jose is not None:
-                    sys.modules["jose"] = existing_jose
-                else:
-                    sys.modules.pop("jose", None)
                 if existing_jwt is not None:
                     sys.modules["jwt"] = existing_jwt
                 else:

@@ -6,10 +6,13 @@ Runs in Docker on port 80 (mapped to 7010 externally).
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
+import time
 import uuid
+from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
@@ -40,6 +43,7 @@ from .crud import (
     get_memory_domain_status_counts,
     get_memory_status_counts,
     get_maintenance_report,
+    get_telemetry_counters,
     handle_memory_write,
     handle_memory_write_many,
     list_memories,
@@ -51,8 +55,10 @@ from .crud import (
     sync_check,
     update_memory,
     upsert_memories_bulk,
+    upsert_telemetry_counter,
 )
 from .db import AsyncSessionLocal, get_session
+from .embed import close_embedding_client
 from .obsidian_cli import ObsidianCliAdapter, ObsidianCliError, note_to_memory_write_record
 from .schemas import (
     BulkUpsertResult,
@@ -83,7 +89,14 @@ from .schemas import (
     SyncCheckRequest,
     SyncCheckResponse,
 )
-from .telemetry import get_metrics_snapshot, incr_metric, render_prometheus_metrics, set_gauge_metric
+from .telemetry import (
+    bulk_load_metrics,
+    get_metrics_snapshot,
+    incr_metric,
+    observe_metric,
+    render_prometheus_metrics,
+    set_gauge_metric,
+)
 from pydantic import ValidationError
 
 structlog.configure(
@@ -100,6 +113,57 @@ log = structlog.get_logger()
 # Backwards-compatible module alias used by existing tests and local patches.
 # Semantics now follow effective public exposure, not only PUBLIC_MODE=true.
 PUBLIC_MODE = PUBLIC_EXPOSURE
+
+# ---------------------------------------------------------------------------
+# Lifecycle & Persistence
+# ---------------------------------------------------------------------------
+
+async def _periodic_telemetry_sync():
+    """Periodically flush in-memory counters to PostgreSQL."""
+    while True:
+        await asyncio.sleep(60) # Sync every minute
+        try:
+            snapshot = get_metrics_snapshot()["counters"]
+            async with AsyncSessionLocal() as session:
+                for name, value in snapshot.items():
+                    # We use a slightly more optimized approach here for the background task
+                    await upsert_telemetry_counter(session, name, value)
+                log.info("telemetry_counters_synced", count=len(snapshot))
+        except Exception as e:
+            log.error("telemetry_sync_failed", error=str(e))
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1. Startup: Load counters from DB
+    try:
+        async with AsyncSessionLocal() as session:
+            persisted = await get_telemetry_counters(session)
+            if persisted:
+                bulk_load_metrics(persisted)
+                log.info("telemetry_counters_loaded", count=len(persisted))
+    except Exception as e:
+        log.error("telemetry_load_failed", error=str(e))
+
+    # 2. Start background sync task
+    sync_task = asyncio.create_task(_periodic_telemetry_sync())
+
+    yield
+
+    # 3. Shutdown: Final flush and cleanup
+    sync_task.cancel()
+    try:
+        snapshot = get_metrics_snapshot()["counters"]
+        async with AsyncSessionLocal() as session:
+            for name, value in snapshot.items():
+                await upsert_telemetry_counter(session, name, value)
+            log.info("telemetry_final_flush_complete")
+    except Exception as e:
+        log.error("telemetry_final_flush_failed", error=str(e))
+    try:
+        await close_embedding_client()
+    except Exception as e:
+        log.error("embedding_client_shutdown_failed", error=str(e))
+
 
 # ---------------------------------------------------------------------------
 # App Initialization
@@ -119,6 +183,7 @@ app = FastAPI(
     servers=_servers or None,
     docs_url="/docs",
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 
@@ -358,6 +423,32 @@ def _hide_memory_access_denied(exc: HTTPException) -> HTTPException:
 _REQ_ID_RE = re.compile(r'^[a-zA-Z0-9\-]{1,64}$')
 
 
+class MetricsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        start_time = time.perf_counter()
+        response = await call_next(request)
+        duration = time.perf_counter() - start_time
+        
+        status_code = response.status_code
+        # We don't have easy access to path parameters here, so we use request.url.path
+        # But we want to avoid high cardinality, so we normalize some common paths.
+        path = request.url.path
+        if path.startswith("/api/memories/"):
+            # Simple normalization for memory IDs
+            parts = path.split("/")
+            if len(parts) > 3 and not parts[3].startswith("bulk") and not parts[3] == "search":
+                 path = "/api/memories/{id}"
+        
+        # Increments a counter for status codes (e.g., http_requests_total{status="200"})
+        # Since our custom TelemetryRegistry doesn't support labels yet, we'll use name suffixes.
+        # This is a bit hacky but works with our simple registry.
+        incr_metric(f"http_requests_total_{status_code}")
+        # Observe the duration in a histogram
+        observe_metric("http_request_duration_seconds", duration)
+        
+        return response
+
+
 class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         raw = request.headers.get("X-Request-ID", "")
@@ -368,6 +459,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         structlog.contextvars.clear_contextvars()
         return response
 
+app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 # ---------------------------------------------------------------------------
