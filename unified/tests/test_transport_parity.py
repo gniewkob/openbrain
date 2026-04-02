@@ -15,7 +15,12 @@ if str(GATEWAY_TESTS) not in sys.path:
 
 from helpers import load_gateway_main
 
-gateway = load_gateway_main()
+try:
+    gateway = load_gateway_main()
+    _GATEWAY_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+    gateway = None
+    _GATEWAY_IMPORT_ERROR = exc
 
 
 def _drop_none(value):
@@ -132,6 +137,7 @@ class _TransportClient:
         raise AssertionError(f"Unexpected transport request: {method} {path}")
 
 
+@unittest.skipIf(gateway is None, f"gateway test deps unavailable: {_GATEWAY_IMPORT_ERROR}")
 class TransportParityTests(unittest.IsolatedAsyncioTestCase):
     async def test_store_parity_between_stdio_and_http(self) -> None:
         with patch("_gateway_src.main._client", return_value=_GatewayClient()), patch.object(
