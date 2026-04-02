@@ -145,6 +145,7 @@ The repository now includes a shared host-level canary:
 
 - `scripts/host_dual_canary.sh`
 - `scripts/host_resource_canary.sh`
+- `scripts/host_full_canary.sh`
 
 It checks:
 
@@ -162,4 +163,5 @@ Recommended usage:
 ```bash
 bash scripts/host_dual_canary.sh
 bash scripts/host_resource_canary.sh
+bash scripts/host_full_canary.sh
 ```
