@@ -146,6 +146,7 @@ Interpretation:
 The repository now includes a safe pruning helper:
 
 - `scripts/prune_mcp_sandboxes.sh`
+- `launchd/com.openbrain.mcp-sandbox-prune-report.plist`
 
 Behavior:
 
@@ -161,6 +162,19 @@ bash scripts/prune_mcp_sandboxes.sh
 bash scripts/prune_mcp_sandboxes.sh --apply
 MAX_RUNNING_AGE_HOURS=72 bash scripts/prune_mcp_sandboxes.sh --include-running
 ```
+
+For automated reporting on the Mac Mini without deleting anything:
+
+```bash
+cp launchd/com.openbrain.mcp-sandbox-prune-report.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.openbrain.mcp-sandbox-prune-report.plist
+launchctl kickstart -k gui/$(id -u)/com.openbrain.mcp-sandbox-prune-report
+```
+
+This job runs every 6 hours in dry-run mode and writes reports to:
+
+- `monitoring/mcp-sandbox-prune-report-stdout.log`
+- `monitoring/mcp-sandbox-prune-report-stderr.log`
 
 ## Recommended Next Actions
 

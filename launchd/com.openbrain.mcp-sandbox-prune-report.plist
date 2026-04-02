@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.openbrain.mcp-sandbox-prune-report</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/bash</string>
+      <string>/Users/gniewkob/Repos/openbrain/scripts/prune_mcp_sandboxes.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/gniewkob/Repos/openbrain</string>
+
+    <key>StartInterval</key>
+    <integer>21600</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/gniewkob/Repos/openbrain/monitoring/mcp-sandbox-prune-report-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/gniewkob/Repos/openbrain/monitoring/mcp-sandbox-prune-report-stderr.log</string>
+  </dict>
+</plist>
