@@ -110,7 +110,7 @@
       },
       "targets": [
         {
-          "expr": "operational_health_status",
+          "expr": "operational_health_status{job=\"openbrain-unified\"}",
           "refId": "A"
         }
       ],
@@ -154,7 +154,7 @@
       },
       "targets": [
         {
-          "expr": "active_memories_total",
+          "expr": "active_memories_total{job=\"openbrain-unified\"}",
           "refId": "A"
         }
       ],
@@ -210,7 +210,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(http_requests_total_500[5m])) or vector(0)",
+          "expr": "sum(increase(http_requests_total_500{job=\"openbrain-unified\"}[5m])) or vector(0)",
           "refId": "A"
         }
       ],
@@ -253,7 +253,7 @@
       },
       "targets": [
         {
-          "expr": "rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])",
+          "expr": "rate(http_request_duration_seconds_sum{job=\"openbrain-unified\"}[5m]) / rate(http_request_duration_seconds_count{job=\"openbrain-unified\"}[5m])",
           "refId": "A"
         }
       ],
@@ -307,22 +307,22 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (rate(http_requests_total_200[5m]))",
+          "expr": "sum by (status) (rate(http_requests_total_200{job=\"openbrain-unified\"}[5m]))",
           "legendFormat": "2xx Success",
           "refId": "A"
         },
         {
-          "expr": "sum by (status) (rate(http_requests_total_401[5m])) + sum by (status) (rate(http_requests_total_403[5m]))",
+          "expr": "sum by (status) (rate(http_requests_total_401{job=\"openbrain-unified\"}[5m])) + sum by (status) (rate(http_requests_total_403{job=\"openbrain-unified\"}[5m]))",
           "legendFormat": "4xx Auth/Forbidden",
           "refId": "B"
         },
         {
-          "expr": "sum by (status) (rate(http_requests_total_404[5m]))",
+          "expr": "sum by (status) (rate(http_requests_total_404{job=\"openbrain-unified\"}[5m]))",
           "legendFormat": "404 Not Found",
           "refId": "C"
         },
         {
-          "expr": "sum by (status) (rate(http_requests_total_500[5m])) + sum by (status) (rate(http_requests_total_502[5m])) + sum by (status) (rate(http_requests_total_503[5m]))",
+          "expr": "sum by (status) (rate(http_requests_total_500{job=\"openbrain-unified\"}[5m])) + sum by (status) (rate(http_requests_total_502{job=\"openbrain-unified\"}[5m])) + sum by (status) (rate(http_requests_total_503{job=\"openbrain-unified\"}[5m]))",
           "legendFormat": "5xx Errors",
           "refId": "D"
         }
@@ -359,17 +359,17 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"openbrain-unified\"}[5m])))",
           "legendFormat": "p99",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"openbrain-unified\"}[5m])))",
           "legendFormat": "p95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"openbrain-unified\"}[5m])))",
           "legendFormat": "p50 (median)",
           "refId": "C"
         }
@@ -410,22 +410,22 @@
       },
       "targets": [
         {
-          "expr": "rate(memories_created_total[5m])",
+          "expr": "rate(memories_created_total{job=\"openbrain-unified\"}[5m])",
           "legendFormat": "Created",
           "refId": "A"
         },
         {
-          "expr": "rate(memories_updated_total[5m])",
+          "expr": "rate(memories_updated_total{job=\"openbrain-unified\"}[5m])",
           "legendFormat": "Updated (In-place)",
           "refId": "B"
         },
         {
-          "expr": "rate(memories_versioned_total[5m])",
+          "expr": "rate(memories_versioned_total{job=\"openbrain-unified\"}[5m])",
           "legendFormat": "Versioned (Corporate)",
           "refId": "C"
         },
         {
-          "expr": "rate(memories_deleted_total[5m])",
+          "expr": "rate(memories_deleted_total{job=\"openbrain-unified\"}[5m])",
           "legendFormat": "Deleted",
           "refId": "D"
         }
@@ -453,17 +453,17 @@
       },
       "targets": [
         {
-          "expr": "active_memories_corporate_total",
+          "expr": "active_memories_corporate_total{job=\"openbrain-unified\"}",
           "legendFormat": "Corporate",
           "refId": "A"
         },
         {
-          "expr": "active_memories_build_total",
+          "expr": "active_memories_build_total{job=\"openbrain-unified\"}",
           "legendFormat": "Build",
           "refId": "B"
         },
         {
-          "expr": "active_memories_personal_total",
+          "expr": "active_memories_personal_total{job=\"openbrain-unified\"}",
           "legendFormat": "Personal",
           "refId": "C"
         }
@@ -504,12 +504,12 @@
       },
       "targets": [
         {
-          "expr": "policy_skip_per_maintain_run_ratio",
+          "expr": "policy_skip_per_maintain_run_ratio{job=\"openbrain-unified\"}",
           "legendFormat": "Policy Skip Ratio",
           "refId": "A"
         },
         {
-          "expr": "duplicate_candidates_per_maintain_run_ratio",
+          "expr": "duplicate_candidates_per_maintain_run_ratio{job=\"openbrain-unified\"}",
           "legendFormat": "Duplicate Candidate Ratio",
           "refId": "B"
         }
@@ -537,17 +537,17 @@
       },
       "targets": [
         {
-          "expr": "policy_skip_delete_total",
+          "expr": "policy_skip_delete_total{job=\"openbrain-unified\"}",
           "legendFormat": "Delete Blocked",
           "refId": "A"
         },
         {
-          "expr": "policy_skip_dedup_total",
+          "expr": "policy_skip_dedup_total{job=\"openbrain-unified\"}",
           "legendFormat": "Dedup Blocked",
           "refId": "B"
         },
         {
-          "expr": "policy_skip_owner_normalization_total",
+          "expr": "policy_skip_owner_normalization_total{job=\"openbrain-unified\"}",
           "legendFormat": "Normalization Blocked",
           "refId": "C"
         }
@@ -636,89 +636,6 @@
         }
       ],
       "title": "OpenBrain Host Canary",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "openbrain-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "color": "green",
-                  "index": 0,
-                  "text": "HEALTHY"
-                },
-                "1": {
-                  "color": "orange",
-                  "index": 1,
-                  "text": "WATCH"
-                },
-                "2": {
-                  "color": "red",
-                  "index": 2,
-                  "text": "FAIL"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 2
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 32
-      },
-      "id": 44,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "expr": "macmini_canary_component_status{component=\"host\"}",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Mac Mini Resource Canary",
       "type": "stat"
     }
   ],

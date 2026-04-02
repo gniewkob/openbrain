@@ -136,7 +136,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_state_processed",
+          "expr": "mailai_state_processed{job=\"mailai\"}",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -201,7 +201,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_state_failed",
+          "expr": "mailai_state_failed{job=\"mailai\"}",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -266,7 +266,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_state_cleanup_pending",
+          "expr": "mailai_state_cleanup_pending{job=\"mailai\"}",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -331,7 +331,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_state_uncertain",
+          "expr": "mailai_state_uncertain{job=\"mailai\"}",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -399,7 +399,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_quality_llm_share * 100",
+          "expr": "mailai_quality_llm_share{job=\"mailai\"} * 100",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -467,7 +467,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_quality_rule_share * 100",
+          "expr": "mailai_quality_rule_share{job=\"mailai\"} * 100",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -524,7 +524,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_quality_records",
+          "expr": "mailai_quality_records{job=\"mailai\"}",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -576,7 +576,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "sort_desc(mailai_mailbox_records)",
+          "expr": "sort_desc(mailai_mailbox_records{job=\"mailai\"})",
           "instant": true,
           "range": false,
           "legendFormat": "{{mailbox_id}}",
@@ -631,7 +631,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_category_records",
+          "expr": "mailai_category_records{job=\"mailai\"}",
           "instant": true,
           "range": false,
           "legendFormat": "{{category}}",
@@ -686,7 +686,7 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_route_source_records",
+          "expr": "mailai_route_source_records{job=\"mailai\"}",
           "instant": true,
           "range": false,
           "legendFormat": "{{route_source}}",
@@ -729,22 +729,22 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_state_processed",
+          "expr": "mailai_state_processed{job=\"mailai\"}",
           "legendFormat": "processed",
           "refId": "A"
         },
         {
-          "expr": "mailai_state_failed",
+          "expr": "mailai_state_failed{job=\"mailai\"}",
           "legendFormat": "failed",
           "refId": "B"
         },
         {
-          "expr": "mailai_state_cleanup_pending",
+          "expr": "mailai_state_cleanup_pending{job=\"mailai\"}",
           "legendFormat": "cleanup_pending",
           "refId": "C"
         },
         {
-          "expr": "mailai_state_uncertain",
+          "expr": "mailai_state_uncertain{job=\"mailai\"}",
           "legendFormat": "uncertain",
           "refId": "D"
         }
@@ -785,12 +785,12 @@
       "pluginVersion": "11.1.5",
       "targets": [
         {
-          "expr": "mailai_quality_llm_share * 100",
+          "expr": "mailai_quality_llm_share{job=\"mailai\"} * 100",
           "legendFormat": "LLM %",
           "refId": "A"
         },
         {
-          "expr": "mailai_quality_rule_share * 100",
+          "expr": "mailai_quality_rule_share{job=\"mailai\"} * 100",
           "legendFormat": "Rule %",
           "refId": "B"
         }
@@ -876,86 +876,6 @@
         }
       ],
       "title": "MailAI Host Canary",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "openbrain-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "text": "normal"
-                },
-                "1": {
-                  "text": "watch"
-                },
-                "2": {
-                  "text": "fail"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 2
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 23
-      },
-      "id": 15,
-      "options": {
-        "colorMode": "background_solid",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value_and_name"
-      },
-      "pluginVersion": "11.1.5",
-      "targets": [
-        {
-          "expr": "macmini_canary_component_status{component=\"host\"}",
-          "instant": true,
-          "range": false,
-          "refId": "A",
-          "legendFormat": "host_canary"
-        }
-      ],
-      "title": "Mac Mini Resource Canary",
       "type": "stat"
     }
   ],
