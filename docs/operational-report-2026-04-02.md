@@ -131,3 +131,36 @@ Representative files:
 - `launchd/com.openbrain.host-full-canary.plist`
 - `launchd/com.openbrain.mcp-sandbox-prune-report.plist`
 - `docs/mac-mini-system-map-2026-04-02.md`
+
+## Deployment Follow-up: `stop` cleanup bug
+
+Issue observed:
+
+- `./start_unified.sh stop` could report `Network openbrain_net_unified Resource is still in use`
+- repeating `stop` produced the same result even though the main application containers were already removed
+
+Root cause:
+
+- the stack can be started with the Compose `public` profile when `ENABLE_NGROK=1`
+- `compose_down()` previously depended on the *current* `ENABLE_NGROK` value
+- if the stack was started with the `public` profile but stopped later without that env flag, `openbrain-unified-ngrok` was not included in `docker compose down`
+- the leftover `ngrok` container remained attached to `openbrain_net_unified`, preventing network removal
+
+Fix:
+
+- `start_unified.sh` now tears down both:
+  - the base stack
+  - the `public` profile
+- this makes `stop` symmetric with `start` and removes the `ngrok` container regardless of the current shell env
+
+Verification:
+
+```bash
+./start_unified.sh stop
+```
+
+Observed after the fix:
+
+- `openbrain-unified-ngrok Removed`
+- `Network openbrain_net_unified Removed`
+- `All services stopped.`

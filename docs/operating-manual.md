@@ -109,6 +109,7 @@ For the full production operating model, see [Governance Layer](governance-layer
 ## Troubleshooting
 - **404 Not Found in ChatGPT**: Ensure you are using the base ngrok URL without any suffix. The server handles all routing.
 - **401 Unauthorized**: Check OIDC config in public mode, or verify that `INTERNAL_API_KEY` in your `.env` file matches the server configuration for trusted internal callers.
+- **`./start_unified.sh stop` leaves `openbrain_net_unified` behind**: This used to happen when the stack had been started with `ENABLE_NGROK=1`, but `stop` was later run without that env flag, leaving `openbrain-unified-ngrok` attached to the network. The stop path now tears down both the base stack and the Compose `public` profile, so `ngrok` and `openbrain_net_unified` are removed correctly.
 - **Python `httpx`/`urllib` probes fail while `curl` to `localhost` works**: In the Codex CLI sandbox, Python socket connections to `127.0.0.1` can be blocked with `[Errno 1] Operation not permitted`. This is a sandbox restriction, not an OpenBrain or MCP bug. Validate local MCP connectivity with `curl`, or run the Python probe outside the sandbox when you need to exercise the HTTP client code path.
 - **Ollama Issues**: If search returns errors, verify that the model is loaded: `docker exec openbrain-unified-ollama ollama list`.
 - **Swagger UI not loading**: Access `/docs` directly via the REST port (`http://localhost:7010/docs`). The combined ASGI wrapper now correctly routes `/docs` to FastAPI.
