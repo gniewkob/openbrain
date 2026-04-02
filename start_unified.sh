@@ -32,6 +32,14 @@ compose_cmd() {
     docker compose "${args[@]}" "$@"
 }
 
+compose_cmd_public() {
+    docker compose -f docker-compose.unified.yml --profile public "$@"
+}
+
+compose_cmd_base() {
+    docker compose -f docker-compose.unified.yml "$@"
+}
+
 validate_runtime_security() {
     local public_mode="${PUBLIC_MODE:-false}"
     local public_base_url="${PUBLIC_BASE_URL:-}"
@@ -96,7 +104,11 @@ compose_up() {
 
 compose_down() {
     info "Stopping Unified OpenBrain ..."
-    compose_cmd down
+    # Always tear down the public profile too. Otherwise a stack started with
+    # ENABLE_NGROK=1 can leave the ngrok container attached to the network when
+    # stop is later invoked without that env flag.
+    compose_cmd_public down
+    compose_cmd_base down
     ok "All services stopped."
 }
 
