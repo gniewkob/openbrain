@@ -8,6 +8,8 @@ LOAD_WARN_PER_CPU="${LOAD_WARN_PER_CPU:-1.5}"
 LOAD_FAIL_PER_CPU="${LOAD_FAIL_PER_CPU:-3.0}"
 SWAPOUT_WARN_PAGES="${SWAPOUT_WARN_PAGES:-20000000}"
 SWAPOUT_FAIL_PAGES="${SWAPOUT_FAIL_PAGES:-50000000}"
+MEMORY_FREE_WARN_PCT="${MEMORY_FREE_WARN_PCT:-10}"
+MEMORY_FREE_FAIL_PCT="${MEMORY_FREE_FAIL_PCT:-5}"
 
 STATUS=0
 
@@ -78,8 +80,10 @@ check_load() {
 }
 
 check_vm_pressure() {
-  local vm_output page_size pages_free pages_speculative pages_active pages_inactive pages_wired swapouts free_bytes total_bytes free_ratio
+  local vm_output pressure_output pressure_free_pct page_size pages_free pages_speculative pages_active pages_inactive pages_wired swapouts free_bytes total_bytes free_ratio
   vm_output="$(vm_stat)"
+  pressure_output="$(memory_pressure -Q 2>/dev/null || true)"
+  pressure_free_pct="$(awk -F': ' '/System-wide memory free percentage/ {gsub(/%/, "", $2); print $2}' <<<"${pressure_output}")"
   page_size="$(awk -F'page size of ' 'NR==1 {gsub(/[^0-9]/, "", $2); print $2}' <<<"${vm_output}")"
   pages_free="$(awk '/Pages free/ {gsub(/\./, "", $3); print $3}' <<<"${vm_output}")"
   pages_speculative="$(awk '/Pages speculative/ {gsub(/\./, "", $3); print $3}' <<<"${vm_output}")"
@@ -97,14 +101,24 @@ check_vm_pressure() {
   total_bytes=$(( (pages_free + pages_speculative + pages_active + pages_inactive + pages_wired) * page_size ))
   free_ratio="$(awk -v free="${free_bytes}" -v total="${total_bytes}" 'BEGIN { if (total == 0) { print "0.00" } else { printf "%.2f", (free / total) * 100 } }')"
 
-  if (( swapouts >= SWAPOUT_FAIL_PAGES )); then
-    fail "swapouts high: ${swapouts} pages, free memory ${free_ratio}%"
-  elif (( swapouts >= SWAPOUT_WARN_PAGES )); then
-    warn "swapouts elevated: ${swapouts} pages, free memory ${free_ratio}%"
+  if [[ -n "${pressure_free_pct}" ]]; then
+    if awk -v free="${pressure_free_pct}" -v thr="${MEMORY_FREE_FAIL_PCT}" 'BEGIN {exit !(free <= thr)}'; then
+      fail "memory pressure high: system free ${pressure_free_pct}%, vm free ${free_ratio}%, swapouts ${swapouts}"
+    elif awk -v free="${pressure_free_pct}" -v thr="${MEMORY_FREE_WARN_PCT}" 'BEGIN {exit !(free <= thr)}'; then
+      warn "memory pressure elevated: system free ${pressure_free_pct}%, vm free ${free_ratio}%, swapouts ${swapouts}"
+    else
+      ok "memory pressure acceptable: system free ${pressure_free_pct}%, vm free ${free_ratio}%, swapouts ${swapouts}"
+    fi
   elif awk -v free="${free_ratio}" 'BEGIN {exit !(free < 3.0)}'; then
-    warn "free memory low: ${free_ratio}%"
+    warn "free memory low: vm free ${free_ratio}%, swapouts ${swapouts}"
   else
-    ok "vm pressure acceptable: free memory ${free_ratio}%, swapouts ${swapouts}"
+    if (( swapouts >= SWAPOUT_FAIL_PAGES )); then
+      fail "swapouts high: ${swapouts} pages, vm free ${free_ratio}%"
+    elif (( swapouts >= SWAPOUT_WARN_PAGES )); then
+      warn "swapouts elevated: ${swapouts} pages, vm free ${free_ratio}%"
+    else
+      ok "vm pressure acceptable: vm free ${free_ratio}%, swapouts ${swapouts}"
+    fi
   fi
 }
 
@@ -141,6 +155,7 @@ check_restart_symptoms() {
 
 main() {
   require_command df
+  require_command memory_pressure
   require_command vm_stat
   require_command uptime
   require_command launchctl
