@@ -5,7 +5,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from src.crud import export_memories
+from src.memory_reads import export_memories
 from src.models import DomainEnum, Memory
 
 

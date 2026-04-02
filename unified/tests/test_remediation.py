@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src import crud
+from src import memory_reads, memory_writes
+from src.crud_common import STATUS_DUPLICATE, STATUS_SUPERSEDED
 from src.models import DomainEnum, Memory
 from src.schemas import MaintenanceRequest, SearchRequest, MemoryFindRequest
 
@@ -66,7 +67,7 @@ class RemediationTests(unittest.IsolatedAsyncioTestCase):
         
         req = MaintenanceRequest(dry_run=False, dedup_threshold=0.05, fix_superseded_links=False)
         
-        report = await crud.run_maintenance(session, req)
+        report = await memory_writes.run_maintenance(session, req)
         
         # Verify actions
         self.assertEqual(report.dedup_found, 1)
@@ -74,7 +75,7 @@ class RemediationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report.actions[1].action, "dedup_remediate")
         
         # Verify status and metadata change on the duplicate record
-        self.assertEqual(duplicate.status, crud.STATUS_DUPLICATE)
+        self.assertEqual(duplicate.status, STATUS_DUPLICATE)
         self.assertEqual(duplicate.metadata_["duplicate_of"], "can-1")
         
         # Verify canonical remains active
@@ -114,10 +115,10 @@ class RemediationTests(unittest.IsolatedAsyncioTestCase):
         ]
         
         req = MaintenanceRequest(dry_run=False, dedup_threshold=0.05, fix_superseded_links=False)
-        report = await crud.run_maintenance(session, req)
+        report = await memory_writes.run_maintenance(session, req)
         
         self.assertEqual(report.dedup_found, 1)
-        self.assertEqual(duplicate.status, crud.STATUS_SUPERSEDED)
+        self.assertEqual(duplicate.status, STATUS_SUPERSEDED)
         self.assertEqual(duplicate.superseded_by, "can-1")
 
     async def test_retrieval_excludes_duplicates(self) -> None:
@@ -129,14 +130,14 @@ class RemediationTests(unittest.IsolatedAsyncioTestCase):
         mock_result.scalars.return_value.all.return_value = []
         session.execute.return_value = mock_result
 
-        with patch("src.crud.select") as mock_select:
+        with patch("src.memory_reads.select") as mock_select:
             mock_stmt = MagicMock()
             mock_select.return_value = mock_stmt
             mock_stmt.where.return_value = mock_stmt
             mock_stmt.order_by.return_value = mock_stmt
             mock_stmt.limit.return_value = mock_stmt
             
-            await crud.list_memories(session, filters={})
+            await memory_reads.list_memories(session, filters={})
             
             # Ensure select was called
             self.assertTrue(mock_select.called)
