@@ -43,6 +43,38 @@ groups:
           summary: "mAiL operational health is in watch state"
           description: "The mail routing service reports sustained watch-level pressure. Review uncertain backlog and recent routing anomalies before they escalate."
 
+  - name: macmini-host-canary
+    rules:
+      - alert: MacMiniHostCanaryFailed
+        expr: macmini_canary_status{scope="full"} >= 2
+        for: 5m
+        labels:
+          severity: critical
+          service: macmini-host
+        annotations:
+          summary: "Mac Mini host canary failed"
+          description: "The combined host canary is in failed state for at least 5 minutes. Check openbrain, mailai, Docker, launchd, and public ingress health."
+
+      - alert: MacMiniHostCanaryWatch
+        expr: macmini_canary_status{scope="full"} >= 1
+        for: 15m
+        labels:
+          severity: warning
+          service: macmini-host
+        annotations:
+          summary: "Mac Mini host canary is in watch state"
+          description: "The combined host canary has been in watch state for at least 15 minutes. Review service canary and resource canary outputs before it escalates."
+
+      - alert: MacMiniHostCanaryMetricsStale
+        expr: time() - macmini_canary_last_run_timestamp_seconds > 900
+        for: 5m
+        labels:
+          severity: warning
+          service: macmini-host
+        annotations:
+          summary: "Mac Mini host canary metrics are stale"
+          description: "The host canary metrics file has not been refreshed for more than 15 minutes. Check the launchd runner and host-full-canary logs."
+
   - name: openbrain-governance
     rules:
       - alert: OpenBrainPolicySkipPressure

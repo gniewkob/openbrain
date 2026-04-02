@@ -125,6 +125,24 @@ The goal is to make collisions, shared dependencies, and operational boundaries 
   - `zealous_bell`
   - `stoic_antonelli`
 
+## Classified Docker Noise
+
+The generated-name containers above were inspected during the audit. They are not part of OpenBrain or MailAI application runtime.
+
+- image: `mcp/node-code-sandbox@sha256:e8cbb5c3ae86...`
+- command: `node dist/server.js`
+- labels:
+  - `docker-mcp=true`
+  - `docker-mcp-name=node-code-sandbox`
+  - `docker-mcp-tool-type=mcp`
+  - `docker-mcp-transport=stdio`
+
+Interpretation:
+
+- these are MCP sandbox containers used by the local tooling layer
+- they should not be mixed into application health judgments for OpenBrain or MailAI
+- they are still worth pruning periodically if they accumulate or consume unexpected resources
+
 ## Recommended Next Actions
 
 1. Add a single host-level canary script that checks both systems end-to-end.
@@ -199,3 +217,9 @@ Dashboard panels were added to:
 
 - `monitoring/grafana/dashboards/openbrain/openbrain-overview.json`
 - `monitoring/grafana/dashboards/mail/mailai-overview.json`
+
+Prometheus alerts now also cover:
+
+- host canary failure
+- sustained host canary watch state
+- stale host canary metrics when the scheduled runner stops refreshing
