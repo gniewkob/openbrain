@@ -28,6 +28,7 @@ from .schemas import (
     MaintenanceReport,
     MaintenanceRequest,
     MemoryCreate,
+    MemoryOut,
     MemoryRelations,
     MemoryUpdate,
     MemoryUpsertItem,
