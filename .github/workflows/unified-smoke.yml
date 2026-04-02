@@ -56,3 +56,17 @@ jobs:
         run: pip install -e .
       - name: Run gateway tests
         run: python -m unittest discover -s tests -v
+
+  transport-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install unified package
+        run: pip install -e ./unified
+      - name: Install gateway package
+        run: pip install -e ./unified/mcp-gateway
+      - name: Run transport parity tests
+        run: PYTHONPATH=.:unified python -m unittest unified.tests.test_transport_parity -v
