@@ -62,6 +62,7 @@ HTTP MCP transport and stdio gateway must expose the same logical record shape.
 ## Testing rules
 
 - Prefer testing focused modules directly.
+- Test `middleware.py`, `lifespan.py`, `routes_*.py`, and `app_factory.py` directly when the behavior is module-local.
 - Keep compatibility tests for `main.py` and `crud.py` only where they protect public API stability.
 - Use full regression discovery in CI in addition to targeted smoke tests.
 - If a refactor needs monkey-patching compatibility, preserve it deliberately and document why.
