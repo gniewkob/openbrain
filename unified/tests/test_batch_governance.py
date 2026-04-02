@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from src import crud
+from src import crud, memory_writes
 from src.schemas import MemoryWriteManyRequest, MemoryWriteRecord
 
 
@@ -37,7 +37,7 @@ class BatchGovernanceTests(unittest.IsolatedAsyncioTestCase):
         ]
 
         with patch.object(crud, "handle_memory_write", new=AsyncMock(side_effect=responses)):
-            result = await crud.handle_memory_write_many(
+            result = await memory_writes.handle_memory_write_many(
                 session,
                 MemoryWriteManyRequest(records=records, write_mode="upsert"),
             )

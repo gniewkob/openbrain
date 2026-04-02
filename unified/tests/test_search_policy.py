@@ -5,7 +5,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from src import crud
+from src import crud, memory_reads, memory_writes
 from src.models import DomainEnum, Memory
 from src.schemas import MemoryFindRequest, MemoryWriteRecord, MemoryWriteRequest, SearchRequest, WriteMode
 
@@ -22,7 +22,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
         session = SimpleNamespace(execute=execute)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
-            await crud.search_memories(
+            await memory_reads.search_memories(
                 session,
                 SearchRequest(query="policy", top_k=5, filters={"owner": "owner-a"}),
             )
@@ -42,7 +42,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
         session = SimpleNamespace(execute=execute)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
-            result = await crud.search_memories(session, SearchRequest(query="policy", top_k=5))
+            result = await memory_reads.search_memories(session, SearchRequest(query="policy", top_k=5))
 
         self.assertEqual(result, [])
         self.assertIsNotNone(captured_stmt)
@@ -61,7 +61,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
         session = SimpleNamespace(execute=execute)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
-            result = await crud.find_memories_v1(session, MemoryFindRequest(query="policy", limit=5))
+            result = await memory_reads.find_memories_v1(session, MemoryFindRequest(query="policy", limit=5))
 
         self.assertEqual(result, [])
         self.assertIsNotNone(captured_stmt)
@@ -114,7 +114,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
         session.flush = AsyncMock(side_effect=_flush)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.3, 0.4])):
-            result = await crud.handle_memory_write(
+            result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
                     record=MemoryWriteRecord(
