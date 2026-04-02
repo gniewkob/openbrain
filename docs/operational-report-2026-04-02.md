@@ -94,3 +94,40 @@ After this follow-up closure pass, the second 360 audit did not leave open findi
 - immediate security posture
 - CI/guardrail regressions
 - high-signal operational hygiene
+
+## Operational Closure Addendum
+
+The host-level operational package for the shared Mac Mini was completed after the code and transport cleanup.
+
+Completed:
+
+- a dual-system canary for `openbrain` and `mailai`
+- a host resource canary for disk, load, memory pressure, Docker, and launchd
+- a full wrapper runner with status logs and Prometheus metric export
+- Grafana panels for host canary state on both the OpenBrain and MailAI dashboards
+- Prometheus alerts for host canary failure, sustained watch state, and stale metrics
+- classification of the generated-name Docker containers as MCP `node-code-sandbox` containers rather than application runtime
+- a safe pruning helper for MCP sandbox containers with dry-run as the default mode
+- an optional `launchd` dry-run report job for periodic MCP sandbox pruning reports
+
+Current host canary state after tuning:
+
+- `macmini_canary_status{scope="full"} = 0`
+- `macmini_canary_status{scope="service"} = 0`
+- `macmini_canary_status{scope="resource"} = 0`
+- `macmini_canary_component_status{component="openbrain"} = 0`
+- `macmini_canary_component_status{component="mailai"} = 0`
+- `macmini_canary_component_status{component="host"} = 0`
+
+Representative files:
+
+- `scripts/host_dual_canary.sh`
+- `scripts/host_resource_canary.sh`
+- `scripts/host_full_canary.sh`
+- `scripts/host_full_canary_runner.sh`
+- `scripts/prune_mcp_sandboxes.sh`
+- `monitoring/openbrain-metrics-bridge.py`
+- `docs/prometheus-alerts.yml`
+- `launchd/com.openbrain.host-full-canary.plist`
+- `launchd/com.openbrain.mcp-sandbox-prune-report.plist`
+- `docs/mac-mini-system-map-2026-04-02.md`
