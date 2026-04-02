@@ -797,6 +797,166 @@
       ],
       "title": "Routing Share Trends",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openbrain-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "normal"
+                },
+                "1": {
+                  "text": "watch"
+                },
+                "2": {
+                  "text": "fail"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 23
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "11.1.5",
+      "targets": [
+        {
+          "expr": "macmini_canary_component_status{component=\"mailai\"}",
+          "instant": true,
+          "range": false,
+          "refId": "A",
+          "legendFormat": "mailai_canary"
+        }
+      ],
+      "title": "MailAI Host Canary",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openbrain-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "normal"
+                },
+                "1": {
+                  "text": "watch"
+                },
+                "2": {
+                  "text": "fail"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 23
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "11.1.5",
+      "targets": [
+        {
+          "expr": "macmini_canary_component_status{component=\"host\"}",
+          "instant": true,
+          "range": false,
+          "refId": "A",
+          "legendFormat": "host_canary"
+        }
+      ],
+      "title": "Mac Mini Resource Canary",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
@@ -817,6 +977,6 @@
   "timezone": "browser",
   "title": "mAiL Overview",
   "uid": "mailai-overview",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

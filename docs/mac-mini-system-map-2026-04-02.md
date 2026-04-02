@@ -180,5 +180,22 @@ Logs:
 
 - `monitoring/host-full-canary-stdout.log`
 - `monitoring/host-full-canary-status.log`
+- `monitoring/host-full-canary.prom`
 - `monitoring/host-full-canary-launchd-stdout.log`
 - `monitoring/host-full-canary-launchd-stderr.log`
+
+## Grafana Visibility
+
+Host canary state is now exported as Prometheus metrics through the existing OpenBrain metrics bridge on `9180`.
+The runner writes `monitoring/host-full-canary.prom`, and `monitoring/openbrain-metrics-bridge.py` appends it to the regular OpenBrain `/metrics` scrape payload.
+
+Exported metrics:
+
+- `macmini_canary_status{scope="full|service|resource"}`
+- `macmini_canary_component_status{component="openbrain|mailai|host"}`
+- `macmini_canary_last_run_timestamp_seconds`
+
+Dashboard panels were added to:
+
+- `monitoring/grafana/dashboards/openbrain/openbrain-overview.json`
+- `monitoring/grafana/dashboards/mail/mailai-overview.json`

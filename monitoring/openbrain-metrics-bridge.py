@@ -81,6 +81,21 @@ def resolve_api_key() -> str:
 # ---------------------------------------------------------------------------
 
 UPSTREAM = "http://127.0.0.1:7010/metrics"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+HOST_CANARY_METRICS = REPO_ROOT / "monitoring" / "host-full-canary.prom"
+
+
+def read_extra_metrics() -> bytes:
+    if not HOST_CANARY_METRICS.exists():
+        return b""
+    try:
+        payload = HOST_CANARY_METRICS.read_bytes().strip()
+    except OSError as exc:
+        log.warning("Could not read %s: %s", HOST_CANARY_METRICS, exc)
+        return b""
+    if not payload:
+        return b""
+    return b"\n" + payload + b"\n"
 
 
 class BridgeHandler(http.server.BaseHTTPRequestHandler):
@@ -102,7 +117,7 @@ class BridgeHandler(http.server.BaseHTTPRequestHandler):
 
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
-                body = resp.read()
+                body = resp.read() + read_extra_metrics()
                 self.send_response(200)
                 self.send_header("Content-Type", resp.headers.get("Content-Type", "text/plain"))
                 self.send_header("Content-Length", str(len(body)))
