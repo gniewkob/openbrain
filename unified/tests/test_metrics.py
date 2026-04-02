@@ -39,6 +39,7 @@ def _import_main_with_fake_auth_deps():
 
 main = _import_main_with_fake_auth_deps()
 from src import lifespan as lifespan_module
+from src import middleware as middleware_module
 
 
 class MetricsTests(unittest.IsolatedAsyncioTestCase):
@@ -217,7 +218,7 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("policy_skip_per_maintain_run_ratio_watch_threshold 0.25", payload)
 
     async def test_metrics_middleware_counts_unhandled_exceptions_as_500(self) -> None:
-        middleware = main.MetricsMiddleware(app=main.app)
+        middleware = middleware_module.MetricsMiddleware(app=main.app)
         request = Request(
             {
                 "type": "http",
@@ -243,7 +244,7 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snapshot["histograms"]["http_request_duration_seconds"]["count"], 1)
 
     async def test_request_id_middleware_clears_context_on_exception(self) -> None:
-        middleware = main.RequestIDMiddleware(app=main.app)
+        middleware = middleware_module.RequestIDMiddleware(app=main.app)
         request = Request(
             {
                 "type": "http",
@@ -259,13 +260,13 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
         )
 
         async def _boom(_request):
-            self.assertEqual(main.structlog.contextvars.get_contextvars().get("request_id"), "req-123")
+            self.assertEqual(middleware_module.structlog.contextvars.get_contextvars().get("request_id"), "req-123")
             raise RuntimeError("boom")
 
         with self.assertRaisesRegex(RuntimeError, "boom"):
             await middleware.dispatch(request, _boom)
 
-        self.assertNotIn("request_id", main.structlog.contextvars.get_contextvars())
+        self.assertNotIn("request_id", middleware_module.structlog.contextvars.get_contextvars())
 
     async def test_lifespan_restores_histograms_from_persistence(self) -> None:
         counters = {"http_requests_total_200": 7}
@@ -292,7 +293,7 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
             fake_task.set_result(None)
             create_task.side_effect = lambda coro: (coro.close(), fake_task)[1]
 
-            async with main.lifespan(main.app):
+            async with lifespan_module.lifespan(main.app):
                 snapshot = get_metrics_snapshot()
                 self.assertEqual(snapshot["counters"]["http_requests_total_200"], 7)
                 self.assertEqual(

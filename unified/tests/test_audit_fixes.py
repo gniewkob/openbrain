@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src import crud, memory_reads, memory_writes
+from src import crud, memory_reads, memory_writes, middleware as middleware_module
 from src.models import DomainEnum, Memory
 from src.schemas import (
     MemoryCreate,
@@ -571,7 +571,7 @@ class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
             (b"x-request-id", valid_id.encode()),
         ], "query_string": b""}
 
-        middleware = main.RequestIDMiddleware(app=fake_next)
+        middleware = middleware_module.RequestIDMiddleware(app=fake_next)
 
         req_ids: list[str] = []
 
@@ -592,11 +592,11 @@ class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
         from tests.test_metrics import _import_main_with_fake_auth_deps
         main = _import_main_with_fake_auth_deps()
         import re
-        self.assertFalse(bool(main._REQ_ID_RE.match("inject\nnewline")))
-        self.assertFalse(bool(main._REQ_ID_RE.match("x" * 65)))
-        self.assertFalse(bool(main._REQ_ID_RE.match("")))
-        self.assertTrue(bool(main._REQ_ID_RE.match("abc-123")))
-        self.assertTrue(bool(main._REQ_ID_RE.match("123e4567-e89b-12d3-a456-426614174000")))
+        self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("inject\nnewline")))
+        self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("x" * 65)))
+        self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("")))
+        self.assertTrue(bool(middleware_module.REQUEST_ID_RE.match("abc-123")))
+        self.assertTrue(bool(middleware_module.REQUEST_ID_RE.match("123e4567-e89b-12d3-a456-426614174000")))
 
 
 class EntityTypeMaxLengthTest(unittest.TestCase):
