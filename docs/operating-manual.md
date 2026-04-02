@@ -76,6 +76,13 @@ Idempotency (skip if content unchanged) applies to all modes including `append_v
 preventing phantom version creation on repeated identical writes.
 The idempotency check now includes metadata state as well, so metadata-only updates are persisted correctly.
 
+## Test Posture
+
+- `unified/tests` now passes full `unittest discover` as a supported regression path.
+- Transport parity tests remain part of CI, but they are skipped during bare `unified` discovery when gateway-only dependencies are not installed.
+- Route registration, middleware, lifespan, and app-factory modules now have direct tests instead of relying only on indirect coverage through `main.py`.
+- `main.py` and `crud.py` remain intentionally covered only where they still represent public assembly or compatibility surfaces.
+
 ## Export Policy
 - **Admin callers** (privileged users authenticated via JWT) receive fully unredacted records.
 - **Service account callers** (`X-Internal-Key` subject = `internal`) also receive full records since they have already passed `_require_admin()`.
