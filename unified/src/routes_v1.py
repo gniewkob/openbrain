@@ -1,0 +1,73 @@
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from .schemas import (
+    MemoryGetContextResponse,
+    MemoryRecord,
+    MemoryWriteManyResponse,
+    MemoryWriteResponse,
+    ObsidianNoteResponse,
+    ObsidianSyncResponse,
+)
+
+
+def register_v1_routes(app: FastAPI, handlers) -> None:
+    app.add_api_route(
+        "/api/v1/memory/write",
+        handlers.v1_write,
+        methods=["POST"],
+        response_model=MemoryWriteResponse,
+    )
+    app.add_api_route(
+        "/api/v1/memory/write-many",
+        handlers.v1_write_many,
+        methods=["POST"],
+        response_model=MemoryWriteManyResponse,
+    )
+    app.add_api_route(
+        "/api/v1/memory/find",
+        handlers.v1_find,
+        methods=["POST"],
+        response_model=list[dict],
+    )
+    app.add_api_route(
+        "/api/v1/memory/get-context",
+        handlers.v1_get_context,
+        methods=["POST"],
+        response_model=MemoryGetContextResponse,
+    )
+    app.add_api_route(
+        "/api/v1/memory/{memory_id}",
+        handlers.v1_get,
+        methods=["GET"],
+        response_model=MemoryRecord,
+    )
+    app.add_api_route(
+        "/api/v1/obsidian/vaults",
+        handlers.v1_obsidian_vaults,
+        methods=["GET"],
+        response_model=list[str],
+    )
+    app.add_api_route(
+        "/api/v1/obsidian/read-note",
+        handlers.v1_obsidian_read_note,
+        methods=["POST"],
+        response_model=ObsidianNoteResponse,
+    )
+    app.add_api_route(
+        "/api/v1/obsidian/sync",
+        handlers.v1_obsidian_sync,
+        methods=["POST"],
+        response_model=ObsidianSyncResponse,
+    )
+    app.add_api_route(
+        "/.well-known/oauth-protected-resource",
+        handlers.oauth_protected_resource,
+        methods=["GET"],
+    )
+    app.add_api_route(
+        "/.well-known/oauth-authorization-server",
+        handlers.oauth_authorization_server,
+        methods=["GET"],
+    )

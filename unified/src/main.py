@@ -9,10 +9,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import re
-import time
-import uuid
-from contextlib import asynccontextmanager, suppress
 from typing import Any
 
 import structlog
@@ -20,8 +16,8 @@ from fastapi import Body, Depends, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.middleware.base import BaseHTTPMiddleware
 
+from .app_factory import create_app
 from .auth import (
     PUBLIC_EXPOSURE,
     get_domain_scope,
@@ -33,8 +29,11 @@ from .auth import (
     require_auth,
     set_policy_registry,
 )
-from .crud import (
-    delete_memory,
+from .crud_common import _to_out
+from .db import AsyncSessionLocal, get_session
+from .lifespan import lifespan, periodic_telemetry_sync
+from .middleware import MetricsMiddleware, REQUEST_ID_RE as _REQ_ID_RE, RequestIDMiddleware
+from .memory_reads import (
     export_memories,
     find_memories_v1,
     get_grounding_pack,
@@ -43,24 +42,25 @@ from .crud import (
     get_memory_domain_status_counts,
     get_memory_status_counts,
     get_maintenance_report,
-    get_telemetry_counters,
-    get_telemetry_histograms,
+    list_maintenance_reports,
+    list_memories,
+    search_memories,
+    sync_check,
+)
+from .memory_writes import (
+    delete_memory,
     handle_memory_write,
     handle_memory_write_many,
-    list_memories,
-    list_maintenance_reports,
     run_maintenance,
-    search_memories,
     store_memories_bulk,
     store_memory,
-    sync_check,
     update_memory,
     upsert_memories_bulk,
-    upsert_telemetry_metrics,
 )
-from .db import AsyncSessionLocal, get_session
-from .embed import close_embedding_client
 from .obsidian_cli import ObsidianCliAdapter, ObsidianCliError, note_to_memory_write_record
+from .routes_crud import register_crud_routes
+from .routes_ops import register_ops_routes
+from .routes_v1 import register_v1_routes
 from .schemas import (
     BulkUpsertResult,
     ExportRequest,
@@ -91,11 +91,8 @@ from .schemas import (
     SyncCheckResponse,
 )
 from .telemetry import (
-    bulk_load_histograms,
-    bulk_load_metrics,
     get_metrics_snapshot,
     incr_metric,
-    observe_metric,
     render_prometheus_metrics,
     set_gauge_metric,
 )
@@ -117,95 +114,11 @@ log = structlog.get_logger()
 PUBLIC_MODE = PUBLIC_EXPOSURE
 
 # ---------------------------------------------------------------------------
-# Lifecycle & Persistence
-# ---------------------------------------------------------------------------
-
-async def _periodic_telemetry_sync():
-    """Periodically flush in-memory telemetry to PostgreSQL."""
-    while True:
-        await asyncio.sleep(60) # Sync every minute
-        try:
-            snapshot = get_metrics_snapshot()
-            async with AsyncSessionLocal() as session:
-                await upsert_telemetry_metrics(
-                    session,
-                    counters=snapshot["counters"],
-                    histograms=snapshot["histograms"],
-                )
-                log.info(
-                    "telemetry_state_synced",
-                    counter_count=len(snapshot["counters"]),
-                    histogram_count=len(snapshot["histograms"]),
-                )
-        except Exception as e:
-            log.error("telemetry_sync_failed", error=str(e))
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # 1. Startup: Load telemetry from DB
-    try:
-        async with AsyncSessionLocal() as session:
-            persisted_counters = await get_telemetry_counters(session)
-            persisted_histograms = await get_telemetry_histograms(session)
-            if persisted_counters:
-                bulk_load_metrics(persisted_counters)
-            if persisted_histograms:
-                bulk_load_histograms(persisted_histograms)
-            if persisted_counters or persisted_histograms:
-                log.info(
-                    "telemetry_state_loaded",
-                    counter_count=len(persisted_counters),
-                    histogram_count=len(persisted_histograms),
-                )
-    except Exception as e:
-        log.error("telemetry_load_failed", error=str(e))
-
-    # 2. Start background sync task
-    sync_task = asyncio.create_task(_periodic_telemetry_sync())
-
-    yield
-
-    # 3. Shutdown: Final flush and cleanup
-    sync_task.cancel()
-    with suppress(asyncio.CancelledError):
-        await sync_task
-    try:
-        snapshot = get_metrics_snapshot()
-        async with AsyncSessionLocal() as session:
-            await upsert_telemetry_metrics(
-                session,
-                counters=snapshot["counters"],
-                histograms=snapshot["histograms"],
-            )
-            log.info("telemetry_final_flush_complete")
-    except Exception as e:
-        log.error("telemetry_final_flush_failed", error=str(e))
-    try:
-        await close_embedding_client()
-    except Exception as e:
-        log.error("embedding_client_shutdown_failed", error=str(e))
-
-
-# ---------------------------------------------------------------------------
 # App Initialization
 # ---------------------------------------------------------------------------
 
 _public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-_servers = [{"url": _public_base}] if _public_base else []
-
-app = FastAPI(
-    title="OpenBrain Unified Memory Service",
-    version="2.0.0",
-    description=(
-        "Unified memory store with domain-aware governance. "
-        "Corporate: append-only versioning + audit trail. "
-        "Build/Personal: mutable + deletable."
-    ),
-    servers=_servers or None,
-    docs_url="/docs",
-    redoc_url=None,
-    lifespan=lifespan,
-)
+app = create_app(public_base_url=_public_base, lifespan=lifespan)
 
 
 def _count_policy_skips_by_reason(actions: list[Any]) -> dict[str, int]:
@@ -439,37 +352,6 @@ def _hide_memory_access_denied(exc: HTTPException) -> HTTPException:
         return HTTPException(status_code=404, detail="Memory not found")
     return exc
 
-# Allowlist: UUID-like tokens only (alphanumeric + hyphens, 1-64 chars).
-# Anything else is replaced with a server-generated UUID to prevent log injection.
-_REQ_ID_RE = re.compile(r'^[a-zA-Z0-9\-]{1,64}$')
-
-
-class MetricsMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        start_time = time.perf_counter()
-        status_code = 500
-        try:
-            response = await call_next(request)
-            status_code = response.status_code
-            return response
-        finally:
-            duration = time.perf_counter() - start_time
-            incr_metric(f"http_requests_total_{status_code}")
-            observe_metric("http_request_duration_seconds", duration)
-
-
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        raw = request.headers.get("X-Request-ID", "")
-        req_id = raw if _REQ_ID_RE.match(raw) else str(uuid.uuid4())
-        structlog.contextvars.bind_contextvars(request_id=req_id)
-        try:
-            response = await call_next(request)
-            response.headers["X-Request-ID"] = req_id
-            return response
-        finally:
-            structlog.contextvars.clear_contextvars()
-
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
@@ -477,7 +359,6 @@ app.add_middleware(RequestIDMiddleware)
 # API V1 (Canonical)
 # ---------------------------------------------------------------------------
 
-@app.post("/api/v1/memory/write", response_model=MemoryWriteResponse)
 async def v1_write(
     req: MemoryWriteRequest,
     session: AsyncSession = Depends(get_session),
@@ -499,7 +380,6 @@ async def v1_write(
         incr_metric("memories_skipped_total")
     return result
 
-@app.post("/api/v1/memory/write-many", response_model=MemoryWriteManyResponse)
 async def v1_write_many(
     req: MemoryWriteManyRequest,
     session: AsyncSession = Depends(get_session),
@@ -517,7 +397,6 @@ async def v1_write_many(
             incr_metric(f"memories_{key}_total", result.summary[key])
     return result
 
-@app.post("/api/v1/memory/find", response_model=list[dict[str, Any]])
 async def v1_find(
     req: MemoryFindRequest,
     session: AsyncSession = Depends(get_session),
@@ -530,7 +409,6 @@ async def v1_find(
         incr_metric("search_zero_hit_total")
     return [{"record": rec, "score": score} for rec, score in hits]
 
-@app.post("/api/v1/memory/get-context", response_model=MemoryGetContextResponse)
 async def v1_get_context(
     req: MemoryGetContextRequest,
     session: AsyncSession = Depends(get_session),
@@ -551,7 +429,6 @@ async def v1_get_context(
     return response
 
 
-@app.get("/api/v1/memory/{memory_id}", response_model=MemoryRecord)
 async def v1_get(
     memory_id: str,
     session: AsyncSession = Depends(get_session),
@@ -566,7 +443,6 @@ async def v1_get(
     return record
 
 
-@app.get("/api/v1/obsidian/vaults", response_model=list[str])
 async def v1_obsidian_vaults(
     _user: dict = Depends(require_auth),
 ) -> list[str]:
@@ -578,7 +454,6 @@ async def v1_obsidian_vaults(
         raise HTTPException(status_code=503, detail=str(e))
 
 
-@app.post("/api/v1/obsidian/read-note", response_model=ObsidianNoteResponse)
 async def v1_obsidian_read_note(
     req: ObsidianReadRequest,
     _user: dict = Depends(require_auth),
@@ -600,7 +475,6 @@ async def v1_obsidian_read_note(
     )
 
 
-@app.post("/api/v1/obsidian/sync", response_model=ObsidianSyncResponse)
 async def v1_obsidian_sync(
     req: ObsidianSyncRequest,
     session: AsyncSession = Depends(get_session),
@@ -644,7 +518,6 @@ async def v1_obsidian_sync(
 # Well-Known Discovery (for ChatGPT MCP)
 # ---------------------------------------------------------------------------
 
-@app.get("/.well-known/oauth-protected-resource")
 async def oauth_protected_resource() -> dict:
     """RFC 9470 — tells ChatGPT where to find the OAuth server."""
     return {
@@ -654,7 +527,6 @@ async def oauth_protected_resource() -> dict:
         ],
     }
 
-@app.get("/.well-known/oauth-authorization-server")
 async def oauth_authorization_server() -> dict:
     """OAuth Authorization Server Metadata (RFC 8414)."""
     issuer = os.environ.get("OIDC_ISSUER_URL", "").rstrip("/")
@@ -672,12 +544,10 @@ async def oauth_authorization_server() -> dict:
 # Health
 # ---------------------------------------------------------------------------
 
-@app.get("/healthz")
 async def healthz() -> dict:
     return {"status": "ok", "service": "openbrain-unified"}
 
 
-@app.get("/readyz")
 async def readyz() -> dict:
     try:
         async with AsyncSessionLocal() as session:
@@ -691,14 +561,12 @@ async def readyz() -> dict:
         )
 
 
-@app.get("/health")
 async def health(
     _user: dict = Depends(require_auth),
 ) -> dict:
     return await readyz()
 
 
-@app.get("/api/diagnostics/metrics")
 async def diagnostics_metrics(
     session: AsyncSession = Depends(get_session),
     _user: dict = Depends(require_auth),
@@ -718,7 +586,6 @@ async def diagnostics_metrics(
     return snapshot
 
 
-@app.get("/metrics", response_class=PlainTextResponse)
 async def prometheus_metrics(
     session: AsyncSession = Depends(get_session),
     _user: dict = Depends(require_auth),
@@ -739,7 +606,6 @@ async def prometheus_metrics(
 # API Routes (CRUD)
 # ---------------------------------------------------------------------------
 
-@app.post("/api/memories", response_model=MemoryOut, status_code=201)
 async def create_memory(
     data: MemoryCreate,
     session: AsyncSession = Depends(get_session),
@@ -755,7 +621,6 @@ async def create_memory(
     incr_metric("memories_created_total")
     return memory
 
-@app.post("/api/memories/bulk", response_model=list[MemoryOut], status_code=201)
 async def create_memories_bulk(
     data: list[MemoryCreate],
     session: AsyncSession = Depends(get_session),
@@ -773,7 +638,6 @@ async def create_memories_bulk(
     incr_metric("memories_created_total", len(memories))
     return memories
 
-@app.post("/api/memories/bulk-upsert", response_model=BulkUpsertResult, status_code=200)
 async def bulk_upsert_memories(
     data: list[MemoryUpsertItem],
     session: AsyncSession = Depends(get_session),
@@ -794,7 +658,6 @@ async def bulk_upsert_memories(
     incr_metric("memories_skipped_total", len(result.skipped))
     return result
 
-@app.get("/api/memories/{memory_id}", response_model=MemoryOut)
 async def read_memory(
     memory_id: str,
     session: AsyncSession = Depends(get_session),
@@ -807,7 +670,6 @@ async def read_memory(
     _enforce_memory_access(_user, memory)
     return memory
 
-@app.get("/api/memories", response_model=list[MemoryOut])
 async def read_memories(
     domain: str | None = Query(None),
     entity_type: str | None = Query(None),
@@ -834,7 +696,6 @@ async def read_memories(
         filters["tenant_id"] = tenant_id
     return await list_memories(session, _apply_owner_scope(_user, filters), limit)
 
-@app.post("/api/memories/search", response_model=list[SearchResult])
 async def search(
     req: SearchRequest,
     session: AsyncSession = Depends(get_session),
@@ -847,7 +708,6 @@ async def search(
         incr_metric("search_zero_hit_total")
     return [SearchResult(memory=mem, score=score) for mem, score in rows]
 
-@app.put("/api/memories/{memory_id}", response_model=MemoryOut)
 async def update(
     memory_id: str,
     data: MemoryUpdate,
@@ -874,7 +734,6 @@ async def update(
         incr_metric("memories_updated_total")
     return memory
 
-@app.delete("/api/memories/{memory_id}", status_code=204)
 async def delete(
     memory_id: str,
     session: AsyncSession = Depends(get_session),
@@ -896,7 +755,6 @@ async def delete(
         raise HTTPException(status_code=404, detail="Memory not found")
     incr_metric("memories_deleted_total")
 
-@app.post("/api/memories/sync-check", response_model=SyncCheckResponse)
 async def check_sync_endpoint(
     req: SyncCheckRequest | None = Body(default=None),
     memory_id: str | None = Query(None),
@@ -937,7 +795,6 @@ async def check_sync_endpoint(
     incr_metric(f"sync_{result['status']}_total")
     return SyncCheckResponse(**result)
 
-@app.post("/api/admin/maintain", response_model=MaintenanceReport)
 async def maintain(
     req: MaintenanceRequest,
     session: AsyncSession = Depends(get_session),
@@ -960,7 +817,6 @@ async def maintain(
     return report
 
 
-@app.get("/api/admin/policy-registry", response_model=PolicyRegistry)
 async def read_policy_registry(
     _user: dict = Depends(require_auth),
 ) -> PolicyRegistry:
@@ -968,7 +824,6 @@ async def read_policy_registry(
     return PolicyRegistry(**get_policy_registry())
 
 
-@app.put("/api/admin/policy-registry", response_model=PolicyRegistry)
 async def update_policy_registry(
     registry: PolicyRegistry,
     _user: dict = Depends(require_auth),
@@ -977,7 +832,6 @@ async def update_policy_registry(
     return PolicyRegistry(**await set_policy_registry(registry.model_dump()))
 
 
-@app.get("/api/admin/maintain/reports", response_model=list[MaintenanceReportEntry])
 async def maintain_reports(
     limit: int = Query(20, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
@@ -987,7 +841,6 @@ async def maintain_reports(
     return await list_maintenance_reports(session, limit=limit)
 
 
-@app.get("/api/admin/maintain/reports/{report_id}", response_model=MaintenanceReportDetail)
 async def maintain_report_detail(
     report_id: str,
     session: AsyncSession = Depends(get_session),
@@ -999,7 +852,6 @@ async def maintain_report_detail(
         raise HTTPException(status_code=404, detail="Maintenance report not found")
     return report
 
-@app.post("/api/memories/export")
 async def export(
     req: ExportRequest,
     session: AsyncSession = Depends(get_session),
@@ -1023,3 +875,8 @@ async def export(
         content = "\n".join(json.dumps(r, default=str) for r in records) + "\n"
         return Response(content=content, media_type="application/x-ndjson")
     return records
+
+
+register_v1_routes(app, handlers=__import__(__name__, fromlist=["*"]))
+register_ops_routes(app, handlers=__import__(__name__, fromlist=["*"]))
+register_crud_routes(app, handlers=__import__(__name__, fromlist=["*"]))

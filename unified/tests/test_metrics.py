@@ -38,6 +38,7 @@ def _import_main_with_fake_auth_deps():
 
 
 main = _import_main_with_fake_auth_deps()
+from src import lifespan as lifespan_module
 
 
 class MetricsTests(unittest.IsolatedAsyncioTestCase):
@@ -278,15 +279,15 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
         }
 
         with (
-            patch.object(main, "AsyncSessionLocal") as session_factory,
-            patch.object(main, "get_telemetry_counters", new=AsyncMock(return_value=counters)),
-            patch.object(main, "get_telemetry_histograms", new=AsyncMock(return_value=histograms)),
-            patch.object(main, "close_embedding_client", new=AsyncMock()),
-            patch.object(main, "upsert_telemetry_metrics", new=AsyncMock()),
-            patch.object(main.asyncio, "create_task") as create_task,
+            patch.object(lifespan_module, "AsyncSessionLocal") as session_factory,
+            patch.object(lifespan_module, "get_telemetry_counters", new=AsyncMock(return_value=counters)),
+            patch.object(lifespan_module, "get_telemetry_histograms", new=AsyncMock(return_value=histograms)),
+            patch.object(lifespan_module, "close_embedding_client", new=AsyncMock()),
+            patch.object(lifespan_module, "upsert_telemetry_metrics", new=AsyncMock()),
+            patch.object(lifespan_module.asyncio, "create_task") as create_task,
         ):
             session_factory.return_value.__aenter__.return_value = object()
-            loop = main.asyncio.get_running_loop()
+            loop = lifespan_module.asyncio.get_running_loop()
             fake_task = loop.create_future()
             fake_task.set_result(None)
             create_task.side_effect = lambda coro: (coro.close(), fake_task)[1]
