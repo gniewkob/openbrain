@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src import crud
+from src import crud, memory_reads, memory_writes
 from src.models import DomainEnum, Memory
 from src.schemas import (
     MemoryCreate,
@@ -133,7 +133,7 @@ class UpdateMemoryErrorPropagationTest(unittest.IsolatedAsyncioTestCase):
         )
         with patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=failed_response)):
             with self.assertRaises(ValueError) as ctx:
-                await crud.update_memory(session, "mem-1", MemoryUpdate(content="new"))
+                await memory_writes.update_memory(session, "mem-1", MemoryUpdate(content="new"))
 
         self.assertIn("Owner is required", str(ctx.exception))
 
@@ -141,7 +141,7 @@ class UpdateMemoryErrorPropagationTest(unittest.IsolatedAsyncioTestCase):
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
 
-        result = await crud.update_memory(session, "missing-id", MemoryUpdate(content="x"))
+        result = await memory_writes.update_memory(session, "missing-id", MemoryUpdate(content="x"))
         self.assertIsNone(result)
 
     async def test_update_memory_skipped_returns_existing_record(self) -> None:
@@ -152,9 +152,9 @@ class UpdateMemoryErrorPropagationTest(unittest.IsolatedAsyncioTestCase):
         skipped_response = MemoryWriteResponse(status="skipped", record=_record())
         with (
             patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=skipped_response)),
-            patch.object(crud, "get_memory", new=AsyncMock()) as mock_get,
+            patch.object(memory_writes, "get_memory", new=AsyncMock()) as mock_get,
         ):
-            result = await crud.update_memory(session, "mem-1", MemoryUpdate(content="unchanged"))
+            result = await memory_writes.update_memory(session, "mem-1", MemoryUpdate(content="unchanged"))
 
         self.assertIsNotNone(result)
         self.assertEqual(result.id, "mem-1")
@@ -186,7 +186,7 @@ class AtomicWriteManyTest(unittest.IsolatedAsyncioTestCase):
         request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=True)
 
         with patch.object(crud, "handle_memory_write", side_effect=_write_side_effect):
-            result = await crud.handle_memory_write_many(session, request)
+            result = await memory_writes.handle_memory_write_many(session, request)
 
         # Batch must be rolled back
         session.rollback.assert_awaited_once()
@@ -213,7 +213,7 @@ class AtomicWriteManyTest(unittest.IsolatedAsyncioTestCase):
         request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=False)
 
         with patch.object(crud, "handle_memory_write", side_effect=_write_side_effect):
-            result = await crud.handle_memory_write_many(session, request)
+            result = await memory_writes.handle_memory_write_many(session, request)
 
         self.assertEqual(result.status, "partial_success")
         self.assertEqual(result.summary["created"], 2)
@@ -252,7 +252,7 @@ class MatchKeySelectForUpdateTest(unittest.IsolatedAsyncioTestCase):
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
             # The SELECT FOR UPDATE statement should be the first executed
             try:
-                await crud.handle_memory_write(session, req)
+                await memory_writes.handle_memory_write(session, req)
             except Exception:
                 pass  # May fail without real DB, we only check SQL shape
 
@@ -301,12 +301,12 @@ class StoreBulkFieldMappingTest(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(crud, "handle_memory_write", side_effect=_capture_write),
-            patch.object(crud, "handle_memory_write_many", wraps=crud.handle_memory_write_many),
+            patch.object(crud, "handle_memory_write_many", wraps=memory_writes.handle_memory_write_many),
             patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1])),
         ):
             # Call store_memories_bulk directly
             session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
-            await crud.store_memories_bulk(session, items)
+            await memory_writes.store_memories_bulk(session, items)
 
         self.assertGreater(len(captured_reqs), 0)
         rec = captured_reqs[0].record
@@ -366,7 +366,7 @@ class CrossDomainDedupTest(unittest.IsolatedAsyncioTestCase):
         session.commit = AsyncMock()
 
         req = MaintenanceRequest(dry_run=True, dedup_threshold=0.05, fix_superseded_links=False)
-        await crud.run_maintenance(session, req)
+        await memory_writes.run_maintenance(session, req)
 
         # The dedup GROUP BY statement should reference domain
         dedup_stmts = [s for s in captured_stmts if "GROUP BY" in s.upper()]
@@ -407,7 +407,7 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
         req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
-            result = await crud.handle_memory_write(session, req)
+            result = await memory_writes.handle_memory_write(session, req)
 
         self.assertNotEqual(result.status, "skipped", "sensitivity-only change must not be skipped")
 
@@ -449,7 +449,7 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
         req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
-            result = await crud.handle_memory_write(session, req)
+            result = await memory_writes.handle_memory_write(session, req)
 
         self.assertNotEqual(result.status, "skipped", "metadata-only change must not be skipped")
 
@@ -478,7 +478,7 @@ class NonAtomicSessionRollbackTest(unittest.IsolatedAsyncioTestCase):
         request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=False)
 
         with patch.object(crud, "handle_memory_write", side_effect=_write_side_effect):
-            result = await crud.handle_memory_write_many(session, request)
+            result = await memory_writes.handle_memory_write_many(session, request)
 
         session.rollback.assert_awaited_once()
         self.assertEqual(result.status, "partial_success")
@@ -500,7 +500,7 @@ class DryRunAuditLogTest(unittest.IsolatedAsyncioTestCase):
         session.commit = AsyncMock()
 
         req = MaintenanceRequest(dry_run=True, dedup_threshold=0.0, fix_superseded_links=False)
-        report = await crud.run_maintenance(session, req)
+        report = await memory_writes.run_maintenance(session, req)
 
         from src.models import AuditLog
         audit_entries = [o for o in added_objects if isinstance(o, AuditLog)]
@@ -520,7 +520,7 @@ class DryRunAuditLogTest(unittest.IsolatedAsyncioTestCase):
         session.commit = AsyncMock()
 
         req = MaintenanceRequest(dry_run=False, dedup_threshold=0.0, fix_superseded_links=False)
-        await crud.run_maintenance(session, req)
+        await memory_writes.run_maintenance(session, req)
 
         audit_entries = [o for o in added_objects if isinstance(o, AuditLog)]
         self.assertEqual(len(audit_entries), 1, "dry_run=False must persist exactly one AuditLog")
@@ -530,7 +530,6 @@ class SearchScoreSemanticsTest(unittest.IsolatedAsyncioTestCase):
     """Fix2 — search_memories must return similarity (1=similar), not raw distance (0=similar)."""
 
     async def test_search_memories_returns_similarity_not_distance(self) -> None:
-        from src.crud import search_memories
         from src.schemas import SearchRequest
 
         # distance=0.1 means very similar → similarity should be 0.9
@@ -543,7 +542,7 @@ class SearchScoreSemanticsTest(unittest.IsolatedAsyncioTestCase):
         session = SimpleNamespace(execute=_execute)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
-            results = await search_memories(session, SearchRequest(query="test", top_k=1))
+            results = await memory_reads.search_memories(session, SearchRequest(query="test", top_k=1))
 
         self.assertEqual(len(results), 1)
         _mem_out, score = results[0]
