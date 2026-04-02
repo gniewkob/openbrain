@@ -143,6 +143,25 @@ Interpretation:
 - they should not be mixed into application health judgments for OpenBrain or MailAI
 - they are still worth pruning periodically if they accumulate or consume unexpected resources
 
+The repository now includes a safe pruning helper:
+
+- `scripts/prune_mcp_sandboxes.sh`
+
+Behavior:
+
+- default mode is dry-run
+- it only targets containers with `docker-mcp=true`
+- it removes exited/dead containers by default
+- it only touches running MCP sandbox containers when `--include-running` is explicitly set
+
+Examples:
+
+```bash
+bash scripts/prune_mcp_sandboxes.sh
+bash scripts/prune_mcp_sandboxes.sh --apply
+MAX_RUNNING_AGE_HOURS=72 bash scripts/prune_mcp_sandboxes.sh --include-running
+```
+
 ## Recommended Next Actions
 
 1. Add a single host-level canary script that checks both systems end-to-end.
