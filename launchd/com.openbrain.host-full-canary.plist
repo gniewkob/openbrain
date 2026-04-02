@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.openbrain.host-full-canary</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/bash</string>
+      <string>/Users/gniewkob/Repos/openbrain/scripts/host_full_canary_runner.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/gniewkob/Repos/openbrain</string>
+
+    <key>StartInterval</key>
+    <integer>300</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/gniewkob/Repos/openbrain/monitoring/host-full-canary-launchd-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/gniewkob/Repos/openbrain/monitoring/host-full-canary-launchd-stderr.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>HOST_CANARY_NOTIFY</key>
+      <string>1</string>
+    </dict>
+  </dict>
+</plist>

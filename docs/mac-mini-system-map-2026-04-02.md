@@ -146,6 +146,8 @@ The repository now includes a shared host-level canary:
 - `scripts/host_dual_canary.sh`
 - `scripts/host_resource_canary.sh`
 - `scripts/host_full_canary.sh`
+- `scripts/host_full_canary_runner.sh`
+- `launchd/com.openbrain.host-full-canary.plist`
 
 It checks:
 
@@ -165,3 +167,18 @@ bash scripts/host_dual_canary.sh
 bash scripts/host_resource_canary.sh
 bash scripts/host_full_canary.sh
 ```
+
+For automated execution on the Mac Mini:
+
+```bash
+cp launchd/com.openbrain.host-full-canary.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.openbrain.host-full-canary.plist
+launchctl kickstart -k gui/$(id -u)/com.openbrain.host-full-canary
+```
+
+Logs:
+
+- `monitoring/host-full-canary-stdout.log`
+- `monitoring/host-full-canary-status.log`
+- `monitoring/host-full-canary-launchd-stdout.log`
+- `monitoring/host-full-canary-launchd-stderr.log`
