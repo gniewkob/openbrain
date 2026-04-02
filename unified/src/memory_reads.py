@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib import import_module
 from typing import Any
 
 from sqlalchemy import func, select
@@ -26,6 +27,15 @@ from .schemas import (
     MemoryRecord,
     SearchRequest,
 )
+
+
+def _crud_module():
+    return import_module(f"{__package__}.crud")
+
+
+async def _get_embedding_compat(text: str):
+    func = getattr(_crud_module(), "get_embedding", get_embedding)
+    return await func(text)
 
 
 async def get_memory_raw(session: AsyncSession, memory_id: str) -> Memory:
@@ -76,7 +86,7 @@ async def list_memories(session: AsyncSession, filters: dict[str, Any], limit: i
 
 
 async def search_memories(session: AsyncSession, req: SearchRequest) -> list[tuple[MemoryOut, float]]:
-    embedding = await get_embedding(req.query)
+    embedding = await _get_embedding_compat(req.query)
     stmt = select(Memory, Memory.embedding.cosine_distance(embedding).label("distance")).where(Memory.status == "active")
     filters = req.filters
     if "domain" in filters:
@@ -238,7 +248,7 @@ async def get_maintenance_report(session: AsyncSession, report_id: str) -> Maint
 
 
 async def find_memories_v1(session: AsyncSession, req: MemoryFindRequest) -> list[tuple[MemoryRecord, float]]:
-    embedding = await get_embedding(req.query) if req.query else None
+    embedding = await _get_embedding_compat(req.query) if req.query else None
     if embedding:
         stmt = select(Memory, Memory.embedding.cosine_distance(embedding).label("distance")).where(Memory.status == "active")
     else:

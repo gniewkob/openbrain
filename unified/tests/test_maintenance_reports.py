@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from src import crud
+from src import memory_reads
 from src.models import AuditLog
 from tests.test_metrics import _import_main_with_fake_auth_deps
 
@@ -35,7 +35,7 @@ class MaintenanceReportsTests(unittest.IsolatedAsyncioTestCase):
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [audit_entry]))
 
-        reports = await crud.list_maintenance_reports(session, limit=10)
+        reports = await memory_reads.list_maintenance_reports(session, limit=10)
 
         self.assertEqual(len(reports), 1)
         self.assertEqual(reports[0].report_id, "audit-1")
@@ -88,7 +88,7 @@ class MaintenanceReportsTests(unittest.IsolatedAsyncioTestCase):
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: audit_entry)
 
-        report = await crud.get_maintenance_report(session, "audit-1")
+        report = await memory_reads.get_maintenance_report(session, "audit-1")
 
         self.assertIsNotNone(report)
         self.assertEqual(report.report_id, "audit-1")

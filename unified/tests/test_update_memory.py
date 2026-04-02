@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from src import crud
+from src import crud, memory_writes
+from src.crud_common import _to_out, _to_record
 from src.models import DomainEnum, Memory
 from src.schemas import (
     MemoryOut,
@@ -99,7 +100,7 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="updated", record=updated_record))) as handle_write,
-            patch.object(crud, "get_memory", new=AsyncMock(return_value=expected_out)) as get_memory,
+            patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=expected_out)) as get_memory,
         ):
             result = await crud.update_memory(
                 session,
@@ -175,7 +176,7 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="versioned", record=versioned_record))) as handle_write,
-            patch.object(crud, "get_memory", new=AsyncMock(return_value=MemoryOut(
+            patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=MemoryOut(
                 id="mem-2",
                 domain="corporate",
                 entity_type="Decision",
@@ -236,7 +237,7 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="updated", record=None))) as handle_write,
-            patch.object(crud, "get_memory", new=AsyncMock(return_value=None)),
+            patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=None)),
         ):
             await crud.update_memory(session, "mem-1", MemoryUpdate(content="after"), actor="auth-sub")
 
@@ -268,8 +269,8 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
 
-        legacy = crud._to_out(existing)
-        canonical = crud._to_record(existing)
+        legacy = _to_out(existing)
+        canonical = _to_record(existing)
 
         self.assertEqual(legacy.updated_by, "editor")
         self.assertEqual(canonical.updated_by, "editor")

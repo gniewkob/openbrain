@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from src.crud import sync_check
+from src.memory_reads import sync_check
 from src.models import DomainEnum, Memory
 
 
