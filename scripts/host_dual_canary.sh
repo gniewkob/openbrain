@@ -119,7 +119,7 @@ check_prometheus_target() {
 
 check_launchd_label() {
   local label="$1"
-  if launchctl list | awk '{print $3}' | grep -Fxq "${label}"; then
+  if launchctl list | grep -Eq "[[:space:]]${label}$"; then
     ok "launchd label present: ${label}"
   else
     fail "launchd label missing: ${label}"
