@@ -5,7 +5,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from src import crud
+from src import crud, memory_writes
+from src.crud_common import _to_out
 from src.models import DomainEnum, Memory
 from src.schemas import MemoryCreate, MemoryWriteRecord, MemoryWriteRequest, WriteMode
 
@@ -32,7 +33,7 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
         session.flush = AsyncMock(side_effect=_flush)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
-            result = await crud.handle_memory_write(
+            result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
                     record=MemoryWriteRecord(
@@ -101,7 +102,7 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
         session.flush = AsyncMock(side_effect=_flush)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.3, 0.4])):
-            result = await crud.handle_memory_write(
+            result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
                     record=MemoryWriteRecord(
@@ -149,10 +150,10 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
         )
         with (
             patch.object(crud, "handle_memory_write", new=AsyncMock()) as handle_write,
-            patch.object(crud, "get_memory_raw", new=AsyncMock(return_value=created)),
+            patch.object(memory_writes, "get_memory_raw", new=AsyncMock(return_value=created)),
         ):
             handle_write.return_value = SimpleNamespace(status="created", errors=[], record=SimpleNamespace(id="mem-1"))
-            result = await crud.store_memory(
+            result = await memory_writes.store_memory(
                 AsyncMock(),
                 MemoryCreate(
                     content="payload",
@@ -201,7 +202,7 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
 
-        result = crud._to_out(memory)
+        result = _to_out(memory)
 
         self.assertEqual(result.tenant_id, "tenant-column")
 

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
 
-from src import crud
+from src import crud, memory_writes
 from src.models import DomainEnum, Memory
 from src.schemas import MaintenanceRequest, MemoryCreate, MemoryUpsertItem, MemoryWriteRecord, MemoryWriteRequest
 from tests.test_metrics import _import_main_with_fake_auth_deps
@@ -25,7 +25,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         ]
 
         with self.assertRaisesRegex(ValueError, "bulk-upsert requires match_key"):
-            await crud.upsert_memories_bulk(session, items)
+            await memory_writes.upsert_memories_bulk(session, items)
 
     async def test_bulk_upsert_endpoint_returns_422_when_match_key_missing(self) -> None:
         with patch.object(main, "upsert_memories_bulk", new=AsyncMock(side_effect=ValueError("bulk-upsert requires match_key"))):
@@ -62,7 +62,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             owner="alice",
             # match_key intentionally omitted
         )
-        result = await crud.handle_memory_write(
+        result = await memory_writes.handle_memory_write(
             session, MemoryWriteRequest(record=rec, write_mode="upsert")
         )
 
@@ -99,7 +99,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             match_key="corp:decision:approved-2026",
         )
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
-            result = await crud.handle_memory_write(
+            result = await memory_writes.handle_memory_write(
                 session, MemoryWriteRequest(record=rec, write_mode="upsert")
             )
 
@@ -127,7 +127,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session.flush = AsyncMock(side_effect=_flush)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
-            result = await crud.handle_memory_write(
+            result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
                     record=MemoryWriteRecord(
@@ -169,7 +169,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session.flush = AsyncMock(side_effect=_flush)
 
         with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
-            result = await crud.handle_memory_write(
+            result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
                     record=MemoryWriteRecord(
@@ -215,7 +215,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
 
         with self.assertRaisesRegex(ValueError, "append-only"):
-            await crud.delete_memory(session, "mem-1")
+            await memory_writes.delete_memory(session, "mem-1")
 
     async def test_delete_memory_writes_audit_event_before_hard_delete(self) -> None:
         now = datetime.now(timezone.utc)
@@ -245,7 +245,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
 
         with patch.object(crud, "_audit", new=AsyncMock()) as audit:
-            deleted = await crud.delete_memory(session, "mem-1", actor="admin-user")
+            deleted = await memory_writes.delete_memory(session, "mem-1", actor="admin-user")
 
         self.assertTrue(deleted)
         audit.assert_awaited_once()
@@ -313,7 +313,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session.flush = AsyncMock()
         session.commit = AsyncMock()
 
-        report = await crud.run_maintenance(
+        report = await memory_writes.run_maintenance(
             session,
             MaintenanceRequest(dry_run=False, dedup_threshold=0.05, fix_superseded_links=False),
             actor="tester",
@@ -351,7 +351,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session.flush = AsyncMock()
         session.commit = AsyncMock()
 
-        report = await crud.run_maintenance(
+        report = await memory_writes.run_maintenance(
             session,
             MaintenanceRequest(
                 dry_run=False, dedup_threshold=0.05,
@@ -393,7 +393,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session.flush = AsyncMock()
         session.commit = AsyncMock()
 
-        report = await crud.run_maintenance(
+        report = await memory_writes.run_maintenance(
             session,
             MaintenanceRequest(dry_run=False, dedup_threshold=0.05,
                                fix_superseded_links=False, allow_exact_dedup_override=False),
@@ -430,7 +430,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
                     # match_key intentionally absent
                 )
                 try:
-                    await crud.handle_memory_write(
+                    await memory_writes.handle_memory_write(
                         session, MemoryWriteRequest(record=rec, write_mode="upsert")
                     )
                 except Exception:
