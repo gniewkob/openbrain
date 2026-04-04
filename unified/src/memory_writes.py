@@ -1,3 +1,7 @@
+"""
+Memory write operations with circular imports fixed.
+Refactored to reduce cyclomatic complexity.
+"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -60,6 +64,262 @@ def _session_add(session: AsyncSession, obj) -> None:
     return None
 
 
+def _validate_corporate_domain(
+    rec: MemoryWriteRecord,
+    mode: WriteMode,
+) -> tuple[WriteMode, list[str]]:
+    """
+    Validate corporate domain requirements.
+    
+    Returns:
+        Tuple of (updated_mode, error_messages)
+    """
+    errors = []
+    
+    if mode == WriteMode.upsert:
+        mode = WriteMode.append_version
+    elif mode == WriteMode.update_only:
+        errors.append("Corporate domain does not support 'update_only'. Use 'append_version'.")
+    
+    if not rec.owner:
+        errors.append("Owner is required for corporate domain.")
+    
+    if not rec.match_key:
+        errors.append(
+            "match_key is required for corporate domain — ensures idempotency on append-only records."
+        )
+    
+    return mode, errors
+
+
+def _validate_write_mode(
+    mode: WriteMode,
+    existing: Memory | None,
+    match_key: str | None,
+) -> list[str]:
+    """
+    Validate write mode constraints.
+    
+    Returns:
+        List of error messages (empty if valid)
+    """
+    errors = []
+    
+    if mode == WriteMode.create_only and existing:
+        errors.append(f"Record with match_key '{match_key}' already exists.")
+    
+    if mode == WriteMode.update_only and not existing:
+        errors.append(f"No active record found for match_key '{match_key}'.")
+    
+    return errors
+
+
+async def _find_existing_memory(
+    session: AsyncSession,
+    match_key: str | None,
+) -> Memory | None:
+    """Find existing active memory by match_key."""
+    if not match_key:
+        return None
+    
+    stmt = (
+        select(Memory)
+        .where(Memory.match_key == match_key, Memory.status == "active")
+        .with_for_update()
+    )
+    res = await session.execute(stmt)
+    return res.scalar_one_or_none()
+
+
+def _log_duplicate_risk(rec: MemoryWriteRecord) -> None:
+    """Log warning for duplicate risk writes."""
+    if not rec.match_key and rec.domain != "corporate":
+        log.warning(
+            "duplicate_risk_write",
+            domain=rec.domain,
+            entity_type=rec.entity_type,
+            owner=rec.owner,
+            hint="Provide match_key for idempotent writes",
+        )
+
+
+def _build_memory_metadata(
+    rec: MemoryWriteRecord,
+    actor: str,
+    append_only_policy: bool,
+    previous_id: str | None = None,
+    root_id: str | None = None,
+) -> dict:
+    """Build metadata dictionary for memory record."""
+    return {
+        "title": rec.title,
+        "tenant_id": rec.tenant_id,
+        "custom_fields": rec.custom_fields,
+        "updated_by": actor,
+        "source": rec.source.model_dump(),
+        "governance": {"mutable": not append_only_policy, "append_only": append_only_policy},
+        "previous_id": previous_id,
+        "root_id": root_id,
+    }
+
+
+async def _create_new_memory(
+    session: AsyncSession,
+    rec: MemoryWriteRecord,
+    actor: str,
+    content_hash: str,
+    append_only_policy: bool,
+    _commit: bool,
+) -> MemoryWriteResponse:
+    """Create a new memory record."""
+    embedding = await _get_embedding_compat(rec.content)
+    
+    memory = Memory(
+        domain=rec.domain,
+        entity_type=rec.entity_type,
+        content=rec.content,
+        embedding=embedding,
+        owner=rec.owner,
+        tenant_id=rec.tenant_id,
+        created_by=actor,
+        status="active",
+        version=1,
+        sensitivity=rec.sensitivity,
+        tags=rec.tags,
+        relations=rec.relations.model_dump(),
+        obsidian_ref=rec.obsidian_ref,
+        content_hash=content_hash,
+        match_key=rec.match_key,
+        metadata_=_build_memory_metadata(rec, actor, append_only_policy),
+    )
+    
+    maybe_add = _session_add(session, memory)
+    if maybe_add is not None:
+        await maybe_add
+    await session.flush()
+    
+    memory.metadata_ = {
+        **(memory.metadata_ or {}),
+        "previous_id": None,
+        "root_id": memory.id,
+    }
+    
+    if rec.domain == "corporate":
+        await _audit_compat(session, "create", memory.id, actor=actor, tool_name="memory.write")
+    
+    if _commit:
+        await session.commit()
+        await session.refresh(memory)
+    else:
+        await session.flush()
+    
+    return MemoryWriteResponse(status="created", record=_to_record(memory))
+
+
+async def _version_memory(
+    session: AsyncSession,
+    existing: Memory,
+    rec: MemoryWriteRecord,
+    actor: str,
+    content_hash: str,
+    _commit: bool,
+) -> MemoryWriteResponse:
+    """Create a new version of an existing memory."""
+    new_embedding = await _get_embedding_compat(rec.content)
+    
+    new_memory = Memory(
+        domain=existing.domain,
+        entity_type=rec.entity_type,
+        content=rec.content,
+        embedding=new_embedding,
+        owner=rec.owner or existing.owner,
+        tenant_id=rec.tenant_id or existing.tenant_id or existing.metadata_.get("tenant_id"),
+        created_by=existing.created_by,
+        status="active",
+        version=existing.version + 1,
+        sensitivity=rec.sensitivity,
+        tags=rec.tags,
+        relations=rec.relations.model_dump(),
+        obsidian_ref=rec.obsidian_ref or existing.obsidian_ref,
+        content_hash=content_hash,
+        match_key=existing.match_key,
+        metadata_={
+            "title": rec.title,
+            "tenant_id": rec.tenant_id or existing.tenant_id or existing.metadata_.get("tenant_id"),
+            "custom_fields": rec.custom_fields or existing.metadata_.get("custom_fields", {}),
+            "updated_by": actor,
+            "previous_id": existing.id,
+            "root_id": existing.metadata_.get("root_id") or existing.id,
+            "source": rec.source.model_dump(),
+            "governance": existing.metadata_.get("governance", {}),
+        },
+    )
+    
+    maybe_add = _session_add(session, new_memory)
+    if maybe_add is not None:
+        await maybe_add
+    await session.flush()
+    
+    existing.status = "superseded"
+    existing.superseded_by = new_memory.id
+    
+    await _audit_compat(
+        session,
+        "version",
+        new_memory.id,
+        actor=actor,
+        tool_name="memory.write",
+        meta={"prev_id": existing.id, "reason": "content_update"},
+    )
+    
+    if _commit:
+        await session.commit()
+        await session.refresh(new_memory)
+    else:
+        await session.flush()
+    
+    return MemoryWriteResponse(status="versioned", record=_to_record(new_memory))
+
+
+async def _update_memory(
+    session: AsyncSession,
+    existing: Memory,
+    rec: MemoryWriteRecord,
+    actor: str,
+    content_hash: str,
+    _commit: bool,
+) -> MemoryWriteResponse:
+    """Update an existing memory in place."""
+    new_embedding = await _get_embedding_compat(rec.content)
+    
+    existing.content = rec.content
+    existing.content_hash = content_hash
+    existing.embedding = new_embedding
+    existing.owner = rec.owner
+    existing.tenant_id = rec.tenant_id
+    existing.tags = rec.tags
+    existing.relations = rec.relations.model_dump()
+    existing.obsidian_ref = rec.obsidian_ref
+    existing.entity_type = rec.entity_type
+    existing.sensitivity = rec.sensitivity
+    existing.metadata_ = {
+        **(existing.metadata_ or {}),
+        "title": rec.title,
+        "tenant_id": rec.tenant_id,
+        "custom_fields": rec.custom_fields,
+        "updated_by": actor,
+        "source": rec.source.model_dump(),
+    }
+    
+    if _commit:
+        await session.commit()
+        await session.refresh(existing)
+    else:
+        await session.flush()
+    
+    return MemoryWriteResponse(status="updated", record=_to_record(existing))
+
+
 async def handle_memory_write(
     session: AsyncSession,
     request: MemoryWriteRequest,
@@ -85,177 +345,47 @@ async def handle_memory_write(
     mode = request.write_mode
     domain = rec.domain
     append_only_policy = _requires_append_only(domain, rec.entity_type)
-
+    
+    # Validate corporate domain requirements
     if domain == "corporate":
-        if mode == WriteMode.upsert:
-            mode = WriteMode.append_version
-        elif mode == WriteMode.update_only:
-            return MemoryWriteResponse(
-                status="failed",
-                errors=["Corporate domain does not support 'update_only'. Use 'append_version'."],
-            )
-        if not rec.owner:
-            return MemoryWriteResponse(status="failed", errors=["Owner is required for corporate domain."])
-        if not rec.match_key:
-            return MemoryWriteResponse(
-                status="failed",
-                errors=["match_key is required for corporate domain — ensures idempotency on append-only records."],
-            )
-
-    existing = None
-    if rec.match_key:
-        stmt = (
-            select(Memory)
-            .where(Memory.match_key == rec.match_key, Memory.status == "active")
-            .with_for_update()
-        )
-        res = await session.execute(stmt)
-        existing = res.scalar_one_or_none()
-
-    if mode == WriteMode.create_only and existing:
-        return MemoryWriteResponse(status="failed", errors=[f"Record with match_key '{rec.match_key}' already exists."])
-    if mode == WriteMode.update_only and not existing:
-        return MemoryWriteResponse(status="failed", errors=[f"No active record found for match_key '{rec.match_key}'."])
-
-    from .models import compute_hash  # local import keeps helper module smaller
-
+        mode, errors = _validate_corporate_domain(rec, mode)
+        if errors:
+            return MemoryWriteResponse(status="failed", errors=errors)
+    
+    # Find existing record
+    existing = await _find_existing_memory(session, rec.match_key)
+    
+    # Validate write mode
+    mode_errors = _validate_write_mode(mode, existing, rec.match_key)
+    if mode_errors:
+        return MemoryWriteResponse(status="failed", errors=mode_errors)
+    
+    # Compute content hash
+    from .models import compute_hash
     content_hash = compute_hash(rec.content)
-
-    if not rec.match_key and rec.domain != "corporate":
-        log.warning(
-            "duplicate_risk_write",
-            domain=rec.domain,
-            entity_type=rec.entity_type,
-            owner=rec.owner,
-            hint="Provide match_key for idempotent writes",
-        )
-
+    
+    # Log duplicate risk
+    _log_duplicate_risk(rec)
+    
+    # Create new memory if none exists
     if not existing:
-        embedding = await _get_embedding_compat(rec.content)
-        memory = Memory(
-            domain=rec.domain,
-            entity_type=rec.entity_type,
-            content=rec.content,
-            embedding=embedding,
-            owner=rec.owner,
-            tenant_id=rec.tenant_id,
-            created_by=actor,
-            status="active",
-            version=1,
-            sensitivity=rec.sensitivity,
-            tags=rec.tags,
-            relations=rec.relations.model_dump(),
-            obsidian_ref=rec.obsidian_ref,
-            content_hash=content_hash,
-            match_key=rec.match_key,
-            metadata_={
-                "title": rec.title,
-                "tenant_id": rec.tenant_id,
-                "custom_fields": rec.custom_fields,
-                "updated_by": actor,
-                "source": rec.source.model_dump(),
-                "governance": {"mutable": not append_only_policy, "append_only": append_only_policy},
-            },
+        return await _create_new_memory(
+            session, rec, actor, content_hash, append_only_policy, _commit
         )
-        maybe_add = _session_add(session, memory)
-        if maybe_add is not None:
-            await maybe_add
-        await session.flush()
-        memory.metadata_ = {**(memory.metadata_ or {}), "previous_id": None, "root_id": memory.id}
-
-        if domain == "corporate":
-            await _audit_compat(session, "create", memory.id, actor=actor, tool_name="memory.write")
-
-        if _commit:
-            await session.commit()
-            await session.refresh(memory)
-        else:
-            await session.flush()
-        return MemoryWriteResponse(status="created", record=_to_record(memory))
-
+    
+    # Skip if content hasn't changed
     if _record_matches_existing(existing, rec, content_hash):
         return MemoryWriteResponse(status="skipped", record=_to_record(existing))
-
+    
+    # Version or update based on mode and policy
     if mode == WriteMode.append_version or append_only_policy:
-        new_embedding = await _get_embedding_compat(rec.content)
-        new_memory = Memory(
-            domain=existing.domain,
-            entity_type=rec.entity_type,
-            content=rec.content,
-            embedding=new_embedding,
-            owner=rec.owner or existing.owner,
-            tenant_id=rec.tenant_id or existing.tenant_id or existing.metadata_.get("tenant_id"),
-            created_by=existing.created_by,
-            status="active",
-            version=existing.version + 1,
-            sensitivity=rec.sensitivity,
-            tags=rec.tags,
-            relations=rec.relations.model_dump(),
-            obsidian_ref=rec.obsidian_ref or existing.obsidian_ref,
-            content_hash=content_hash,
-            match_key=existing.match_key,
-            metadata_={
-                "title": rec.title,
-                "tenant_id": rec.tenant_id or existing.tenant_id or existing.metadata_.get("tenant_id"),
-                "custom_fields": rec.custom_fields or existing.metadata_.get("custom_fields", {}),
-                "updated_by": actor,
-                "previous_id": existing.id,
-                "root_id": existing.metadata_.get("root_id") or existing.id,
-                "source": rec.source.model_dump(),
-                "governance": existing.metadata_.get("governance", {}),
-            },
-        )
-        maybe_add = _session_add(session, new_memory)
-        if maybe_add is not None:
-            await maybe_add
-        await session.flush()
-
-        existing.status = "superseded"
-        existing.superseded_by = new_memory.id
-        await _audit_compat(
-            session,
-            "version",
-            new_memory.id,
-            actor=actor,
-            tool_name="memory.write",
-            meta={"prev_id": existing.id, "reason": "content_update"},
-        )
-
-        if _commit:
-            await session.commit()
-            await session.refresh(new_memory)
-        else:
-            await session.flush()
-        return MemoryWriteResponse(status="versioned", record=_to_record(new_memory))
-
-    new_embedding = await _get_embedding_compat(rec.content)
-    existing.content = rec.content
-    existing.content_hash = content_hash
-    existing.embedding = new_embedding
-    existing.owner = rec.owner
-    existing.tenant_id = rec.tenant_id
-    existing.tags = rec.tags
-    existing.relations = rec.relations.model_dump()
-    existing.obsidian_ref = rec.obsidian_ref
-    existing.entity_type = rec.entity_type
-    existing.sensitivity = rec.sensitivity
-    existing.metadata_ = {
-        **(existing.metadata_ or {}),
-        "title": rec.title,
-        "tenant_id": rec.tenant_id,
-        "custom_fields": rec.custom_fields,
-        "updated_by": actor,
-        "source": rec.source.model_dump(),
-    }
-
-    if _commit:
-        await session.commit()
-        await session.refresh(existing)
-    else:
-        await session.flush()
-    return MemoryWriteResponse(status="updated", record=_to_record(existing))
+        return await _version_memory(session, existing, rec, actor, content_hash, _commit)
+    
+    return await _update_memory(session, existing, rec, actor, content_hash, _commit)
 
 
+# Keep the rest of the file (handle_memory_write_many, etc.)
+# Copy from original file...
 async def handle_memory_write_many(
     session: AsyncSession,
     request: MemoryWriteManyRequest,
