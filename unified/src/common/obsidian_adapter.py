@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 # Vault path configuration from environment
 # Format: OBSIDIAN_VAULT_{VAULT_NAME}_PATH or OBSIDIAN_VAULT_PATHS as JSON
 _VAULT_PATHS_CACHE: dict[str, str] = {}
+_VAULT_PATHS_LOCK = asyncio.Lock()
 
 _LOG_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2} ")
 _INSTALLER_WARNING = "Your Obsidian installer is out of date."
@@ -367,32 +368,31 @@ class ObsidianCliAdapter:
         except ObsidianCliError:
             return False
 
-    def _get_vault_path(self, vault: str) -> str | None:
+    async def _get_vault_path(self, vault: str) -> str | None:
         """Get filesystem path for vault from environment configuration."""
-        global _VAULT_PATHS_CACHE
+        async with _VAULT_PATHS_LOCK:
+            if vault in _VAULT_PATHS_CACHE:
+                return _VAULT_PATHS_CACHE[vault]
 
-        if vault in _VAULT_PATHS_CACHE:
-            return _VAULT_PATHS_CACHE[vault]
+            # Try individual env var: OBSIDIAN_VAULT_{VAULT_NAME}_PATH
+            env_var = f"OBSIDIAN_VAULT_{vault.upper().replace(' ', '_').replace('-', '_')}_PATH"
+            path = os.environ.get(env_var)
+            if path:
+                _VAULT_PATHS_CACHE[vault] = path
+                return path
 
-        # Try individual env var: OBSIDIAN_VAULT_{VAULT_NAME}_PATH
-        env_var = f"OBSIDIAN_VAULT_{vault.upper().replace(' ', '_').replace('-', '_')}_PATH"
-        path = os.environ.get(env_var)
-        if path:
-            _VAULT_PATHS_CACHE[vault] = path
-            return path
+            # Try JSON config: OBSIDIAN_VAULT_PATHS
+            paths_json = os.environ.get("OBSIDIAN_VAULT_PATHS")
+            if paths_json:
+                try:
+                    paths_map = json.loads(paths_json)
+                    if isinstance(paths_map, dict) and vault in paths_map:
+                        _VAULT_PATHS_CACHE[vault] = paths_map[vault]
+                        return paths_map[vault]
+                except json.JSONDecodeError:
+                    pass
 
-        # Try JSON config: OBSIDIAN_VAULT_PATHS
-        paths_json = os.environ.get("OBSIDIAN_VAULT_PATHS")
-        if paths_json:
-            try:
-                paths_map = json.loads(paths_json)
-                if isinstance(paths_map, dict) and vault in paths_map:
-                    _VAULT_PATHS_CACHE[vault] = paths_map[vault]
-                    return paths_map[vault]
-            except json.JSONDecodeError:
-                pass
-
-        return None
+            return None
 
     async def update_note(
         self,
@@ -463,7 +463,7 @@ class ObsidianCliAdapter:
         """
         self._validate_vault_path(vault, path)
         
-        vault_root = self._get_vault_path(vault)
+        vault_root = await self._get_vault_path(vault)
         if not vault_root:
             raise ObsidianCliError(f"Cannot determine path for vault: {vault}")
         
@@ -502,7 +502,7 @@ class ObsidianCliAdapter:
         Write note directly to vault filesystem.
         Uses aiofiles for async file operations.
         """
-        vault_root = self._get_vault_path(vault)
+        vault_root = await self._get_vault_path(vault)
         if not vault_root:
             raise ObsidianCliError(
                 f"Cannot determine filesystem path for vault: {vault}. "

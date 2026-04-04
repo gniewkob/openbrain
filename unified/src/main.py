@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
 from typing import Any
 
 import structlog
@@ -19,12 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .app_factory import create_app
 from .auth import (
     PUBLIC_EXPOSURE,
-    get_domain_scope,
     get_policy_registry,
-    get_registry_domain_scope,
-    get_subject,
-    get_tenant_id,
-    is_privileged_user,
     require_auth,
     set_policy_registry,
 )
@@ -33,10 +27,7 @@ from .lifespan import lifespan
 from .middleware import MetricsMiddleware, RequestIDMiddleware
 from .memory_reads import (
     export_memories,
-    find_memories_v1,
-    get_grounding_pack,
     get_memory,
-    get_memory_as_record,
     get_memory_domain_status_counts,
     get_memory_status_counts,
     get_maintenance_report,
@@ -47,20 +38,15 @@ from .memory_reads import (
 )
 from .memory_writes import (
     delete_memory,
-    handle_memory_write,
-    handle_memory_write_many,
     run_maintenance,
     store_memories_bulk,
     store_memory,
     update_memory,
     upsert_memories_bulk,
 )
-from .obsidian_cli import ObsidianCliAdapter, ObsidianCliError, note_to_memory_write_record
 from .routes_crud import register_crud_routes
 from .api.v1 import health_router, memory_router, obsidian_router
 from .routes_ops import register_ops_routes
-from .routes_v1 import register_v1_routes
-from .obsidian_sync import BidirectionalSyncEngine, ObsidianChangeTracker, SyncStrategy
 from .schemas import (
     BulkUpsertResult,
     ExportRequest,
@@ -69,37 +55,23 @@ from .schemas import (
     MaintenanceReportEntry,
     MaintenanceRequest,
     MemoryCreate,
-    MemoryFindRequest,
-    MemoryGetContextRequest,
-    MemoryGetContextResponse,
     MemoryOut,
-    MemoryRecord,
     MemoryUpdate,
     MemoryUpsertItem,
-    MemoryWriteManyRequest,
-    MemoryWriteManyResponse,
-    MemoryWriteRequest,
-    MemoryWriteResponse,
-    ObsidianBidirectionalSyncRequest,
-    ObsidianBidirectionalSyncResponse,
-    ObsidianCollectionRequest,
-    ObsidianSyncChange,
-    ObsidianCollectionResponse,
-    ObsidianExportItem,
-    ObsidianExportRequest,
-    ObsidianExportResponse,
-    ObsidianNoteResponse,
-    ObsidianReadRequest,
-    ObsidianSyncRequest,
-    ObsidianSyncResponse,
-    ObsidianSyncStatus,
-    ObsidianWriteRequest,
-    ObsidianWriteResponse,
     PolicyRegistry,
     SearchRequest,
     SearchResult,
     SyncCheckRequest,
     SyncCheckResponse,
+)
+from .security import (
+    require_admin as _require_admin,
+    enforce_domain_access as _enforce_domain_access,
+    resolve_owner_for_write as _resolve_owner_for_write,
+    resolve_tenant_for_write as _resolve_tenant_for_write,
+    apply_owner_scope as _apply_owner_scope,
+    enforce_memory_access as _enforce_memory_access,
+    hide_memory_access_denied as _hide_memory_access_denied,
 )
 from .telemetry import (
     get_metrics_snapshot,
@@ -243,125 +215,7 @@ def _build_operational_summary() -> dict[str, float | str | dict[str, dict[str, 
     return {"health": health, "health_status": float(health_status), "thresholds": ALERT_THRESHOLDS, **summary}
 
 
-def _is_scoped_user(user: dict[str, Any]) -> bool:
-    return PUBLIC_MODE and not is_privileged_user(user)
 
-
-def _record_access_denied(reason: str) -> None:
-    incr_metric("access_denied_total")
-    incr_metric(f"access_denied_{reason}_total")
-
-
-def _require_admin(user: dict[str, Any]) -> None:
-    if not PUBLIC_MODE:
-        return
-    if not is_privileged_user(user):
-        _record_access_denied("admin")
-        raise HTTPException(status_code=403, detail="Admin privileges required")
-
-
-def _effective_domain_scope(user: dict[str, Any], action: str) -> set[str]:
-    subject = get_subject(user)
-    tenant_id = get_tenant_id(user)
-    claim_scope = get_domain_scope(user, action)
-    registry_scope = get_registry_domain_scope(subject, tenant_id, action)
-    if claim_scope and registry_scope:
-        return claim_scope & registry_scope
-    return claim_scope or registry_scope
-
-
-def _enforce_domain_access(user: dict[str, Any], domain: str, action: str) -> None:
-    if not PUBLIC_MODE:
-        return
-    allowed = _effective_domain_scope(user, action)
-    if not allowed:
-        # No domain scope configured — privileged users get full access, others are denied.
-        if is_privileged_user(user):
-            return
-        _record_access_denied("domain")
-        raise HTTPException(status_code=403, detail=f"{action.capitalize()} access denied for domain '{domain}'")
-    # Fail-closed: deny unless there is an explicit non-empty grant that includes
-    # this domain. An empty allowed set means no grants were configured for this
-    # user+action pair, not "all domains permitted" (C1 fix).
-    if domain.lower() not in allowed:
-        _record_access_denied("domain")
-        raise HTTPException(status_code=403, detail=f"{action.capitalize()} access denied for domain '{domain}'")
-
-
-def _resolve_owner_for_write(user: dict[str, Any], owner: str | None) -> str:
-    if not _is_scoped_user(user):
-        return owner or ""
-    if get_tenant_id(user):
-        return owner or ""
-    subject = get_subject(user)
-    if owner and owner != subject:
-        _record_access_denied("owner")
-        raise HTTPException(status_code=403, detail="Cannot write records for another owner")
-    return subject
-
-
-def _resolve_tenant_for_write(user: dict[str, Any], tenant_id: str | None) -> str | None:
-    if not _is_scoped_user(user):
-        return tenant_id
-    scoped_tenant = get_tenant_id(user)
-    if not scoped_tenant:
-        return tenant_id
-    if tenant_id and tenant_id != scoped_tenant:
-        _record_access_denied("tenant")
-        raise HTTPException(status_code=403, detail="Cannot write records for another tenant")
-    return scoped_tenant
-
-
-def _apply_owner_scope(user: dict[str, Any], filters: dict[str, Any]) -> dict[str, Any]:
-    scoped = dict(filters)
-    if _is_scoped_user(user):
-        allowed_read_domains = _effective_domain_scope(user, "read")
-        requested = scoped.get("domain")
-        if requested is None:
-            if allowed_read_domains:
-                scoped["domain"] = sorted(allowed_read_domains)
-            # If allowed_read_domains is empty, rely on owner/tenant_id filters below
-            # to limit exposure — no domain injection means all domains but only the
-            # user's own records are returned.
-        else:
-            if allowed_read_domains:
-                requested_domains = requested if isinstance(requested, list) else [requested]
-                normalized = {str(domain).lower() for domain in requested_domains}
-                if not normalized.issubset(allowed_read_domains):
-                    _record_access_denied("domain")
-                    raise HTTPException(status_code=403, detail="Read access denied for requested domain scope")
-            # If no domain grants exist, we don't block the request — owner/tenant
-            # scope below will still restrict the result set to the user's own records.
-    if not _is_scoped_user(user):
-        return scoped
-    scoped_tenant = get_tenant_id(user)
-    if scoped_tenant:
-        scoped["tenant_id"] = scoped_tenant
-        scoped.pop("owner", None)
-    else:
-        scoped["owner"] = get_subject(user)
-    return scoped
-
-
-def _enforce_memory_access(user: dict[str, Any], memory: MemoryOut) -> None:
-    if not _is_scoped_user(user):
-        return
-    scoped_tenant = get_tenant_id(user)
-    if scoped_tenant:
-        if not memory.tenant_id or memory.tenant_id != scoped_tenant:
-            _record_access_denied("tenant")
-            raise HTTPException(status_code=404, detail="Memory not found")
-        return
-    subject = get_subject(user)
-    if not memory.owner or memory.owner != subject:
-        _record_access_denied("owner")
-        raise HTTPException(status_code=404, detail="Memory not found")
-
-
-def _hide_memory_access_denied(exc: HTTPException) -> HTTPException:
-    if exc.status_code in {403, 404}:
-        return HTTPException(status_code=404, detail="Memory not found")
-    return exc
 
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestIDMiddleware)
@@ -373,467 +227,6 @@ app.add_middleware(RequestIDMiddleware)
 app.include_router(health_router)
 app.include_router(memory_router, prefix="/api/v1")
 app.include_router(obsidian_router, prefix="/api/v1")
-
-# ---------------------------------------------------------------------------
-# Legacy API V1 (Inline - to be migrated)
-# ---------------------------------------------------------------------------
-
-async def v1_write(
-    req: MemoryWriteRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> MemoryWriteResponse:
-    _enforce_domain_access(_user, req.record.domain, "write")
-    req.record.owner = _resolve_owner_for_write(_user, req.record.owner)
-    req.record.tenant_id = _resolve_tenant_for_write(_user, req.record.tenant_id)
-    if not req.record.match_key:
-        incr_metric("duplicate_risk_writes_total")
-    result = await handle_memory_write(session, req, actor=_user.get("sub", "agent"))
-    if result.status == "created":
-        incr_metric("memories_created_total")
-    elif result.status == "updated":
-        incr_metric("memories_updated_total")
-    elif result.status == "versioned":
-        incr_metric("memories_versioned_total")
-    elif result.status == "skipped":
-        incr_metric("memories_skipped_total")
-    return result
-
-async def v1_write_many(
-    req: MemoryWriteManyRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> MemoryWriteManyResponse:
-    for record in req.records:
-        _enforce_domain_access(_user, record.domain, "write")
-        record.owner = _resolve_owner_for_write(_user, record.owner)
-        record.tenant_id = _resolve_tenant_for_write(_user, record.tenant_id)
-    result = await handle_memory_write_many(session, req, actor=_user.get("sub", "agent"))
-    incr_metric("bulk_batches_total")
-    incr_metric("bulk_records_total", len(req.records))
-    for key in ("created", "updated", "versioned", "skipped", "failed"):
-        if result.summary.get(key):
-            incr_metric(f"memories_{key}_total", result.summary[key])
-    return result
-
-async def v1_find(
-    req: MemoryFindRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> list[dict[str, Any]]:
-    req.filters = _apply_owner_scope(_user, req.filters)
-    hits = await find_memories_v1(session, req)
-    incr_metric("search_requests_total")
-    if not hits:
-        incr_metric("search_zero_hit_total")
-    return [{"record": rec, "score": score} for rec, score in hits]
-
-async def v1_get_context(
-    req: MemoryGetContextRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> MemoryGetContextResponse:
-    if req.domain:
-        _enforce_domain_access(_user, req.domain, "read")
-    elif PUBLIC_MODE and _is_scoped_user(_user):
-        # domain=None → context spans all domains; ensure user has at least one read grant.
-        allowed = _effective_domain_scope(_user, "read")
-        if not allowed and not is_privileged_user(_user):
-            _record_access_denied("domain")
-            raise HTTPException(status_code=403, detail="Read access denied: no domain grants configured")
-    owner = get_subject(_user) if _is_scoped_user(_user) and not get_tenant_id(_user) else None
-    tenant_id = get_tenant_id(_user) if _is_scoped_user(_user) else None
-    response = await get_grounding_pack(session, req, owner=owner, tenant_id=tenant_id)
-    incr_metric("get_context_requests_total")
-    return response
-
-
-async def v1_get(
-    memory_id: str,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> MemoryRecord:
-    """Retrieve a single memory by ID — returns canonical MemoryRecord (V1 shape)."""
-    record, memory_out = await get_memory_as_record(session, memory_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Memory not found")
-    _enforce_domain_access(_user, memory_out.domain, "read")
-    _enforce_memory_access(_user, memory_out)
-    return record
-
-
-async def v1_obsidian_vaults(
-    _user: dict = Depends(require_auth),
-) -> list[str]:
-    _require_admin(_user)
-    adapter = ObsidianCliAdapter()
-    try:
-        return await adapter.list_vaults()
-    except ObsidianCliError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-
-async def v1_obsidian_read_note(
-    req: ObsidianReadRequest,
-    _user: dict = Depends(require_auth),
-) -> ObsidianNoteResponse:
-    _require_admin(_user)
-    adapter = ObsidianCliAdapter()
-    try:
-        note = await adapter.read_note(req.vault, req.path)
-    except ObsidianCliError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    return ObsidianNoteResponse(
-        vault=note.vault,
-        path=note.path,
-        title=note.title,
-        content=note.content,
-        frontmatter=note.frontmatter,
-        tags=note.tags,
-        file_hash=note.file_hash,
-    )
-
-
-async def v1_obsidian_sync(
-    req: ObsidianSyncRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> ObsidianSyncResponse:
-    _require_admin(_user)
-    adapter = ObsidianCliAdapter()
-    try:
-        if req.paths:
-            resolved_paths = req.paths[: req.limit]
-        else:
-            resolved_paths = await adapter.list_files(req.vault, folder=req.folder, limit=req.limit)
-
-        notes = [await adapter.read_note(req.vault, path) for path in resolved_paths]
-    except ObsidianCliError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    records = [
-        note_to_memory_write_record(
-            note,
-            default_domain=req.domain,
-            default_entity_type=req.entity_type,
-            default_owner=req.owner,
-            default_tags=req.tags,
-        )
-        for note in notes
-    ]
-    result = await handle_memory_write_many(
-        session,
-        MemoryWriteManyRequest(records=records, write_mode="upsert"),
-        actor=_user.get("sub", "obsidian-sync"),
-    )
-    return ObsidianSyncResponse(
-        vault=req.vault,
-        resolved_paths=resolved_paths,
-        scanned=len(resolved_paths),
-        summary=result.summary,
-        results=result.results,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Obsidian Export (OpenBrain → Obsidian)
-# ---------------------------------------------------------------------------
-
-async def v1_obsidian_write_note(
-    req: ObsidianWriteRequest,
-    _user: dict = Depends(require_auth),
-) -> ObsidianWriteResponse:
-    """Write a single note to Obsidian vault."""
-    _require_admin(_user)
-    adapter = ObsidianCliAdapter()
-    try:
-        # Check if note exists
-        exists = await adapter.note_exists(req.vault, req.path)
-        
-        note = await adapter.write_note(
-            vault=req.vault,
-            path=req.path,
-            content=req.content,
-            frontmatter=req.frontmatter,
-            overwrite=req.overwrite,
-        )
-    except ObsidianCliError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-    return ObsidianWriteResponse(
-        vault=note.vault,
-        path=note.path,
-        title=note.title,
-        content=note.content,
-        frontmatter=note.frontmatter,
-        tags=note.tags,
-        file_hash=note.file_hash,
-        created=not exists,  # True if new, False if updated
-    )
-
-
-async def v1_obsidian_export(
-    req: ObsidianExportRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> ObsidianExportResponse:
-    """Export memories from OpenBrain to Obsidian notes."""
-    _require_admin(_user)
-
-    # Get memories to export
-    memories: list[MemoryOut] = []
-    if req.memory_ids:
-        for mid in req.memory_ids:
-            mem = await get_memory(session, mid)
-            if mem:
-                memories.append(mem)
-    elif req.query:
-        search_results = await search_memories(
-            session,
-            SearchRequest(query=req.query, top_k=req.max_items, filters={}),
-        )
-        memories = [mem for mem, _ in search_results]
-        
-        # Filter by domain if specified
-        if req.domain:
-            memories = [m for m in memories if m.domain == req.domain]
-    else:
-        raise HTTPException(status_code=422, detail="Either memory_ids or query must be provided")
-
-    # Export to Obsidian
-    adapter = ObsidianCliAdapter()
-    exported: list[ObsidianExportItem] = []
-    errors: list[dict[str, str]] = []
-
-    for memory in memories:
-        try:
-            # Generate note path
-            safe_title = _sanitize_filename(memory.title or memory.id)
-            path = f"{req.folder}/{safe_title}.md" if req.folder else f"{safe_title}.md"
-
-            # Generate content and frontmatter
-            content = _memory_to_note_content(memory, req.template)
-            frontmatter = _memory_to_frontmatter(memory)
-
-            # Check if exists
-            exists = await adapter.note_exists(req.vault, path)
-            
-            note = await adapter.write_note(
-                vault=req.vault,
-                path=path,
-                content=content,
-                frontmatter=frontmatter,
-                overwrite=True,
-            )
-            exported.append(ObsidianExportItem(
-                memory_id=memory.id,
-                path=note.path,
-                title=note.title,
-                created=not exists,
-            ))
-        except Exception as e:
-            log.warning("export_memory_failed", memory_id=memory.id, error=str(e))
-            errors.append({"memory_id": memory.id, "error": str(e)})
-
-    return ObsidianExportResponse(
-        vault=req.vault,
-        folder=req.folder,
-        exported_count=len(exported),
-        exported=exported,
-        errors=errors,
-    )
-
-
-async def v1_obsidian_collection(
-    req: ObsidianCollectionRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> ObsidianCollectionResponse:
-    """Create a collection (index note) from memories."""
-    _require_admin(_user)
-
-    # First export memories
-    export_req = ObsidianExportRequest(
-        vault=req.vault,
-        folder=f"{req.folder}/{req.collection_name}",
-        query=req.query,
-        domain=req.domain,
-        max_items=req.max_items,
-    )
-    
-    # Get memories for grouping info
-    search_results = await search_memories(
-        session,
-        SearchRequest(query=req.query, top_k=req.max_items, filters={}),
-    )
-    memories = [mem for mem, _ in search_results]
-    if req.domain:
-        memories = [m for m in memories if m.domain == req.domain]
-    
-    # Export memories
-    export_result = await v1_obsidian_export(export_req, session, _user)
-
-    # Create index note
-    adapter = ObsidianCliAdapter()
-    try:
-        index_content = _build_collection_index(
-            collection_name=req.collection_name,
-            query=req.query,
-            exported=export_result.exported,
-            memories=memories,
-            group_by=req.group_by,
-        )
-        
-        index_path = f"{req.folder}/{req.collection_name}/Index.md"
-        
-        await adapter.write_note(
-            vault=req.vault,
-            path=index_path,
-            content=index_content,
-            frontmatter={
-                "title": req.collection_name,
-                "tags": ["openbrain-collection", "index"],
-                "query": req.query,
-                "item_count": len(export_result.exported),
-                "created_at": datetime.now().isoformat(),
-            },
-            overwrite=True,
-        )
-
-        return ObsidianCollectionResponse(
-            collection_name=req.collection_name,
-            vault=req.vault,
-            folder=req.folder,
-            index_path=index_path,
-            exported_count=export_result.exported_count,
-            exported=export_result.exported,
-            errors=export_result.errors,
-        )
-    except ObsidianCliError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-
-def _sanitize_filename(name: str) -> str:
-    """Sanitize string for use as filename."""
-    unsafe = '<>:"/\\|?*'
-    for char in unsafe:
-        name = name.replace(char, '_')
-    return name[:100]  # Limit length
-
-
-def _memory_to_note_content(memory: MemoryOut, template: str | None = None) -> str:
-    """Convert memory to markdown note content."""
-    if template:
-        try:
-            return template.format(
-                title=memory.title or "Untitled",
-                content=memory.content,
-                domain=memory.domain,
-                entity_type=memory.entity_type,
-                created_at=memory.created_at,
-                updated_at=memory.updated_at,
-                owner=memory.owner,
-                tags=", ".join(memory.tags),
-                id=memory.id,
-                version=memory.version,
-            )
-        except Exception:
-            # Fall back to default if template fails
-            pass
-
-    # Default format
-    lines = [
-        f"# {memory.title or 'Untitled'}",
-        "",
-        f"**Domain:** {memory.domain}",
-        f"**Type:** {memory.entity_type}",
-        f"**Owner:** {memory.owner}",
-        f"**Created:** {memory.created_at}",
-        "",
-        "## Content",
-        "",
-        memory.content,
-        "",
-        "## Metadata",
-        "",
-        f"- ID: `{memory.id}`",
-        f"- Version: {memory.version}",
-        f"- Status: {memory.status}",
-        f"- Tags: {', '.join(memory.tags)}",
-    ]
-    return "\n".join(lines)
-
-
-def _memory_to_frontmatter(memory: MemoryOut) -> dict[str, Any]:
-    """Generate YAML frontmatter from memory metadata."""
-    return {
-        "title": memory.title,
-        "openbrain_id": memory.id,
-        "domain": memory.domain,
-        "entity_type": memory.entity_type,
-        "owner": memory.owner,
-        "version": memory.version,
-        "status": memory.status,
-        "created_at": memory.created_at.isoformat() if hasattr(memory.created_at, 'isoformat') else str(memory.created_at),
-        "updated_at": memory.updated_at.isoformat() if hasattr(memory.updated_at, 'isoformat') else str(memory.updated_at),
-        "tags": memory.tags,
-        "source": "openbrain-export",
-    }
-
-
-def _build_collection_index(
-    collection_name: str,
-    query: str,
-    exported: list[ObsidianExportItem],
-    memories: list[MemoryOut],
-    group_by: str | None,
-) -> str:
-    """Build markdown index for collection."""
-    lines = [
-        f"# {collection_name}",
-        "",
-        f"*Collection generated from OpenBrain — {len(exported)} items*",
-        "",
-        f"**Query:** `{query}`",
-        "",
-    ]
-
-    if group_by and memories:
-        lines.append(f"## Grouped by: {group_by}")
-        lines.append("")
-        
-        # Group memories
-        groups: dict[str, list[tuple[ObsidianExportItem, MemoryOut]]] = {}
-        for exp in exported:
-            mem = next((m for m in memories if m.id == exp.memory_id), None)
-            if mem:
-                if group_by == "entity_type":
-                    key = mem.entity_type
-                elif group_by == "owner":
-                    key = mem.owner or "No owner"
-                elif group_by == "tags":
-                    key = mem.tags[0] if mem.tags else "Untagged"
-                else:
-                    key = "Other"
-                groups.setdefault(key, []).append((exp, mem))
-        
-        # Output groups
-        for key, items in sorted(groups.items()):
-            lines.append(f"### {key}")
-            lines.append("")
-            for exp, mem in items:
-                link_path = exp.path.replace('.md', '')
-                lines.append(f"- [[{link_path}]] — {exp.title}")
-            lines.append("")
-    else:
-        lines.append("## Items")
-        lines.append("")
-        for exp in exported:
-            link_path = exp.path.replace('.md', '')
-            lines.append(f"- [[{link_path}]] — {exp.title}")
-        lines.append("")
-    
-    return "\n".join(lines)
-
 
 # ---------------------------------------------------------------------------
 # Well-Known Discovery (for ChatGPT MCP)
@@ -860,6 +253,10 @@ async def oauth_authorization_server() -> dict:
         "grant_types_supported": ["authorization_code", "refresh_token"],
         "code_challenge_methods_supported": ["S256"],
     }
+
+# Register well-known routes
+app.add_api_route("/.well-known/oauth-protected-resource", oauth_protected_resource, methods=["GET"])
+app.add_api_route("/.well-known/oauth-authorization-server", oauth_authorization_server, methods=["GET"])
 
 # ---------------------------------------------------------------------------
 # Health & Diagnostics
@@ -1175,141 +572,12 @@ async def export(
     return records
 
 
-# ---------------------------------------------------------------------------
-# Bidirectional Sync Handlers (OpenBrain ↔ Obsidian)
-# ---------------------------------------------------------------------------
 
-# Global sync tracker instance
-_sync_tracker: ObsidianChangeTracker | None = None
-_sync_engine: BidirectionalSyncEngine | None = None
-
-
-def _get_sync_tracker() -> ObsidianChangeTracker:
-    """Get or create sync tracker singleton."""
-    global _sync_tracker
-    if _sync_tracker is None:
-        _sync_tracker = ObsidianChangeTracker()
-    return _sync_tracker
-
-
-def _get_sync_engine(strategy: str = "domain_based") -> BidirectionalSyncEngine:
-    """Get or create sync engine singleton."""
-    global _sync_engine
-    if _sync_engine is None:
-        strategy_enum = SyncStrategy(strategy)
-        _sync_engine = BidirectionalSyncEngine(
-            strategy=strategy_enum,
-            tracker=_get_sync_tracker(),
-        )
-    return _sync_engine
-
-
-async def v1_obsidian_bidirectional_sync(
-    req: ObsidianBidirectionalSyncRequest,
-    session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
-) -> ObsidianBidirectionalSyncResponse:
-    """
-    Perform bidirectional synchronization between OpenBrain and Obsidian.
-    
-    Detects and resolves changes in both systems.
-    """
-    _require_admin(_user)
-    
-    engine = _get_sync_engine(req.strategy)
-    adapter = ObsidianCliAdapter()
-    
-    result = await engine.sync(
-        session=session,
-        adapter=adapter,
-        vault=req.vault,
-        dry_run=req.dry_run,
-    )
-    
-    # Convert to response format
-    changes_response = [
-        ObsidianSyncChange(
-            memory_id=change.memory_id,
-            obsidian_path=change.obsidian_path,
-            change_type=change.change_type.value,
-            source=change.source,
-            conflict=change.conflict,
-            resolution=change.resolution,
-        )
-        for change in result.details
-    ]
-    
-    return ObsidianBidirectionalSyncResponse(
-        started_at=result.started_at,
-        completed_at=result.completed_at,
-        vault=req.vault,
-        strategy=req.strategy,
-        changes_detected=result.changes_detected,
-        changes_applied=result.changes_applied,
-        conflicts=result.conflicts,
-        dry_run=req.dry_run,
-        errors=result.errors,
-        changes=changes_response,
-    )
-
-
-async def v1_obsidian_sync_status(
-    _user: dict = Depends(require_auth),
-) -> ObsidianSyncStatus:
-    """Get status of sync tracking."""
-    _require_admin(_user)
-    
-    tracker = _get_sync_tracker()
-    stats = tracker.get_stats()
-    
-    return ObsidianSyncStatus(**stats).model_dump()
-
-
-async def v1_obsidian_update_note(
-    vault: str,
-    path: str,
-    content: str | None = None,
-    append: bool = False,
-    tags: list[str] | None = None,
-    _user: dict = Depends(require_auth),
-) -> ObsidianWriteResponse:
-    """Update an existing note in Obsidian."""
-    _require_admin(_user)
-    
-    adapter = ObsidianCliAdapter()
-    
-    # Build frontmatter update if tags provided
-    frontmatter = None
-    if tags:
-        frontmatter = {"tags": tags}
-    
-    try:
-        note = await adapter.update_note(
-            vault=vault,
-            path=path,
-            content=content,
-            frontmatter=frontmatter,
-            append=append,
-        )
-    except ObsidianCliError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    
-    return ObsidianWriteResponse(
-        vault=note.vault,
-        path=note.path,
-        title=note.title,
-        content=note.content,
-        frontmatter=note.frontmatter,
-        tags=note.tags,
-        file_hash=note.file_hash,
-        created=False,  # It was an update
-    )
 
 
 # ---------------------------------------------------------------------------
 # Route Registration
 # ---------------------------------------------------------------------------
 
-register_v1_routes(app, handlers=__import__(__name__, fromlist=["*"]))
 register_ops_routes(app, handlers=__import__(__name__, fromlist=["*"]))
 register_crud_routes(app, handlers=__import__(__name__, fromlist=["*"]))

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,25 +47,30 @@ router = APIRouter(prefix="/obsidian", tags=["obsidian"])
 # Sync singletons
 _sync_tracker: ObsidianChangeTracker | None = None
 _sync_engine: BidirectionalSyncEngine | None = None
+_sync_lock = asyncio.Lock()
 
 
-def _get_sync_tracker() -> ObsidianChangeTracker:
+async def _get_sync_tracker() -> ObsidianChangeTracker:
     """Get or create sync tracker singleton."""
     global _sync_tracker
     if _sync_tracker is None:
-        _sync_tracker = ObsidianChangeTracker()
+        async with _sync_lock:
+            if _sync_tracker is None:
+                _sync_tracker = ObsidianChangeTracker()
     return _sync_tracker
 
 
-def _get_sync_engine(strategy: str = "domain_based") -> BidirectionalSyncEngine:
+async def _get_sync_engine(strategy: str = "domain_based") -> BidirectionalSyncEngine:
     """Get or create sync engine singleton."""
     global _sync_engine
     if _sync_engine is None:
-        strategy_enum = SyncStrategy(strategy)
-        _sync_engine = BidirectionalSyncEngine(
-            strategy=strategy_enum,
-            tracker=_get_sync_tracker(),
-        )
+        async with _sync_lock:
+            if _sync_engine is None:
+                strategy_enum = SyncStrategy(strategy)
+                _sync_engine = BidirectionalSyncEngine(
+                    strategy=strategy_enum,
+                    tracker=await _get_sync_tracker(),
+                )
     return _sync_engine
 
 
@@ -336,7 +343,7 @@ async def v1_obsidian_bidirectional_sync(
     """Perform bidirectional synchronization between OpenBrain and Obsidian."""
     require_admin(_user)
     
-    engine = _get_sync_engine(req.strategy)
+    engine = await _get_sync_engine(req.strategy)
     adapter = ObsidianCliAdapter()
     
     result = await engine.sync(
@@ -380,7 +387,7 @@ async def v1_obsidian_sync_status(
     """Get status of sync tracking."""
     require_admin(_user)
     
-    tracker = _get_sync_tracker()
+    tracker = await _get_sync_tracker()
     stats = tracker.get_stats()
     
     return ObsidianSyncStatus(**stats).model_dump()

@@ -112,35 +112,37 @@ async def get_embedding(text: str) -> list[float]:
     # Store in cache (convert to tuple for hashability)
     # Note: lru_cache requires hashable types, so we use a simple wrapper
     # The cache is managed at module level for persistence
-    _update_embedding_cache(text_hash, tuple(result), EMBED_MODEL)
+    await _update_embedding_cache(text_hash, tuple(result), EMBED_MODEL)
     
     return result
 
 
 # Simple cache storage (module-level for persistence)
 _embedding_cache: dict[str, tuple[tuple[float, ...], str]] = {}
+_embedding_cache_lock = asyncio.Lock()
 
 
-def _update_embedding_cache(text_hash: str, embedding: tuple[float, ...], model: str) -> None:
+async def _update_embedding_cache(text_hash: str, embedding: tuple[float, ...], model: str) -> None:
     """Update the embedding cache with a new entry."""
-    global _embedding_cache
-    # Simple LRU eviction when cache is full
-    if len(_embedding_cache) >= _EMBED_CACHE_SIZE:
-        # Remove oldest entry (simple FIFO for now)
-        oldest_key = next(iter(_embedding_cache))
-        del _embedding_cache[oldest_key]
-    _embedding_cache[text_hash] = (embedding, model)
+    async with _embedding_cache_lock:
+        # Simple LRU eviction when cache is full
+        if len(_embedding_cache) >= _EMBED_CACHE_SIZE:
+            # Remove oldest entry (simple FIFO for now)
+            oldest_key = next(iter(_embedding_cache))
+            del _embedding_cache[oldest_key]
+        _embedding_cache[text_hash] = (embedding, model)
 
 
-def get_cache_stats() -> dict[str, int]:
+async def get_cache_stats() -> dict[str, int]:
     """Return cache statistics for monitoring."""
-    return {
-        "cache_size": len(_embedding_cache),
-        "cache_limit": _EMBED_CACHE_SIZE,
-    }
+    async with _embedding_cache_lock:
+        return {
+            "cache_size": len(_embedding_cache),
+            "cache_limit": _EMBED_CACHE_SIZE,
+        }
 
 
-def clear_embedding_cache() -> None:
+async def clear_embedding_cache() -> None:
     """Clear the embedding cache. Useful for testing or memory management."""
-    global _embedding_cache
-    _embedding_cache.clear()
+    async with _embedding_cache_lock:
+        _embedding_cache.clear()

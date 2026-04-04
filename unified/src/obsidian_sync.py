@@ -154,7 +154,7 @@ class ObsidianChangeTracker:
                         self._state[key] = SyncState.from_dict(state_data)
             except (json.JSONDecodeError, KeyError, TypeError) as e:
                 # If corrupted, start fresh
-                print(f"Warning: Could not load sync state: {e}")
+                log.warning("Could not load sync state: %s", e)
                 self._state = {}
     
     def _save_state(self) -> None:
@@ -522,7 +522,7 @@ class BidirectionalSyncEngine:
         result = SyncResult(started_at=datetime.now(timezone.utc))
         
         # 1. Detect changes
-        print(f"Detecting changes for vault: {vault}...")
+        log.info("Detecting changes for vault: %s", vault)
         changes = await self.detect_changes(session, adapter, vault)
         result.changes_detected = len(changes)
         result.details = changes
@@ -530,18 +530,18 @@ class BidirectionalSyncEngine:
         conflicts = [c for c in changes if c.conflict]
         result.conflicts = len(conflicts)
         
-        print(f"  Detected: {len(changes)} changes, {len(conflicts)} conflicts")
+        log.info("Detected: %d changes, %d conflicts", len(changes), len(conflicts))
         
         if dry_run:
-            print("  Dry run - no changes applied")
+            log.info("Dry run - no changes applied")
             result.completed_at = datetime.now(timezone.utc)
             return result
         
         # 2. Apply changes
-        print("Applying changes...")
+        log.info("Applying changes...")
         for change in changes:
             if change.conflict and self.strategy == SyncStrategy.MANUAL_REVIEW:
-                print(f"  Skipping conflict (manual review): {change.obsidian_path}")
+                log.warning("Skipping conflict (manual review): %s", change.obsidian_path)
                 continue
             
             success = await self.apply_sync(session, adapter, change)
@@ -555,6 +555,6 @@ class BidirectionalSyncEngine:
         
         result.completed_at = datetime.now(timezone.utc)
         
-        print(f"  Applied: {result.changes_applied}, Errors: {len(result.errors)}")
+        log.info("Applied: %d, Errors: %d", result.changes_applied, len(result.errors))
         
         return result
