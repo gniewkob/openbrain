@@ -151,7 +151,7 @@ class TestSecretScanMiddlewareIntegration:
             ) as c:
                 return await c.post(path, json=body)
 
-        return asyncio.get_event_loop().run_until_complete(_run())
+        return asyncio.run(_run())
 
     def _patch(self, app, path: str, body: dict):
         import asyncio
@@ -163,7 +163,7 @@ class TestSecretScanMiddlewareIntegration:
             ) as c:
                 return await c.patch(path, json=body)
 
-        return asyncio.get_event_loop().run_until_complete(_run())
+        return asyncio.run(_run())
 
     def _get(self, app, path: str):
         import asyncio
@@ -175,7 +175,7 @@ class TestSecretScanMiddlewareIntegration:
             ) as c:
                 return await c.get(path)
 
-        return asyncio.get_event_loop().run_until_complete(_run())
+        return asyncio.run(_run())
 
     def test_clean_write_passes_through(self, test_app):
         r = self._post(test_app, "/api/v1/memory/write", {"content": "normal content"})
@@ -244,7 +244,7 @@ class TestSecretScanMiddlewareIntegration:
                     headers={"content-type": "application/json"},
                 )
 
-        r = asyncio.get_event_loop().run_until_complete(_run())
+        r = asyncio.run(_run())
         # Middleware must not return 400 for parse errors — let FastAPI handle it
         assert (
             r.status_code != 400
