@@ -133,7 +133,8 @@ class TelemetryRegistry:
     def bulk_load_counters(self, values: dict[str, int]) -> None:
         with self._lock:
             for name, val in values.items():
-                # We only load values for known counters to avoid bloat from old/deleted metrics
+                # We only load values for known counters to avoid bloat from
+                # old/deleted metrics
                 if name in KNOWN_COUNTERS or name.startswith("http_requests_total_"):
                     self._counters[name] = val
 

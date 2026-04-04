@@ -11,7 +11,8 @@ from .config import get_config
 def register_ops_routes(app: FastAPI, handlers) -> None:
     config = get_config()
 
-    # Health endpoints moved to api.v1.health, registered here for backward compatibility
+    # Health endpoints moved to api.v1.health, registered here for backward
+    # compatibility
     app.add_api_route("/healthz", healthz, methods=["GET"])
     app.add_api_route("/readyz", readyz, methods=["GET"])
     # /health requires auth in PUBLIC_MODE

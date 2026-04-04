@@ -76,7 +76,8 @@ async def lifespan(app):
             "does not survive restarts and breaks under multi-worker deployments.",
         )
         raise RuntimeError(
-            "REDIS_URL must not be 'memory://' when PUBLIC_MODE=true or PUBLIC_BASE_URL is set"
+            "REDIS_URL must not be 'memory://' when PUBLIC_MODE=true or "
+            "PUBLIC_BASE_URL is set"
         )
 
     sync_task = asyncio.create_task(periodic_telemetry_sync())

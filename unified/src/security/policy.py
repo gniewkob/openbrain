@@ -58,7 +58,8 @@ def enforce_domain_access(user: dict[str, Any], domain: str, action: str) -> Non
         return
     allowed = _effective_domain_scope(user, action)
     if not allowed:
-        # No domain scope configured — privileged users get full access, others are denied.
+        # No domain scope configured — privileged users get full access, others
+        # are denied.
         if is_privileged_user(user):
             return
         _record_access_denied("domain")

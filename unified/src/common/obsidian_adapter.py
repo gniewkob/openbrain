@@ -254,7 +254,8 @@ class ObsidianCliAdapter:
         except FileNotFoundError as exc:
             raise ObsidianCliError(
                 f"Obsidian CLI command not found: {self.command}. "
-                "Configure OBSIDIAN_CLI_COMMAND or run this integration on a host with Obsidian installed."
+                "Configure OBSIDIAN_CLI_COMMAND or run this integration on a host "
+                "with Obsidian installed."
             ) from exc
         try:
             stdout, stderr = await asyncio.wait_for(
@@ -364,7 +365,8 @@ class ObsidianCliAdapter:
             path: Note path (e.g., "Projects/OpenBrain.md")
             content: Markdown content (without frontmatter)
             frontmatter: Optional YAML frontmatter dict
-            overwrite: If True, overwrites existing note. If False, raises error if exists.
+            overwrite: If True, overwrites existing note. If False, raises error
+                if exists.
 
         Returns:
             ObsidianNote: Written note metadata
@@ -412,7 +414,8 @@ class ObsidianCliAdapter:
                 return _VAULT_PATHS_CACHE[vault]
 
             # Try individual env var: OBSIDIAN_VAULT_{VAULT_NAME}_PATH
-            env_var = f"OBSIDIAN_VAULT_{vault.upper().replace(' ', '_').replace('-', '_')}_PATH"
+            normalized = vault.upper().replace(' ', '_').replace('-', '_')
+            env_var = f"OBSIDIAN_VAULT_{normalized}_PATH"
             path = os.environ.get(env_var)
             if path:
                 _VAULT_PATHS_CACHE[vault] = path
@@ -544,8 +547,8 @@ class ObsidianCliAdapter:
         if not vault_root:
             raise ObsidianCliError(
                 f"Cannot determine filesystem path for vault: {vault}. "
-                f"Set OBSIDIAN_VAULT_{vault.upper().replace(' ', '_').replace('-', '_')}_PATH "
-                f"or OBSIDIAN_VAULT_PATHS environment variable."
+                f"Set OBSIDIAN_VAULT_{normalized}_PATH or "
+                f"OBSIDIAN_VAULT_PATHS environment variable."
             )
 
         # Validate vault path exists

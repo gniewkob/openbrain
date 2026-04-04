@@ -68,8 +68,10 @@ mcp = FastMCP(
     streamable_http_path="/sse",
     transport_security=_transport_security,
     instructions=(
-        "OpenBrain is a unified memory platform with 3 domains: 'corporate' (work), 'build' (projects), 'personal' (ideas).\n"
-        "Always use brain_capabilities to check feature status. Use Tier 1 tools for daily interactions."
+        "OpenBrain is a unified memory platform with 3 domains: "
+        "'corporate' (work), 'build' (projects), 'personal' (ideas).\n"
+        "Always use brain_capabilities to check feature status. "
+        "Use Tier 1 tools for daily interactions."
     ),
 )
 
@@ -194,9 +196,12 @@ async def _safe_req(method: str, path: str, **kwargs) -> dict[str, Any]:
                 code=r.status_code,
                 detail=detail,
             )
-            raise ValueError(
-                f"Backend {r.status_code}: {json.dumps(detail, ensure_ascii=False) if isinstance(detail, (dict, list)) else detail}"
+            detail_str = (
+                json.dumps(detail, ensure_ascii=False)
+                if isinstance(detail, (dict, list))
+                else str(detail)
             )
+            raise ValueError(f"Backend {r.status_code}: {detail_str}")
         return r.json() if r.status_code != 204 else {"status": "success"}
 
 
@@ -246,7 +251,8 @@ async def brain_search(
 ) -> list[dict[str, Any]]:
     """Primary tool for semantic retrieval. Finds information by topic or phrase.
 
-    Optionally filter by domain (corporate|build|personal), entity_type, owner, sensitivity.
+    Optionally filter by domain (corporate|build|personal), entity_type, owner,
+    sensitivity.
     """
     filters: dict[str, Any] = {}
     if domain:
@@ -264,7 +270,10 @@ async def brain_search(
 @mcp.tool()
 @mcp_tool_guard
 async def brain_get(memory_id: str) -> dict[str, Any]:
-    """Retrieve a single memory by its exact ID. Returns canonical V1 MemoryRecord shape."""
+    """Retrieve a single memory by its exact ID.
+
+    Returns canonical V1 MemoryRecord shape.
+    """
     return await _safe_req("GET", f"/api/v1/memory/{memory_id}")
 
 
@@ -323,7 +332,10 @@ async def brain_update(
     obsidian_ref: Optional[str] = None,
     sensitivity: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Update an existing memory. Corporate records are versioned automatically (append-only)."""
+    """Update an existing memory.
+
+    Corporate records are versioned automatically (append-only).
+    """
     return await _safe_req(
         "PUT",
         f"/api/memories/{memory_id}",
@@ -452,8 +464,8 @@ if ENABLE_HTTP_OBSIDIAN_TOOLS:
         tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """
-        One-way sync from an Obsidian vault into OpenBrain using deterministic match keys.
-        Use paths for explicit notes or folder for a bounded folder sync.
+        One-way sync from an Obsidian vault into OpenBrain using deterministic
+        match keys. Use paths for explicit notes or folder for a bounded folder sync.
         """
         payload = {
             "vault": vault,
@@ -487,7 +499,8 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
     """
     if len(items) > _MAX_BATCH_SIZE:
         raise ValueError(
-            f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. Split into multiple calls."
+            f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. "
+            "Split into multiple calls."
         )
     if not items:
         raise ValueError("Batch cannot be empty.")
@@ -506,7 +519,8 @@ async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
     """
     if len(items) > _MAX_BATCH_SIZE:
         raise ValueError(
-            f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. Split into multiple calls."
+            f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. "
+            "Split into multiple calls."
         )
     if not items:
         raise ValueError("Batch cannot be empty.")

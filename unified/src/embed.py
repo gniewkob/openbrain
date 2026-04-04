@@ -22,7 +22,8 @@ _client: httpx.AsyncClient | None = None
 
 
 # Thread-safe cache for embeddings using LRU strategy
-# Note: Using a fixed maxsize here; actual cache size controlled in _update_embedding_cache
+# Note: Using a fixed maxsize here; actual cache size controlled in
+# _update_embedding_cache
 @lru_cache(maxsize=1000)
 def _get_cached_embedding(text_hash: str) -> tuple[List[float], str] | None:
     """

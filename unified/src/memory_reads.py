@@ -199,7 +199,8 @@ async def sync_check(
         file_hash: Content hash to compare (optional)
 
     Returns:
-        Dictionary with status, memory_id, match_key, obsidian_ref, stored_hash, provided_hash
+        Dictionary with status, memory_id, match_key, obsidian_ref,
+        stored_hash, provided_hash
 
     Raises:
         ValueError: If none of memory_id, match_key, obsidian_ref is provided

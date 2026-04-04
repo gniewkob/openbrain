@@ -133,7 +133,8 @@ class Memory(Base):
             postgresql_where=sa_text("match_key IS NOT NULL"),
         ),
         # Partial unique index: at most one *active* record per match_key.
-        # Created/enforced by migration 003. Declared here so autogenerate stays in sync.
+        # Created/enforced by migration 003. Declared here so autogenerate
+        # stays in sync.
         Index(
             "uq_memories_match_key_active",
             "match_key",
