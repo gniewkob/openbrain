@@ -238,7 +238,8 @@ async def set_policy_registry(registry: dict[str, Any]) -> dict[str, Any]:
         # Atomic reference replacement — no clear()+update() race window.
         POLICY_REGISTRY = normalized
     if POLICY_REGISTRY_PATH:
-        # Disk write is blocking I/O — run in thread pool to avoid blocking the event loop.
+        # Disk write is blocking I/O — run in thread pool to avoid
+        # blocking the event loop.
         def _write() -> None:
             import stat
 
@@ -420,8 +421,9 @@ async def require_auth(
         global _local_auth_warning_emitted
         if not _local_auth_warning_emitted:
             logger.warning(
-                "Authentication is disabled because PUBLIC_MODE and PUBLIC_BASE_URL are unset; "
-                "local-only access is permitted for this process."
+                "Authentication is disabled because PUBLIC_MODE and "
+                "PUBLIC_BASE_URL are unset; local-only access is permitted "
+                "for this process."
             )
             _local_auth_warning_emitted = True
         return {"sub": "local-dev"}

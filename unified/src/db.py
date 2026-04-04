@@ -29,7 +29,9 @@ def validate_database_configuration() -> None:
     config = get_config()
     public_mode = config.auth.public_mode
     public_base_url = bool(config.auth.public_base_url)
-    if (public_mode or public_base_url) and _uses_dev_database_credentials(config.database.url):
+    if (public_mode or public_base_url) and _uses_dev_database_credentials(
+        config.database.url
+    ):
         raise RuntimeError(
             "PUBLIC_MODE=true or PUBLIC_BASE_URL set forbids dev default PostgreSQL "
             "credentials. Configure DATABASE_URL with a unique password."

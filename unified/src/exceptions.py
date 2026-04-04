@@ -21,13 +21,14 @@ from fastapi.responses import JSONResponse
 # Base Exception Hierarchy
 # =============================================================================
 
+
 class OpenBrainError(Exception):
     """Base exception for all OpenBrain errors."""
-    
+
     status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
     error_code: str = "internal_error"
     safe_message: str = "An internal error occurred"
-    
+
     def __init__(
         self,
         message: str | None = None,
@@ -43,6 +44,7 @@ class OpenBrainError(Exception):
 
 class ValidationError(OpenBrainError):
     """Invalid input data."""
+
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     error_code = "validation_error"
     safe_message = "Invalid input data"
@@ -50,6 +52,7 @@ class ValidationError(OpenBrainError):
 
 class NotFoundError(OpenBrainError):
     """Resource not found."""
+
     status_code = status.HTTP_404_NOT_FOUND
     error_code = "not_found"
     safe_message = "Resource not found"
@@ -57,6 +60,7 @@ class NotFoundError(OpenBrainError):
 
 class ConflictError(OpenBrainError):
     """Resource conflict (e.g., duplicate key)."""
+
     status_code = status.HTTP_409_CONFLICT
     error_code = "conflict"
     safe_message = "Resource conflict"
@@ -64,6 +68,7 @@ class ConflictError(OpenBrainError):
 
 class AuthenticationError(OpenBrainError):
     """Authentication failed."""
+
     status_code = status.HTTP_401_UNAUTHORIZED
     error_code = "authentication_error"
     safe_message = "Authentication required"
@@ -71,6 +76,7 @@ class AuthenticationError(OpenBrainError):
 
 class AuthorizationError(OpenBrainError):
     """Permission denied."""
+
     status_code = status.HTTP_403_FORBIDDEN
     error_code = "authorization_error"
     safe_message = "Permission denied"
@@ -78,6 +84,7 @@ class AuthorizationError(OpenBrainError):
 
 class RateLimitError(OpenBrainError):
     """Rate limit exceeded."""
+
     status_code = status.HTTP_429_TOO_MANY_REQUESTS
     error_code = "rate_limit_exceeded"
     safe_message = "Rate limit exceeded, please try again later"
@@ -85,6 +92,7 @@ class RateLimitError(OpenBrainError):
 
 class ExternalServiceError(OpenBrainError):
     """External service failure (Obsidian CLI, Ollama, etc.)."""
+
     status_code = status.HTTP_502_BAD_GATEWAY
     error_code = "external_service_error"
     safe_message = "External service unavailable"
@@ -92,6 +100,7 @@ class ExternalServiceError(OpenBrainError):
 
 class DatabaseError(OpenBrainError):
     """Database operation failed."""
+
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     error_code = "database_error"
     safe_message = "Database operation failed"
@@ -99,6 +108,7 @@ class DatabaseError(OpenBrainError):
 
 class GovernanceError(OpenBrainError):
     """Domain governance policy violation."""
+
     status_code = status.HTTP_403_FORBIDDEN
     error_code = "governance_violation"
     safe_message = "Operation violates domain governance policy"
@@ -108,40 +118,48 @@ class GovernanceError(OpenBrainError):
 # Specific Exception Types
 # =============================================================================
 
+
 class MemoryNotFoundError(NotFoundError):
     """Memory record not found."""
+
     safe_message = "Memory not found"
 
 
 class VaultNotFoundError(NotFoundError):
     """Obsidian vault not found."""
+
     safe_message = "Vault not found"
 
 
 class NoteNotFoundError(NotFoundError):
     """Obsidian note not found."""
+
     safe_message = "Note not found"
 
 
 class DuplicateKeyError(ConflictError):
     """Unique constraint violation."""
+
     safe_message = "Resource with this key already exists"
 
 
 class ObsidianCliError(ExternalServiceError):
     """Obsidian CLI command failed."""
+
     safe_message = "Obsidian CLI operation failed"
 
 
 class EmbeddingError(ExternalServiceError):
     """Embedding generation failed."""
+
     safe_message = "Failed to generate embedding"
 
 
 class SyncConflictError(ConflictError):
     """Bidirectional sync conflict."""
+
     safe_message = "Sync conflict detected"
-    
+
     def __init__(
         self,
         message: str | None = None,
@@ -159,6 +177,7 @@ class SyncConflictError(ConflictError):
 # Error Response Models
 # =============================================================================
 
+
 def is_production() -> bool:
     """Check if running in production mode."""
     return os.environ.get("PUBLIC_MODE", "").lower() == "true"
@@ -169,7 +188,7 @@ def create_error_response(
     request: Request | None = None,
 ) -> dict[str, Any]:
     """Create standardized error response."""
-    
+
     if isinstance(exc, OpenBrainError):
         response = {
             "error": {
@@ -177,20 +196,20 @@ def create_error_response(
                 "message": exc.safe_message if is_production() else exc.message,
             }
         }
-        
+
         # Add details for specific error types (safe to expose)
         if exc.details and not is_production():
             response["error"]["details"] = exc.details
-        
+
         # Add sync conflict details
         if isinstance(exc, SyncConflictError):
             response["error"]["conflict"] = {
                 "memory_id": exc.memory_id,
                 "note_path": exc.note_path,
             }
-        
+
         return response
-    
+
     # Unknown exception - hide details in production
     if is_production():
         return {
@@ -199,7 +218,7 @@ def create_error_response(
                 "message": "An internal error occurred",
             }
         }
-    
+
     # Development - show full error
     return {
         "error": {
@@ -213,6 +232,7 @@ def create_error_response(
 # =============================================================================
 # Exception Handlers
 # =============================================================================
+
 
 async def openbrain_exception_handler(
     request: Request,
@@ -231,27 +251,27 @@ async def generic_exception_handler(
 ) -> JSONResponse:
     """Handler for unhandled exceptions."""
     response = create_error_response(exc, request)
-    
+
     if isinstance(exc, HTTPException):
         status_code = exc.status_code
     elif isinstance(exc, OpenBrainError):
         status_code = exc.status_code
     else:
         status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    
+
     return JSONResponse(status_code=status_code, content=response)
 
 
 def register_exception_handlers(app: Any) -> None:
     """Register all exception handlers with FastAPI app."""
     from fastapi import FastAPI
-    
+
     if not isinstance(app, FastAPI):
         raise TypeError("app must be a FastAPI instance")
-    
+
     # Register OpenBrain exception handlers
     app.add_exception_handler(OpenBrainError, openbrain_exception_handler)
-    
+
     # Generic handler for unexpected exceptions
     app.add_exception_handler(Exception, generic_exception_handler)
 
@@ -260,6 +280,7 @@ def register_exception_handlers(app: Any) -> None:
 # Utility Functions for Safe Error Handling
 # =============================================================================
 
+
 def safe_operation(
     operation: str,
     error_class: type[OpenBrainError] = OpenBrainError,
@@ -267,12 +288,13 @@ def safe_operation(
 ) -> Any:
     """
     Decorator/context manager pattern for safe operation execution.
-    
+
     Usage:
         result = safe_operation("database query", DatabaseError)(
             lambda: db.query(...)
         )
     """
+
     def wrapper(func: Any) -> Any:
         try:
             return func()
@@ -284,12 +306,13 @@ def safe_operation(
                 cause=e,
                 **error_kwargs,
             ) from e
+
     return wrapper
 
 
 class ErrorContext:
     """Context manager for safe error handling with context."""
-    
+
     def __init__(
         self,
         operation: str,
@@ -299,10 +322,10 @@ class ErrorContext:
         self.operation = operation
         self.error_class = error_class
         self.error_kwargs = error_kwargs
-    
+
     def __enter__(self) -> ErrorContext:
         return self
-    
+
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
         if exc_val is not None and not isinstance(exc_val, OpenBrainError):
             raise self.error_class(

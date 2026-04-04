@@ -19,10 +19,10 @@ from ..schemas import MemoryCreate, MemoryUpdate
 class MemoryRepository(ABC):
     """
     Abstract base class for Memory data access.
-    
+
     This repository provides a clean interface for CRUD operations on Memory entities,
     decoupling business logic from database implementation details.
-    
+
     Implementations:
         - SQLAlchemyMemoryRepository: Production implementation using PostgreSQL
         - InMemoryMemoryRepository: Test implementation using in-memory storage
@@ -99,7 +99,7 @@ class MemoryRepository(ABC):
     ) -> list[tuple[Memory, float]]:
         """
         Search memories by vector similarity.
-        
+
         Returns list of (memory, similarity_score) tuples sorted by similarity.
         """
         ...
@@ -108,7 +108,7 @@ class MemoryRepository(ABC):
 class SQLAlchemyMemoryRepository(MemoryRepository):
     """
     SQLAlchemy-based implementation of MemoryRepository.
-    
+
     Uses async SQLAlchemy 2.0 patterns for optimal performance with PostgreSQL.
     """
 
@@ -135,14 +135,14 @@ class SQLAlchemyMemoryRepository(MemoryRepository):
         status: str | None = None,
     ) -> list[Memory]:
         stmt = select(Memory)
-        
+
         if domain:
             stmt = stmt.where(Memory.domain == domain)
         if entity_type:
             stmt = stmt.where(Memory.entity_type == entity_type)
         if status:
             stmt = stmt.where(Memory.status == status)
-        
+
         stmt = stmt.offset(skip).limit(limit)
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -155,14 +155,14 @@ class SQLAlchemyMemoryRepository(MemoryRepository):
         status: str | None = None,
     ) -> int:
         stmt = select(func.count()).select_from(Memory)
-        
+
         if domain:
             stmt = stmt.where(Memory.domain == domain)
         if entity_type:
             stmt = stmt.where(Memory.entity_type == entity_type)
         if status:
             stmt = stmt.where(Memory.status == status)
-        
+
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
@@ -177,11 +177,11 @@ class SQLAlchemyMemoryRepository(MemoryRepository):
         memory = await self.get_by_id(memory_id)
         if memory is None:
             return None
-        
+
         update_data = data.model_dump(exclude_unset=True, exclude_defaults=True)
         for key, value in update_data.items():
             setattr(memory, key, value)
-        
+
         await self._session.flush()
         await self._session.refresh(memory)
         return memory
@@ -190,7 +190,7 @@ class SQLAlchemyMemoryRepository(MemoryRepository):
         memory = await self.get_by_id(memory_id)
         if memory is None:
             return False
-        
+
         await self._session.delete(memory)
         await self._session.flush()
         return True
@@ -204,21 +204,24 @@ class SQLAlchemyMemoryRepository(MemoryRepository):
     ) -> list[tuple[Memory, float]]:
         """
         Search using pgvector cosine similarity.
-        
+
         Note: This requires the vector extension and proper index.
         """
         # Use pgvector's <=> operator for cosine distance
         # Cosine similarity = 1 - cosine distance
         stmt = (
-            select(Memory, (1 - Memory.embedding.cosine_distance(embedding)).label("similarity"))
+            select(
+                Memory,
+                (1 - Memory.embedding.cosine_distance(embedding)).label("similarity"),
+            )
             .where(Memory.embedding.isnot(None))
             .order_by(Memory.embedding.cosine_distance(embedding))
             .limit(top_k)
         )
-        
+
         result = await self._session.execute(stmt)
         rows = result.all()
-        
+
         # Filter by threshold
         return [(row[0], float(row[1])) for row in rows if float(row[1]) >= threshold]
 
@@ -226,7 +229,7 @@ class SQLAlchemyMemoryRepository(MemoryRepository):
 class InMemoryMemoryRepository(MemoryRepository):
     """
     In-memory implementation of MemoryRepository for testing.
-    
+
     This implementation stores data in Python dictionaries and provides
     deterministic behavior for unit tests without database dependencies.
     """
@@ -255,15 +258,15 @@ class InMemoryMemoryRepository(MemoryRepository):
         status: str | None = None,
     ) -> list[Memory]:
         memories = list(self._storage.values())
-        
+
         if domain:
             memories = [m for m in memories if m.domain == domain]
         if entity_type:
             memories = [m for m in memories if m.entity_type == entity_type]
         if status:
             memories = [m for m in memories if m.status == status]
-        
-        return memories[skip:skip + limit]
+
+        return memories[skip : skip + limit]
 
     async def count(
         self,
@@ -273,58 +276,58 @@ class InMemoryMemoryRepository(MemoryRepository):
         status: str | None = None,
     ) -> int:
         memories = list(self._storage.values())
-        
+
         if domain:
             memories = [m for m in memories if m.domain == domain]
         if entity_type:
             memories = [m for m in memories if m.entity_type == entity_type]
         if status:
             memories = [m for m in memories if m.status == status]
-        
+
         return len(memories)
 
     async def create(self, data: MemoryCreate) -> Memory:
         self._id_counter += 1
         memory_id = f"mem_{self._id_counter}"
-        
+
         # Create memory object
         memory_data = data.model_dump(exclude_unset=True)
         memory_data["id"] = memory_id
         memory = Memory(**memory_data)
-        
+
         self._storage[memory_id] = memory
         if memory.match_key:
             self._match_key_index[memory.match_key] = memory_id
-        
+
         return memory
 
     async def update(self, memory_id: str, data: MemoryUpdate) -> Memory | None:
         memory = self._storage.get(memory_id)
         if memory is None:
             return None
-        
+
         update_data = data.model_dump(exclude_unset=True, exclude_defaults=True)
-        
+
         # Handle match_key index update
         if "match_key" in update_data and update_data["match_key"] != memory.match_key:
             if memory.match_key:
                 del self._match_key_index[memory.match_key]
             if update_data["match_key"]:
                 self._match_key_index[update_data["match_key"]] = memory_id
-        
+
         for key, value in update_data.items():
             setattr(memory, key, value)
-        
+
         return memory
 
     async def delete(self, memory_id: str) -> bool:
         memory = self._storage.pop(memory_id, None)
         if memory is None:
             return False
-        
+
         if memory.match_key:
             del self._match_key_index[memory.match_key]
-        
+
         return True
 
     async def search_by_embedding(
@@ -336,34 +339,34 @@ class InMemoryMemoryRepository(MemoryRepository):
     ) -> list[tuple[Memory, float]]:
         """
         Simplified vector search for in-memory implementation.
-        
+
         Uses dot product as similarity metric (not cosine, for simplicity in tests).
         """
         import numpy as np
-        
+
         if not embedding:
             return []
-        
+
         query_vec = np.array(embedding)
         results = []
-        
+
         for memory in self._storage.values():
             if memory.embedding is None:
                 continue
-            
+
             mem_vec = np.array(memory.embedding)
             # Normalize for cosine similarity approximation
             query_norm = np.linalg.norm(query_vec)
             mem_norm = np.linalg.norm(mem_vec)
-            
+
             if query_norm == 0 or mem_norm == 0:
                 continue
-            
+
             similarity = float(np.dot(query_vec, mem_vec) / (query_norm * mem_norm))
-            
+
             if similarity >= threshold:
                 results.append((memory, similarity))
-        
+
         # Sort by similarity descending and take top_k
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:top_k]

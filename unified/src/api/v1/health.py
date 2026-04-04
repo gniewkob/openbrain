@@ -31,7 +31,11 @@ async def readyz() -> dict:
         log.error("readyz_db_check_failed", error=str(exc))
         return JSONResponse(
             status_code=503,
-            content={"status": "degraded", "service": "openbrain-unified", "db": "error"},
+            content={
+                "status": "degraded",
+                "service": "openbrain-unified",
+                "db": "error",
+            },
         )
 
 

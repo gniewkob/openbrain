@@ -6,6 +6,7 @@ Implements the Memory Platform V1 contract:
 - Explicit WriteModes
 - Tiered response envelopes
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -46,20 +47,24 @@ PathStr = Annotated[str, Field(max_length=MAX_PATH_LEN)]
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class WriteMode(str, Enum):
-    create_only = "create_only"      # Fail if match_key exists
-    update_only = "update_only"      # Fail if ID/match_key missing
-    upsert = "upsert"                # Create or update in-place
-    append_version = "append_version" # Create new version, supersede old
+    create_only = "create_only"  # Fail if match_key exists
+    update_only = "update_only"  # Fail if ID/match_key missing
+    upsert = "upsert"  # Create or update in-place
+    append_version = "append_version"  # Create new version, supersede old
 
 
 # ---------------------------------------------------------------------------
 # Sub-models
 # ---------------------------------------------------------------------------
 
+
 class SourceMetadata(BaseModel):
     type: Literal["manual", "agent", "sync", "import", "api"] = "agent"
-    system: Literal["chatgpt", "obsidian", "notion", "slack", "github", "other"] = "chatgpt"
+    system: Literal["chatgpt", "obsidian", "notion", "slack", "github", "other"] = (
+        "chatgpt"
+    )
     reference: Optional[PathStr] = None
 
 
@@ -80,6 +85,7 @@ class MemoryRelations(BaseModel):
 # Canonical Resource Model
 # ---------------------------------------------------------------------------
 
+
 class MemoryRecord(BaseModel):
     id: str
     match_key: Optional[MatchKeyStr] = None
@@ -92,8 +98,12 @@ class MemoryRecord(BaseModel):
     owner: OwnerStr
     tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: MemoryRelations = Field(default_factory=MemoryRelations)
-    status: Literal["active", "archived", "superseded", "deleted", "duplicate"] = "active"
-    sensitivity: Literal["public", "internal", "confidential", "restricted"] = "internal"
+    status: Literal["active", "archived", "superseded", "deleted", "duplicate"] = (
+        "active"
+    )
+    sensitivity: Literal["public", "internal", "confidential", "restricted"] = (
+        "internal"
+    )
     source: SourceMetadata = Field(default_factory=SourceMetadata)
     governance: GovernanceMetadata = Field(default_factory=GovernanceMetadata)
     obsidian_ref: Optional[PathStr] = None
@@ -116,8 +126,10 @@ class MemoryRecord(BaseModel):
 # Request Models (V1)
 # ---------------------------------------------------------------------------
 
+
 class MemoryWriteRecord(BaseModel):
     """The data part of a write request."""
+
     match_key: Optional[MatchKeyStr] = None
     tenant_id: Optional[TenantIdStr] = None
     domain: Literal["corporate", "build", "personal"]
@@ -127,7 +139,9 @@ class MemoryWriteRecord(BaseModel):
     owner: OwnerStr = ""
     tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: MemoryRelations = Field(default_factory=MemoryRelations)
-    sensitivity: Literal["public", "internal", "confidential", "restricted"] = "internal"
+    sensitivity: Literal["public", "internal", "confidential", "restricted"] = (
+        "internal"
+    )
     source: SourceMetadata = Field(default_factory=SourceMetadata)
     obsidian_ref: Optional[PathStr] = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
@@ -187,7 +201,9 @@ class ObsidianSyncRequest(BaseModel):
 
 class ObsidianSyncResponse(BaseModel):
     vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)]
-    resolved_paths: list[PathStr] = Field(default_factory=list, max_length=MAX_SYNC_LIMIT)
+    resolved_paths: list[PathStr] = Field(
+        default_factory=list, max_length=MAX_SYNC_LIMIT
+    )
     scanned: int
     summary: dict[str, int]
     results: list["BatchResultItem"] = Field(default_factory=list)
@@ -197,8 +213,10 @@ class ObsidianSyncResponse(BaseModel):
 # Obsidian Export (OpenBrain → Obsidian)
 # ---------------------------------------------------------------------------
 
+
 class ObsidianWriteRequest(BaseModel):
     """Request to write a note to Obsidian vault."""
+
     vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
     path: PathStr
     content: ContentStr
@@ -208,6 +226,7 @@ class ObsidianWriteRequest(BaseModel):
 
 class ObsidianWriteResponse(BaseModel):
     """Response from writing a note to Obsidian."""
+
     vault: str
     path: str
     title: str
@@ -220,6 +239,7 @@ class ObsidianWriteResponse(BaseModel):
 
 class ObsidianExportRequest(BaseModel):
     """Request to export memories to Obsidian notes."""
+
     vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
     folder: PathStr = "OpenBrain Export"
     memory_ids: Optional[list[str]] = Field(default=None, max_length=MAX_EXPORT_IDS)
@@ -231,6 +251,7 @@ class ObsidianExportRequest(BaseModel):
 
 class ObsidianExportItem(BaseModel):
     """Single exported item result."""
+
     memory_id: str
     path: str
     title: str
@@ -239,6 +260,7 @@ class ObsidianExportItem(BaseModel):
 
 class ObsidianExportResponse(BaseModel):
     """Response from exporting memories to Obsidian."""
+
     vault: str
     folder: str
     exported_count: int
@@ -248,6 +270,7 @@ class ObsidianExportResponse(BaseModel):
 
 class ObsidianCollectionRequest(BaseModel):
     """Request to create a collection (index note) from memories."""
+
     query: QueryStr
     collection_name: TitleStr
     vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
@@ -259,6 +282,7 @@ class ObsidianCollectionRequest(BaseModel):
 
 class ObsidianCollectionResponse(BaseModel):
     """Response from creating a collection."""
+
     collection_name: str
     vault: str
     folder: str
@@ -272,16 +296,21 @@ class ObsidianCollectionResponse(BaseModel):
 # Bidirectional Sync (OpenBrain ↔ Obsidian)
 # ---------------------------------------------------------------------------
 
+
 class ObsidianBidirectionalSyncRequest(BaseModel):
     """Request for bidirectional sync."""
+
     vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Memory"
-    strategy: Literal["last_write_wins", "domain_based", "manual_review"] = "domain_based"
+    strategy: Literal["last_write_wins", "domain_based", "manual_review"] = (
+        "domain_based"
+    )
     dry_run: bool = False  # If True, only detect changes without applying
     since: Optional[datetime] = None  # Only sync changes since this time
 
 
 class ObsidianSyncChange(BaseModel):
     """Single detected change in bidirectional sync."""
+
     memory_id: str
     obsidian_path: str
     change_type: Literal["created", "updated", "deleted", "unchanged"]
@@ -292,6 +321,7 @@ class ObsidianSyncChange(BaseModel):
 
 class ObsidianBidirectionalSyncResponse(BaseModel):
     """Response from bidirectional sync."""
+
     started_at: datetime
     completed_at: Optional[datetime] = None
     vault: str
@@ -306,6 +336,7 @@ class ObsidianBidirectionalSyncResponse(BaseModel):
 
 class ObsidianSyncStatus(BaseModel):
     """Status of sync tracking."""
+
     total_tracked: int
     never_synced: int
     synced_recently: int
@@ -323,7 +354,9 @@ class SyncCheckRequest(BaseModel):
         identifiers = [self.memory_id, self.match_key, self.obsidian_ref]
         provided = [value for value in identifiers if value]
         if len(provided) != 1:
-            raise ValueError("Exactly one of memory_id, match_key, or obsidian_ref must be provided.")
+            raise ValueError(
+                "Exactly one of memory_id, match_key, or obsidian_ref must be provided."
+            )
         return self
 
 
@@ -340,6 +373,7 @@ class SyncCheckResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Response Envelopes (V1)
 # ---------------------------------------------------------------------------
+
 
 class MemoryWriteResponse(BaseModel):
     status: Literal["created", "updated", "versioned", "skipped", "failed"]
@@ -377,10 +411,13 @@ class MemoryGetContextResponse(BaseModel):
 # Legacy compatibility (Deprecated)
 # ---------------------------------------------------------------------------
 
+
 class MemoryCreate(BaseModel):
     content: ContentStr
     domain: Literal["corporate", "build", "personal"] = "corporate"
-    entity_type: EntityTypeStr = Field(default="Decision", max_length=MAX_ENTITY_TYPE_LEN)
+    entity_type: EntityTypeStr = Field(
+        default="Decision", max_length=MAX_ENTITY_TYPE_LEN
+    )
     sensitivity: str = "internal"
     owner: OwnerStr = ""
     created_by: str = "agent"
@@ -410,7 +447,9 @@ class MemoryUpdate(BaseModel):
 class MemoryUpsertItem(BaseModel):
     content: ContentStr
     domain: Literal["corporate", "build", "personal"] = "corporate"
-    entity_type: EntityTypeStr = Field(default="Decision", max_length=MAX_ENTITY_TYPE_LEN)
+    entity_type: EntityTypeStr = Field(
+        default="Decision", max_length=MAX_ENTITY_TYPE_LEN
+    )
     sensitivity: str = "internal"
     owner: OwnerStr = ""
     created_by: str = "agent"
@@ -436,8 +475,12 @@ class ExportRequest(BaseModel):
 class MaintenanceRequest(BaseModel):
     dry_run: bool = True
     dedup_threshold: float = Field(default=0.05, ge=0.0, le=1.0)
-    normalize_owners: dict[str, str] = Field(default_factory=dict, max_length=MAX_POLICY_REWRITES)
-    retype_rules: list[dict[str, str]] = Field(default_factory=list, max_length=MAX_POLICY_REWRITES)
+    normalize_owners: dict[str, str] = Field(
+        default_factory=dict, max_length=MAX_POLICY_REWRITES
+    )
+    retype_rules: list[dict[str, str]] = Field(
+        default_factory=list, max_length=MAX_POLICY_REWRITES
+    )
     fix_superseded_links: bool = True
     allow_exact_dedup_override: bool = False
     """When True, exact content-hash duplicates in append-only domains are superseded
@@ -525,10 +568,18 @@ class MaintenanceReportDetail(BaseModel):
 
 
 class PolicyScopeEntry(BaseModel):
-    allowed_domains: list[Literal["corporate", "build", "personal"]] = Field(default_factory=list)
-    read_domains: list[Literal["corporate", "build", "personal"]] = Field(default_factory=list)
-    write_domains: list[Literal["corporate", "build", "personal"]] = Field(default_factory=list)
-    admin_domains: list[Literal["corporate", "build", "personal"]] = Field(default_factory=list)
+    allowed_domains: list[Literal["corporate", "build", "personal"]] = Field(
+        default_factory=list
+    )
+    read_domains: list[Literal["corporate", "build", "personal"]] = Field(
+        default_factory=list
+    )
+    write_domains: list[Literal["corporate", "build", "personal"]] = Field(
+        default_factory=list
+    )
+    admin_domains: list[Literal["corporate", "build", "personal"]] = Field(
+        default_factory=list
+    )
 
 
 class PolicyRegistry(BaseModel):
@@ -539,6 +590,7 @@ class PolicyRegistry(BaseModel):
 # ---------------------------------------------------------------------------
 # Error Models
 # ---------------------------------------------------------------------------
+
 
 class ErrorDetail(BaseModel):
     code: str

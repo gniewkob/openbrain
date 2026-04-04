@@ -62,13 +62,19 @@ def enforce_domain_access(user: dict[str, Any], domain: str, action: str) -> Non
         if is_privileged_user(user):
             return
         _record_access_denied("domain")
-        raise HTTPException(status_code=403, detail=f"{action.capitalize()} access denied for domain '{domain}'")
+        raise HTTPException(
+            status_code=403,
+            detail=f"{action.capitalize()} access denied for domain '{domain}'",
+        )
     # Fail-closed: deny unless there is an explicit non-empty grant that includes
     # this domain. An empty allowed set means no grants were configured for this
     # user+action pair, not "all domains permitted".
     if domain.lower() not in allowed:
         _record_access_denied("domain")
-        raise HTTPException(status_code=403, detail=f"{action.capitalize()} access denied for domain '{domain}'")
+        raise HTTPException(
+            status_code=403,
+            detail=f"{action.capitalize()} access denied for domain '{domain}'",
+        )
 
 
 def resolve_owner_for_write(user: dict[str, Any], owner: str | None) -> str:
@@ -80,7 +86,9 @@ def resolve_owner_for_write(user: dict[str, Any], owner: str | None) -> str:
     subject = get_subject(user)
     if owner and owner != subject:
         _record_access_denied("owner")
-        raise HTTPException(status_code=403, detail="Cannot write records for another owner")
+        raise HTTPException(
+            status_code=403, detail="Cannot write records for another owner"
+        )
     return subject
 
 
@@ -93,7 +101,9 @@ def resolve_tenant_for_write(user: dict[str, Any], tenant_id: str | None) -> str
         return tenant_id
     if tenant_id and tenant_id != scoped_tenant:
         _record_access_denied("tenant")
-        raise HTTPException(status_code=403, detail="Cannot write records for another tenant")
+        raise HTTPException(
+            status_code=403, detail="Cannot write records for another tenant"
+        )
     return scoped_tenant
 
 
@@ -111,11 +121,16 @@ def apply_owner_scope(user: dict[str, Any], filters: dict[str, Any]) -> dict[str
             # user's own records are returned.
         else:
             if allowed_read_domains:
-                requested_domains = requested if isinstance(requested, list) else [requested]
+                requested_domains = (
+                    requested if isinstance(requested, list) else [requested]
+                )
                 normalized = {str(domain).lower() for domain in requested_domains}
                 if not normalized.issubset(allowed_read_domains):
                     _record_access_denied("domain")
-                    raise HTTPException(status_code=403, detail="Read access denied for requested domain scope")
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Read access denied for requested domain scope",
+                    )
             # If no domain grants exist, we don't block the request — owner/tenant
             # scope below will still restrict the result set to the user's own records.
     if not _is_scoped_user(user):

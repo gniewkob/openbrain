@@ -52,7 +52,22 @@ KNOWN_COUNTERS: tuple[str, ...] = (
 )
 
 # Standard Prometheus buckets for request latency (in seconds)
-DEFAULT_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0)
+DEFAULT_BUCKETS = (
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    2.5,
+    5.0,
+    7.5,
+    10.0,
+)
 
 
 class Histogram:
@@ -135,7 +150,9 @@ class TelemetryRegistry:
         with self._lock:
             return dict(sorted(self._gauges.items()))
 
-    def observe(self, name: str, value: float, buckets: tuple[float, ...] = DEFAULT_BUCKETS) -> None:
+    def observe(
+        self, name: str, value: float, buckets: tuple[float, ...] = DEFAULT_BUCKETS
+    ) -> None:
         with self._lock:
             if name not in self._histograms:
                 self._histograms[name] = Histogram(name, buckets)
@@ -176,7 +193,8 @@ def get_metrics_snapshot() -> dict[str, Any]:
         "counters": registry.snapshot(),
         "gauges": registry.gauges_snapshot(),
         "histograms": {
-            name: hist.snapshot() for name, hist in registry.histograms_snapshot().items()
+            name: hist.snapshot()
+            for name, hist in registry.histograms_snapshot().items()
         },
     }
 
@@ -189,7 +207,9 @@ def set_gauge_metric(name: str, value: float) -> None:
     registry.set_gauge(name, value)
 
 
-def observe_metric(name: str, value: float, buckets: tuple[float, ...] = DEFAULT_BUCKETS) -> None:
+def observe_metric(
+    name: str, value: float, buckets: tuple[float, ...] = DEFAULT_BUCKETS
+) -> None:
     registry.observe(name, value, buckets)
 
 
@@ -219,7 +239,9 @@ def render_prometheus_metrics() -> str:
         for i, bucket in enumerate(hist.buckets):
             cumulative_count += hist.counts[i]
             upper_bound = "inf" if bucket == float("inf") else str(bucket)
-            lines.append(f'{metric_name}_bucket{{le="{upper_bound}"}} {cumulative_count}')
+            lines.append(
+                f'{metric_name}_bucket{{le="{upper_bound}"}} {cumulative_count}'
+            )
         lines.append(f"{metric_name}_count {hist.count}")
         lines.append(f"{metric_name}_sum {hist.sum}")
 

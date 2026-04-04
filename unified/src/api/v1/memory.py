@@ -22,6 +22,7 @@ from ...schemas import (
     MemoryWriteResponse,
 )
 from ...telemetry import incr_metric
+
 # PUBLIC_MODE is imported from auth module
 from ...auth import PUBLIC_EXPOSURE as PUBLIC_MODE
 
@@ -75,7 +76,9 @@ async def v1_write_many(
         enforce_domain_access(_user, record.domain, "write")
         record.owner = resolve_owner_for_write(_user, record.owner)
         record.tenant_id = resolve_tenant_for_write(_user, record.tenant_id)
-    result = await handle_memory_write_many(session, req, actor=_user.get("sub", "agent"))
+    result = await handle_memory_write_many(
+        session, req, actor=_user.get("sub", "agent")
+    )
     incr_metric("bulk_batches_total")
     incr_metric("bulk_records_total", len(req.records))
     for key in ("created", "updated", "versioned", "skipped", "failed"):
@@ -109,12 +112,19 @@ async def v1_get_context(
     if req.domain:
         enforce_domain_access(_user, req.domain, "read")
     elif PUBLIC_MODE and _is_scoped_user(_user):
-        # domain=None → context spans all domains; ensure user has at least one read grant.
+        # domain=None → context spans all domains; ensure user has at least
+        # one read grant.
         allowed = _effective_domain_scope(_user, "read")
         if not allowed and not is_privileged_user(_user):
             _record_access_denied("domain")
-            raise HTTPException(status_code=403, detail="Read access denied: no domain grants configured")
-    owner = get_subject(_user) if _is_scoped_user(_user) and not get_tenant_id(_user) else None
+            raise HTTPException(
+                status_code=403,
+                detail="Read access denied: no domain grants configured",
+            )
+    if _is_scoped_user(_user) and not get_tenant_id(_user):
+        owner = get_subject(_user)
+    else:
+        owner = None
     tenant_id = get_tenant_id(_user) if _is_scoped_user(_user) else None
     response = await get_grounding_pack(session, req, owner=owner, tenant_id=tenant_id)
     incr_metric("get_context_requests_total")

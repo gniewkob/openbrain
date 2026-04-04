@@ -13,7 +13,11 @@ from ...db import get_session
 from ...memory_reads import get_memory, search_memories
 from ...memory_writes import handle_memory_write_many
 from ...obsidian_cli import note_to_memory_write_record
-from ...obsidian_sync import BidirectionalSyncEngine, ObsidianChangeTracker, SyncStrategy
+from ...obsidian_sync import (
+    BidirectionalSyncEngine,
+    ObsidianChangeTracker,
+    SyncStrategy,
+)
 from ...schemas import (
     MemoryWriteManyRequest,
     ObsidianBidirectionalSyncRequest,
@@ -123,7 +127,9 @@ async def v1_obsidian_sync(
         if req.paths:
             resolved_paths = req.paths[: req.limit]
         else:
-            resolved_paths = await adapter.list_files(req.vault, folder=req.folder, limit=req.limit)
+            resolved_paths = await adapter.list_files(
+                req.vault, folder=req.folder, limit=req.limit
+            )
 
         notes = [await adapter.read_note(req.vault, path) for path in resolved_paths]
     except ObsidianCliError as e:
@@ -163,7 +169,7 @@ async def v1_obsidian_write_note(
     try:
         # Check if note exists
         exists = await adapter.note_exists(req.vault, req.path)
-        
+
         note = await adapter.write_note(
             vault=req.vault,
             path=req.path,
@@ -197,6 +203,7 @@ async def v1_obsidian_export(
 
     # Get memories to export
     from ...schemas import MemoryOut
+
     memories: list[MemoryOut] = []
     if req.memory_ids:
         for mid in req.memory_ids:
@@ -209,15 +216,18 @@ async def v1_obsidian_export(
             SearchRequest(query=req.query, top_k=req.max_items, filters={}),
         )
         memories = [mem for mem, _ in search_results]
-        
+
         # Filter by domain if specified
         if req.domain:
             memories = [m for m in memories if m.domain == req.domain]
     else:
-        raise HTTPException(status_code=422, detail="Either memory_ids or query must be provided")
+        raise HTTPException(
+            status_code=422, detail="Either memory_ids or query must be provided"
+        )
 
     # Export to Obsidian
     import structlog
+
     log = structlog.get_logger()
     adapter = ObsidianCliAdapter()
     exported: list = []
@@ -235,7 +245,7 @@ async def v1_obsidian_export(
 
             # Check if exists
             exists = await adapter.note_exists(req.vault, path)
-            
+
             note = await adapter.write_note(
                 vault=req.vault,
                 path=path,
@@ -244,12 +254,15 @@ async def v1_obsidian_export(
                 overwrite=True,
             )
             from ...schemas import ObsidianExportItem
-            exported.append(ObsidianExportItem(
-                memory_id=memory.id,
-                path=note.path,
-                title=note.title,
-                created=not exists,
-            ))
+
+            exported.append(
+                ObsidianExportItem(
+                    memory_id=memory.id,
+                    path=note.path,
+                    title=note.title,
+                    created=not exists,
+                )
+            )
         except Exception as e:
             log.warning("export_memory_failed", memory_id=memory.id, error=str(e))
             errors.append({"memory_id": memory.id, "error": str(e)})
@@ -280,9 +293,10 @@ async def v1_obsidian_collection(
     memories = [mem for mem, _ in search_results]
     if req.domain:
         memories = [m for m in memories if m.domain == req.domain]
-    
+
     # Export memories first
     from ...schemas import ObsidianExportRequest
+
     export_req = ObsidianExportRequest(
         vault=req.vault,
         folder=f"{req.folder}/{req.collection_name}",
@@ -290,9 +304,10 @@ async def v1_obsidian_collection(
         domain=req.domain,
         max_items=req.max_items,
     )
-    
+
     # Call export (we need to import the function)
     from ...api.v1.obsidian import v1_obsidian_export
+
     export_result = await v1_obsidian_export(export_req, session, _user)
 
     # Create index note
@@ -305,9 +320,9 @@ async def v1_obsidian_collection(
             memories=memories,
             group_by=req.group_by,
         )
-        
+
         index_path = f"{req.folder}/{req.collection_name}/Index.md"
-        
+
         await adapter.write_note(
             vault=req.vault,
             path=index_path,
@@ -342,17 +357,17 @@ async def v1_obsidian_bidirectional_sync(
 ) -> ObsidianBidirectionalSyncResponse:
     """Perform bidirectional synchronization between OpenBrain and Obsidian."""
     require_admin(_user)
-    
+
     engine = await _get_sync_engine(req.strategy)
     adapter = ObsidianCliAdapter()
-    
+
     result = await engine.sync(
         session=session,
         adapter=adapter,
         vault=req.vault,
         dry_run=req.dry_run,
     )
-    
+
     # Convert to response format
     changes_response = [
         ObsidianSyncChange(
@@ -365,7 +380,7 @@ async def v1_obsidian_bidirectional_sync(
         )
         for change in result.details
     ]
-    
+
     return ObsidianBidirectionalSyncResponse(
         started_at=result.started_at,
         completed_at=result.completed_at,
@@ -386,10 +401,10 @@ async def v1_obsidian_sync_status(
 ) -> ObsidianSyncStatus:
     """Get status of sync tracking."""
     require_admin(_user)
-    
+
     tracker = await _get_sync_tracker()
     stats = tracker.get_stats()
-    
+
     return ObsidianSyncStatus(**stats).model_dump()
 
 
@@ -404,14 +419,14 @@ async def v1_obsidian_update_note(
 ) -> ObsidianWriteResponse:
     """Update an existing note in Obsidian."""
     require_admin(_user)
-    
+
     adapter = ObsidianCliAdapter()
-    
+
     # Build frontmatter update if tags provided
     frontmatter = None
     if tags:
         frontmatter = {"tags": tags}
-    
+
     try:
         note = await adapter.update_note(
             vault=vault,
@@ -420,7 +435,7 @@ async def v1_obsidian_update_note(
             frontmatter=frontmatter,
             append=append,
         )
-        
+
         return ObsidianWriteResponse(
             vault=note.vault,
             path=note.path,

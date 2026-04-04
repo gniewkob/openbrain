@@ -62,6 +62,7 @@ async def get_memory_as_record(
 # Repository-based API (New - ARCH-002)
 # ============================================================================
 
+
 def get_repository(session: AsyncSession) -> MemoryRepository:
     """Factory function to get the appropriate repository instance."""
     return SQLAlchemyMemoryRepository(session)
@@ -84,17 +85,21 @@ def _apply_filters_to_stmt(
 ) -> Any:
     """
     Apply common filters to a SQLAlchemy select statement.
-    
+
     Args:
         stmt: The SQLAlchemy select statement to filter
         filters: Dictionary of filter conditions
         default_status_filter: If True, exclude superseded/duplicate by default
-    
+
     Returns:
         Modified statement with filters applied
     """
     if "domain" in filters:
-        domains = filters["domain"] if isinstance(filters["domain"], list) else [filters["domain"]]
+        domains = (
+            filters["domain"]
+            if isinstance(filters["domain"], list)
+            else [filters["domain"]]
+        )
         stmt = stmt.where(Memory.domain.in_([DomainEnum(domain) for domain in domains]))
     if "entity_type" in filters:
         entity_types = filters["entity_type"]
@@ -122,11 +127,13 @@ def _apply_filters_to_stmt(
             stmt = stmt.where(_tenant_filter_expr([tenant_ids]))
     if "tags_any" in filters:
         stmt = stmt.where(Memory.tags.overlap(filters["tags_any"]))
-    
+
     return stmt
 
 
-async def list_memories(session: AsyncSession, filters: dict[str, Any], limit: int = 20) -> list[MemoryOut]:
+async def list_memories(
+    session: AsyncSession, filters: dict[str, Any], limit: int = 20
+) -> list[MemoryOut]:
     """List memories with filtering and pagination."""
     stmt = select(Memory)
     stmt = _apply_filters_to_stmt(stmt, filters, default_status_filter=True)
@@ -135,25 +142,31 @@ async def list_memories(session: AsyncSession, filters: dict[str, Any], limit: i
     return [_to_out(memory) for memory in result.scalars().all()]
 
 
-async def search_memories(session: AsyncSession, req: SearchRequest) -> list[tuple[MemoryOut, float]]:
+async def search_memories(
+    session: AsyncSession, req: SearchRequest
+) -> list[tuple[MemoryOut, float]]:
     """Semantic search memories with vector similarity."""
     embedding = await _get_embedding_compat(req.query)
-    stmt = select(Memory, Memory.embedding.cosine_distance(embedding).label("distance")).where(Memory.status == "active")
+    stmt = select(
+        Memory, Memory.embedding.cosine_distance(embedding).label("distance")
+    ).where(Memory.status == "active")
     stmt = _apply_filters_to_stmt(stmt, req.filters, default_status_filter=False)
     stmt = stmt.order_by("distance").limit(req.top_k)
     result = await session.execute(stmt)
     return [(_to_out(row.Memory), 1.0 - float(row.distance)) for row in result.all()]
 
 
-async def export_memories(session: AsyncSession, ids: list[str], role: str = "service") -> list[dict]:
+async def export_memories(
+    session: AsyncSession, ids: list[str], role: str = "service"
+) -> list[dict]:
     """
     Export memories by IDs with sensitivity-based redaction.
-    
+
     Args:
         session: Database session
         ids: List of memory IDs to export
         role: Role of the exporter (affects redaction level)
-    
+
     Returns:
         List of exported memory records with redacted sensitive fields
     """
@@ -177,30 +190,40 @@ async def sync_check(
 ) -> dict[str, str | None]:
     """
     Check if a memory exists and if it's up to date based on content hash.
-    
+
     Args:
         session: Database session
         memory_id: Memory ID to check
         match_key: Match key to check (alternative to memory_id)
         obsidian_ref: Obsidian reference to check (alternative to memory_id)
         file_hash: Content hash to compare (optional)
-    
+
     Returns:
         Dictionary with status, memory_id, match_key, obsidian_ref, stored_hash, provided_hash
-    
+
     Raises:
         ValueError: If none of memory_id, match_key, obsidian_ref is provided
     """
     if memory_id is None and match_key is None and obsidian_ref is None:
-        raise ValueError("Exactly one of memory_id, match_key, or obsidian_ref must be provided.")
+        raise ValueError(
+            "Exactly one of memory_id, match_key, or obsidian_ref must be provided."
+        )
 
     stmt = select(Memory).where(Memory.status == "active")
     if memory_id is not None:
         stmt = stmt.where(Memory.id == memory_id)
     elif match_key is not None:
-        stmt = stmt.where(Memory.match_key == match_key).order_by(Memory.updated_at.desc()).limit(1)
+        stmt = (
+            stmt.where(Memory.match_key == match_key)
+            .order_by(Memory.updated_at.desc())
+            .limit(1)
+        )
     else:
-        stmt = stmt.where(Memory.obsidian_ref == obsidian_ref).order_by(Memory.updated_at.desc()).limit(1)
+        stmt = (
+            stmt.where(Memory.obsidian_ref == obsidian_ref)
+            .order_by(Memory.updated_at.desc())
+            .limit(1)
+        )
 
     result = await session.execute(stmt)
     memory = result.scalar_one_or_none()
@@ -226,14 +249,18 @@ async def sync_check(
         response.update({"status": "exists", "message": "Memory exists."})
         return response
     if memory.content_hash != file_hash:
-        response.update({"status": "outdated", "message": "Hash mismatch. Update required."})
+        response.update(
+            {"status": "outdated", "message": "Hash mismatch. Update required."}
+        )
         return response
     response.update({"status": "synced", "message": "Memory is up to date."})
     return response
 
 
 async def get_memory_status_counts(session: AsyncSession) -> dict[str, int]:
-    result = await session.execute(select(Memory.status, func.count(Memory.id)).group_by(Memory.status))
+    result = await session.execute(
+        select(Memory.status, func.count(Memory.id)).group_by(Memory.status)
+    )
     counts = {status: count for status, count in result.all()}
     return {
         "active": int(counts.get("active", 0)),
@@ -243,9 +270,13 @@ async def get_memory_status_counts(session: AsyncSession) -> dict[str, int]:
     }
 
 
-async def get_memory_domain_status_counts(session: AsyncSession) -> dict[str, dict[str, int]]:
+async def get_memory_domain_status_counts(
+    session: AsyncSession,
+) -> dict[str, dict[str, int]]:
     result = await session.execute(
-        select(Memory.domain, Memory.status, func.count(Memory.id)).group_by(Memory.domain, Memory.status)
+        select(Memory.domain, Memory.status, func.count(Memory.id)).group_by(
+            Memory.domain, Memory.status
+        )
     )
     counts: dict[str, dict[str, int]] = {
         "corporate": {"active": 0, "superseded": 0, "archived": 0, "deleted": 0},
@@ -255,15 +286,24 @@ async def get_memory_domain_status_counts(session: AsyncSession) -> dict[str, di
     for domain, status, count in result.all():
         domain_key = domain.value if isinstance(domain, DomainEnum) else str(domain)
         if domain_key not in counts:
-            counts[domain_key] = {"active": 0, "superseded": 0, "archived": 0, "deleted": 0}
+            counts[domain_key] = {
+                "active": 0,
+                "superseded": 0,
+                "archived": 0,
+                "deleted": 0,
+            }
         counts[domain_key][str(status)] = int(count)
     return counts
 
 
-async def list_maintenance_reports(session: AsyncSession, limit: int = 20) -> list[MaintenanceReportEntry]:
+async def list_maintenance_reports(
+    session: AsyncSession, limit: int = 20
+) -> list[MaintenanceReportEntry]:
     result = await session.execute(
         select(AuditLog)
-        .where(AuditLog.operation == "maintain", AuditLog.tool_name == "memory.maintain")
+        .where(
+            AuditLog.operation == "maintain", AuditLog.tool_name == "memory.maintain"
+        )
         .order_by(AuditLog.created_at.desc())
         .limit(limit)
     )
@@ -287,7 +327,9 @@ async def list_maintenance_reports(session: AsyncSession, limit: int = 20) -> li
     return reports
 
 
-async def get_maintenance_report(session: AsyncSession, report_id: str) -> MaintenanceReportDetail | None:
+async def get_maintenance_report(
+    session: AsyncSession, report_id: str
+) -> MaintenanceReportDetail | None:
     result = await session.execute(
         select(AuditLog).where(
             AuditLog.id == report_id,
@@ -314,11 +356,15 @@ async def get_maintenance_report(session: AsyncSession, report_id: str) -> Maint
     )
 
 
-async def find_memories_v1(session: AsyncSession, req: MemoryFindRequest) -> list[tuple[MemoryRecord, float]]:
+async def find_memories_v1(
+    session: AsyncSession, req: MemoryFindRequest
+) -> list[tuple[MemoryRecord, float]]:
     """Find memories with optional semantic search and filtering."""
     embedding = await _get_embedding_compat(req.query) if req.query else None
     if embedding:
-        stmt = select(Memory, Memory.embedding.cosine_distance(embedding).label("distance")).where(Memory.status == "active")
+        stmt = select(
+            Memory, Memory.embedding.cosine_distance(embedding).label("distance")
+        ).where(Memory.status == "active")
     else:
         stmt = select(Memory).where(Memory.status == "active")
 
@@ -332,7 +378,9 @@ async def find_memories_v1(session: AsyncSession, req: MemoryFindRequest) -> lis
     stmt = stmt.limit(req.limit)
     result = await session.execute(stmt)
     if embedding:
-        return [(_to_record(row.Memory), 1.0 - float(row.distance)) for row in result.all()]
+        return [
+            (_to_record(row.Memory), 1.0 - float(row.distance)) for row in result.all()
+        ]
     return [(_to_record(memory), 1.0) for memory in result.scalars().all()]
 
 
@@ -362,7 +410,9 @@ async def get_grounding_pack(
                 "id": record.id,
                 "title": record.title,
                 "entity_type": record.entity_type,
-                "excerpt": record.content[:300] + "..." if len(record.content) > 300 else record.content,
+                "excerpt": record.content[:300] + "..."
+                if len(record.content) > 300
+                else record.content,
                 "relevance": score,
             }
         )
@@ -371,7 +421,9 @@ async def get_grounding_pack(
         if record.entity_type.lower() == "risk":
             risks.append(record.content)
 
-    summary = f"OpenBrain found {len(records)} relevant memories for query: '{req.query}'."
+    summary = (
+        f"OpenBrain found {len(records)} relevant memories for query: '{req.query}'."
+    )
     return MemoryGetContextResponse(
         query=req.query,
         summary=summary,

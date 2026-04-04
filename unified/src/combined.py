@@ -6,6 +6,7 @@ This wrapper:
 2. Redirects root (/) to /sse for ChatGPT convenience
 3. Forwards everything else to FastMCP (authenticated when public exposure is enabled)
 """
+
 import hmac
 import logging
 
@@ -20,8 +21,13 @@ mcp_app = mcp_server.streamable_http_app()
 
 # Exact paths routed to the FastAPI REST application.
 _REST_EXACT = {
-    "/health", "/healthz", "/readyz", "/metrics",
-    "/docs", "/openapi.json", "/redoc",
+    "/health",
+    "/healthz",
+    "/readyz",
+    "/metrics",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
 }
 
 
@@ -31,18 +37,24 @@ async def app(scope, receive, send):
 
         # REST API, health, OpenAPI docs, and OAuth discovery (/.well-known/*)
         # FastAPI in main.py is the single authoritative handler for all of these.
-        if path in _REST_EXACT or path.startswith("/api") or path.startswith("/.well-known/"):
+        if (
+            path in _REST_EXACT
+            or path.startswith("/api")
+            or path.startswith("/.well-known/")
+        ):
             await rest_app(scope, receive, send)
             return
 
         # Root redirect to /sse (for ChatGPT MCP discovery)
         if path == "/":
             # 307 preserves the POST method
-            await send({
-                "type": "http.response.start",
-                "status": 307,
-                "headers": [(b"location", b"/sse")],
-            })
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 307,
+                    "headers": [(b"location", b"/sse")],
+                }
+            )
             await send({"type": "http.response.body", "body": b""})
             return
 
@@ -51,7 +63,11 @@ async def app(scope, receive, send):
         headers = {k.lower(): v for k, v in scope.get("headers", [])}
         authorized = False
         internal_key = headers.get(b"x-internal-key", b"").decode("latin-1")
-        if internal_key and INTERNAL_API_KEY and hmac.compare_digest(internal_key, INTERNAL_API_KEY):
+        if (
+            internal_key
+            and INTERNAL_API_KEY
+            and hmac.compare_digest(internal_key, INTERNAL_API_KEY)
+        ):
             authorized = True
         if not authorized:
             auth_header = headers.get(b"authorization", b"").decode("latin-1")
@@ -61,14 +77,20 @@ async def app(scope, receive, send):
                     await _oidc.verify_token(token)
                     authorized = True
                 except Exception as exc:
-                    _log.warning("mcp_oidc_verification_failed", extra={"error": str(exc)})
+                    _log.warning(
+                        "mcp_oidc_verification_failed", extra={"error": str(exc)}
+                    )
         if not authorized:
-            await send({
-                "type": "http.response.start",
-                "status": 401,
-                "headers": [(b"content-type", b"application/json")],
-            })
-            await send({"type": "http.response.body", "body": b'{"detail":"Unauthorized"}'})
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 401,
+                    "headers": [(b"content-type", b"application/json")],
+                }
+            )
+            await send(
+                {"type": "http.response.body", "body": b'{"detail":"Unauthorized"}'}
+            )
             return
 
     # Default: Forward to FastMCP (handles /sse and all MCP protocol paths)

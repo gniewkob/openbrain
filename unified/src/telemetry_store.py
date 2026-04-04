@@ -36,14 +36,18 @@ async def upsert_telemetry_metrics(
     """Persist telemetry state with a single transaction per flush."""
     counter_rows = (
         await session.execute(
-            select(TelemetryCounter).where(TelemetryCounter.name.in_(list(counters.keys())))
+            select(TelemetryCounter).where(
+                TelemetryCounter.name.in_(list(counters.keys()))
+            )
         )
         if counters
         else None
     )
-    existing_counters = {
-        counter.name: counter for counter in counter_rows.scalars().all()
-    } if counter_rows else {}
+    existing_counters = (
+        {counter.name: counter for counter in counter_rows.scalars().all()}
+        if counter_rows
+        else {}
+    )
 
     for name, value in counters.items():
         counter = existing_counters.get(name)
@@ -54,14 +58,18 @@ async def upsert_telemetry_metrics(
 
     histogram_rows = (
         await session.execute(
-            select(TelemetryHistogram).where(TelemetryHistogram.name.in_(list(histograms.keys())))
+            select(TelemetryHistogram).where(
+                TelemetryHistogram.name.in_(list(histograms.keys()))
+            )
         )
         if histograms
         else None
     )
-    existing_histograms = {
-        histogram.name: histogram for histogram in histogram_rows.scalars().all()
-    } if histogram_rows else {}
+    existing_histograms = (
+        {histogram.name: histogram for histogram in histogram_rows.scalars().all()}
+        if histogram_rows
+        else {}
+    )
 
     for name, payload in histograms.items():
         histogram = existing_histograms.get(name)

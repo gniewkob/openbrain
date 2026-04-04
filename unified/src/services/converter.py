@@ -11,7 +11,7 @@ def sanitize_filename(name: str) -> str:
     """Sanitize string for use as filename."""
     unsafe = '<>:"/\\|?*'
     for char in unsafe:
-        name = name.replace(char, '_')
+        name = name.replace(char, "_")
     return name[:100]  # Limit length
 
 
@@ -68,8 +68,12 @@ def memory_to_frontmatter(memory: MemoryOut) -> dict[str, Any]:
         "owner": memory.owner,
         "version": memory.version,
         "status": memory.status,
-        "created_at": memory.created_at.isoformat() if hasattr(memory.created_at, 'isoformat') else str(memory.created_at),
-        "updated_at": memory.updated_at.isoformat() if hasattr(memory.updated_at, 'isoformat') else str(memory.updated_at),
+        "created_at": memory.created_at.isoformat()
+        if hasattr(memory.created_at, "isoformat")
+        else str(memory.created_at),
+        "updated_at": memory.updated_at.isoformat()
+        if hasattr(memory.updated_at, "isoformat")
+        else str(memory.updated_at),
         "tags": memory.tags,
         "source": "openbrain-export",
     }
@@ -95,7 +99,7 @@ def build_collection_index(
     if group_by and memories:
         lines.append(f"## Grouped by: {group_by}")
         lines.append("")
-        
+
         # Group memories
         groups: dict[str, list[tuple[ObsidianExportItem, MemoryOut]]] = {}
         for exp in exported:
@@ -110,21 +114,21 @@ def build_collection_index(
                 else:
                     key = "Other"
                 groups.setdefault(key, []).append((exp, mem))
-        
+
         # Output groups
         for key, items in sorted(groups.items()):
             lines.append(f"### {key}")
             lines.append("")
             for exp, mem in items:
-                link_path = exp.path.replace('.md', '')
+                link_path = exp.path.replace(".md", "")
                 lines.append(f"- [[{link_path}]] — {exp.title}")
             lines.append("")
     else:
         lines.append("## Items")
         lines.append("")
         for exp in exported:
-            link_path = exp.path.replace('.md', '')
+            link_path = exp.path.replace(".md", "")
             lines.append(f"- [[{link_path}]] — {exp.title}")
         lines.append("")
-    
+
     return "\n".join(lines)

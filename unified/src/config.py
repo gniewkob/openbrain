@@ -1,7 +1,8 @@
 """Central configuration module for OpenBrain.
 
-Uses pydantic-settings for type-safe, validated configuration from environment variables.
-All configuration is centralized here - no scattered os.environ.get() calls in other modules.
+Uses pydantic-settings for type-safe, validated configuration from
+environment variables. All configuration is centralized here - no
+scattered os.environ.get() calls in other modules.
 """
 
 from __future__ import annotations
@@ -62,7 +63,8 @@ class AuthConfig(BaseSettings):
         if is_public:
             if not self.internal_api_key:
                 raise ValueError(
-                    "INTERNAL_API_KEY is required when PUBLIC_MODE=true or PUBLIC_BASE_URL is set"
+                    "INTERNAL_API_KEY is required when PUBLIC_MODE=true "
+                    "or PUBLIC_BASE_URL is set"
                 )
             if len(self.internal_api_key) < 32:
                 raise ValueError(
@@ -70,7 +72,8 @@ class AuthConfig(BaseSettings):
                 )
             if not self.oidc_issuer_url:
                 raise ValueError(
-                    "OIDC_ISSUER_URL is required when PUBLIC_MODE=true or PUBLIC_BASE_URL is set"
+                    "OIDC_ISSUER_URL is required when PUBLIC_MODE=true "
+                    "or PUBLIC_BASE_URL is set"
                 )
         return self
 

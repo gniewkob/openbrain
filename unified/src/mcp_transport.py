@@ -33,9 +33,15 @@ _ngrok_host = ""
 
 def _init_config():
     """Initialize module-level config from central config."""
-    global BRAIN_URL, BACKEND_TIMEOUT, INTERNAL_API_KEY, MCP_SOURCE_SYSTEM, _public_base, _ngrok_host
+    global \
+        BRAIN_URL, \
+        BACKEND_TIMEOUT, \
+        INTERNAL_API_KEY, \
+        MCP_SOURCE_SYSTEM, \
+        _public_base, \
+        _ngrok_host
     from .config import get_config
-    
+
     config = get_config()
     BRAIN_URL = config.mcp.brain_url
     BACKEND_TIMEOUT = config.mcp.backend_timeout
@@ -43,8 +49,11 @@ def _init_config():
     MCP_SOURCE_SYSTEM = config.mcp.source_system
     _public_base = config.auth.public_base_url
     _ngrok_host = (
-        _public_base.replace("https://", "").replace("http://", "") if _public_base else ""
+        _public_base.replace("https://", "").replace("http://", "")
+        if _public_base
+        else ""
     )
+
 
 _transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=True,
@@ -472,12 +481,14 @@ _MAX_BATCH_SIZE = 100
 async def brain_store_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Bulk store memories. Use for archiving or synchronization.
-    
+
     Args:
         items: List of memory records (max 100 per batch)
     """
     if len(items) > _MAX_BATCH_SIZE:
-        raise ValueError(f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. Split into multiple calls.")
+        raise ValueError(
+            f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. Split into multiple calls."
+        )
     if not items:
         raise ValueError("Batch cannot be empty.")
     payload = {"records": items, "write_mode": "upsert"}
@@ -489,12 +500,14 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
 async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Idempotent bulk synchronization using match_key.
-    
+
     Args:
         items: List of memory records (max 100 per batch)
     """
     if len(items) > _MAX_BATCH_SIZE:
-        raise ValueError(f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. Split into multiple calls.")
+        raise ValueError(
+            f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. Split into multiple calls."
+        )
     if not items:
         raise ValueError("Batch cannot be empty.")
     return await _safe_req("POST", "/api/memories/bulk-upsert", json=items)
