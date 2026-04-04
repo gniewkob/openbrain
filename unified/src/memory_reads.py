@@ -35,12 +35,32 @@ async def _get_embedding_compat(text: str):
 
 
 async def get_memory_raw(session: AsyncSession, memory_id: str) -> Memory:
+    """
+    Get raw Memory model by ID (internal use).
+
+    Args:
+        session: Database session
+        memory_id: Memory ID
+
+    Returns:
+        Memory model instance
+    """
     stmt = select(Memory).where(Memory.id == memory_id)
     res = await session.execute(stmt)
     return res.scalar_one()
 
 
 async def get_memory(session: AsyncSession, memory_id: str) -> MemoryOut | None:
+    """
+    Get memory by ID and convert to output schema.
+
+    Args:
+        session: Database session
+        memory_id: Memory ID
+
+    Returns:
+        Memory output or None if not found
+    """
     stmt = select(Memory).where(Memory.id == memory_id)
     result = await session.execute(stmt)
     memory = result.scalar_one_or_none()
@@ -50,6 +70,16 @@ async def get_memory(session: AsyncSession, memory_id: str) -> MemoryOut | None:
 async def get_memory_as_record(
     session: AsyncSession, memory_id: str
 ) -> tuple[MemoryRecord | None, MemoryOut | None]:
+    """
+    Get memory as both record and output formats.
+
+    Args:
+        session: Database session
+        memory_id: Memory ID
+
+    Returns:
+        Tuple of (MemoryRecord, MemoryOut) or (None, None) if not found
+    """
     stmt = select(Memory).where(Memory.id == memory_id)
     result = await session.execute(stmt)
     memory = result.scalar_one_or_none()

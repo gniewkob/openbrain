@@ -47,6 +47,18 @@ async def periodic_telemetry_sync() -> None:
 
 @asynccontextmanager
 async def lifespan(app):
+    """
+    Application lifespan context manager.
+
+    Handles startup tasks (telemetry loading, security validation)
+    and graceful shutdown.
+
+    Args:
+        app: FastAPI application instance
+
+    Yields:
+        Control to the application
+    """
     del app
     try:
         async with AsyncSessionLocal() as session:

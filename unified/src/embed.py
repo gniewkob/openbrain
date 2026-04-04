@@ -53,6 +53,7 @@ def _get_client() -> httpx.AsyncClient:
 
 
 async def close_embedding_client() -> None:
+    """Close the embedding HTTP client and cleanup resources."""
     global _client
     if _client is not None:
         await _client.aclose()

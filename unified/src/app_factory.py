@@ -24,6 +24,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to every response."""
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        """Add security headers to the response."""
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -41,6 +42,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 def create_app(*, public_base_url: str, lifespan) -> FastAPI:
+    """
+    Create and configure the FastAPI application.
+
+    Args:
+        public_base_url: Public URL for OpenAPI server configuration
+        lifespan: Lifespan context manager for startup/shutdown events
+
+    Returns:
+        Configured FastAPI application instance
+    """
     config = get_config()
     servers = [{"url": public_base_url}] if public_base_url else []
 

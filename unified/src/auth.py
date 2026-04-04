@@ -115,6 +115,18 @@ class OIDCVerifier:
         return self._metadata
 
     async def verify_token(self, token: str) -> dict[str, Any]:
+        """
+        Verify and decode a JWT access token.
+
+        Args:
+            token: JWT access token to verify
+
+        Returns:
+            Decoded token claims
+
+        Raises:
+            ValueError: If token is invalid or verification fails
+        """
         await self.metadata()
 
         if len(token.split(".")) != 3:
@@ -234,6 +246,15 @@ def get_policy_registry() -> dict[str, Any]:
 
 
 async def set_policy_registry(registry: dict[str, Any]) -> dict[str, Any]:
+    """
+    Set the policy registry atomically and persist to disk.
+
+    Args:
+        registry: Policy registry with tenants and subjects configuration
+
+    Returns:
+        Updated policy registry
+    """
     global POLICY_REGISTRY
     normalized = {
         "tenants": dict(registry.get("tenants", {})),
@@ -261,6 +282,12 @@ async def set_policy_registry(registry: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_security_configuration() -> None:
+    """
+    Validate security configuration for public exposure.
+
+    Raises:
+        RuntimeError: If required security settings are missing in public mode
+    """
     if not PUBLIC_EXPOSURE:
         return
     if not OIDC_ISSUER_URL:

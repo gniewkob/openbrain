@@ -26,6 +26,12 @@ def _uses_dev_database_credentials(db_url: str) -> bool:
 
 
 def validate_database_configuration() -> None:
+    """
+    Validate database configuration for security.
+
+    Raises:
+        RuntimeError: If using default dev credentials in public mode
+    """
     config = get_config()
     public_mode = config.auth.public_mode
     public_base_url = bool(config.auth.public_base_url)

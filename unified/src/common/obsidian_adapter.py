@@ -276,6 +276,12 @@ class ObsidianCliAdapter:
         return cleaned_stdout
 
     async def list_vaults(self) -> list[str]:
+        """
+        List all available Obsidian vaults.
+
+        Returns:
+            List of vault names
+        """
         raw = await self._run("vaults")
         return [line.strip() for line in raw.splitlines() if line.strip()]
 
@@ -292,6 +298,17 @@ class ObsidianCliAdapter:
     async def list_files(
         self, vault: str, folder: str | None = None, limit: int | None = None
     ) -> list[str]:
+        """
+        List markdown files in a vault.
+
+        Args:
+            vault: Vault name
+            folder: Optional subfolder to filter
+            limit: Maximum number of files to return
+
+        Returns:
+            List of file paths
+        """
         self._validate_vault_path(vault, folder)
         args = ["files", "ext=md", f"vault={vault}"]
         if folder:
@@ -303,6 +320,16 @@ class ObsidianCliAdapter:
         return paths
 
     async def read_note(self, vault: str, path: str) -> ObsidianNote:
+        """
+        Read a note from Obsidian.
+
+        Args:
+            vault: Vault name
+            path: Note path within vault
+
+        Returns:
+            ObsidianNote with content and metadata
+        """
         self._validate_vault_path(vault, path)
         content = await self._run("read", f"path={path}", f"vault={vault}")
         tags_raw = await self._run(

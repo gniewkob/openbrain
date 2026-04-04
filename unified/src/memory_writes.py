@@ -510,6 +510,20 @@ async def handle_memory_write_many(
 async def store_memory(
     session: AsyncSession, data: MemoryCreate, actor: str = "agent"
 ) -> MemoryOut:
+    """
+    Store a new memory using the write pipeline.
+
+    Args:
+        session: Database session
+        data: Memory creation data
+        actor: Actor identifier for audit
+
+    Returns:
+        Created memory output
+
+    Raises:
+        ValueError: If write fails
+    """
     write_record = MemoryWriteRecord(
         content=data.content,
         domain=data.domain,

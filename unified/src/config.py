@@ -27,6 +27,7 @@ class DatabaseConfig(BaseSettings):
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str) -> str:
+        """Validate database URL format."""
         if not v.startswith(("postgresql", "sqlite")):
             raise ValueError("DATABASE_URL must start with 'postgresql' or 'sqlite'")
         return v
@@ -53,12 +54,14 @@ class AuthConfig(BaseSettings):
     @field_validator("public_mode", mode="before")
     @classmethod
     def parse_bool(cls, v):
+        """Parse boolean from string environment variable."""
         if isinstance(v, str):
             return v.lower() == "true"
         return v
 
     @model_validator(mode="after")
     def validate_public_mode_secrets(self) -> "AuthConfig":
+        """Validate required secrets in public mode."""
         is_public = self.public_mode or bool(self.public_base_url)
         if is_public:
             if not self.internal_api_key:
