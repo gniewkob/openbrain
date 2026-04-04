@@ -1,3 +1,4 @@
+"""Tests for maintenance reports functionality."""
 from __future__ import annotations
 
 import unittest
@@ -7,10 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 from src import memory_reads
 from src.models import AuditLog
-from tests.test_metrics import _import_main_with_fake_auth_deps
-
-
-main = _import_main_with_fake_auth_deps()
+from src.api.v1.memory import maintain_reports, maintain_report_detail
 
 
 class MaintenanceReportsTests(unittest.IsolatedAsyncioTestCase):
@@ -57,8 +55,8 @@ class MaintenanceReportsTests(unittest.IsolatedAsyncioTestCase):
             "action_count": 4,
         })()
 
-        with patch.object(main, "list_maintenance_reports", new=AsyncMock(return_value=[fake_entry])):
-            reports = await main.maintain_reports(limit=5, session=object(), _user={"sub": "tester"})
+        with patch("src.api.v1.memory.list_maintenance_reports", new=AsyncMock(return_value=[fake_entry])):
+            reports = await maintain_reports(limit=5, session=object(), _user={"sub": "tester"})
 
         self.assertEqual(len(reports), 1)
         self.assertEqual(reports[0].report_id, "audit-1")
@@ -110,8 +108,8 @@ class MaintenanceReportsTests(unittest.IsolatedAsyncioTestCase):
             "links_fixed": 1,
         })()
 
-        with patch.object(main, "get_maintenance_report", new=AsyncMock(return_value=fake_detail)):
-            report = await main.maintain_report_detail(report_id="audit-1", session=object(), _user={"sub": "tester"})
+        with patch("src.api.v1.memory.get_maintenance_report", new=AsyncMock(return_value=fake_detail)):
+            report = await maintain_report_detail(report_id="audit-1", session=object(), _user={"sub": "tester"})
 
         self.assertEqual(report.report_id, "audit-1")
         self.assertEqual(len(report.actions), 1)

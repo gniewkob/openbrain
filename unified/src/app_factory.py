@@ -41,7 +41,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def create_app(*, public_base_url: str, lifespan) -> FastAPI:
+def create_app(*, public_base_url: str = "", lifespan) -> FastAPI:
     """
     Create and configure the FastAPI application.
 

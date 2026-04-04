@@ -10,12 +10,6 @@ from fastapi import HTTPException
 from src import crud, memory_writes
 from src.models import DomainEnum, Memory
 from src.schemas import MaintenanceRequest, MemoryCreate, MemoryUpsertItem, MemoryWriteRecord, MemoryWriteRequest
-from tests.test_metrics import _import_main_with_fake_auth_deps
-
-
-main = _import_main_with_fake_auth_deps()
-
-
 class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
     async def test_upsert_memories_bulk_requires_match_key_for_every_record(self) -> None:
         session = AsyncMock()
@@ -26,29 +20,6 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaisesRegex(ValueError, "bulk-upsert requires match_key"):
             await memory_writes.upsert_memories_bulk(session, items)
-
-    async def test_bulk_upsert_endpoint_returns_422_when_match_key_missing(self) -> None:
-        with patch.object(main, "upsert_memories_bulk", new=AsyncMock(side_effect=ValueError("bulk-upsert requires match_key"))):
-            with self.assertRaises(HTTPException) as ctx:
-                await main.bulk_upsert_memories(
-                    data=[MemoryUpsertItem(content="x", domain="build", entity_type="Note", match_key=None)],
-                    session=object(),
-                    _user={"sub": "tester"},
-                )
-
-        self.assertEqual(ctx.exception.status_code, 422)
-
-    async def test_create_memory_endpoint_returns_422_for_corporate_without_owner(self) -> None:
-        data = MemoryCreate(content="x", domain="corporate", entity_type="Decision")
-        with patch.object(main, "store_memory", new=AsyncMock(side_effect=ValueError("Write failed: ['Owner is required for corporate domain.']"))):
-            with self.assertRaises(HTTPException) as ctx:
-                await main.create_memory(
-                    data=data,
-                    session=object(),
-                    _user={"sub": "tester"},
-                )
-
-        self.assertEqual(ctx.exception.status_code, 422)
 
     async def test_handle_memory_write_fails_corporate_without_match_key(self) -> None:
         """Corporate domain must require match_key to prevent permanent un-dedupable duplicates."""

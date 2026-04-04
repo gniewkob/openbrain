@@ -12,11 +12,9 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from tests.test_metrics import _import_main_with_fake_auth_deps
 from src.schemas import PolicyRegistry
-
-
-main = _import_main_with_fake_auth_deps()
+from src.api.v1.memory import read_policy_registry, update_policy_registry
+from src.auth import PUBLIC_EXPOSURE as PUBLIC_MODE, is_privileged_user
 
 
 AUTH_MODULE = "src.auth"
@@ -24,9 +22,9 @@ AUTH_MODULE = "src.auth"
 
 class PolicyRegistryTests(unittest.IsolatedAsyncioTestCase):
     async def test_read_policy_registry_requires_admin(self) -> None:
-        with patch.object(main, "PUBLIC_MODE", True), patch.object(main, "is_privileged_user", return_value=False):
+        with patch("src.security.policy.PUBLIC_MODE", True), patch("src.security.policy.is_privileged_user", return_value=False):
             with self.assertRaises(HTTPException) as ctx:
-                await main.read_policy_registry(_user={"sub": "user-1"})
+                await read_policy_registry(_user={"sub": "user-1"})
         self.assertEqual(ctx.exception.status_code, 403)
 
     async def test_update_policy_registry_round_trips_via_main(self) -> None:
@@ -34,8 +32,8 @@ class PolicyRegistryTests(unittest.IsolatedAsyncioTestCase):
             tenants={"tenant-a": {"write_domains": ["build"]}},
             subjects={"admin@example.com": {"admin_domains": ["corporate", "build", "personal"]}},
         )
-        with patch.object(main, "PUBLIC_MODE", True), patch.object(main, "is_privileged_user", return_value=True):
-            saved = await main.update_policy_registry(registry=registry, _user={"sub": "admin"})
+        with patch("src.auth.PUBLIC_EXPOSURE", True), patch("src.auth.is_privileged_user", return_value=True):
+            saved = await update_policy_registry(registry=registry, _user={"sub": "admin"})
         self.assertEqual(saved.tenants["tenant-a"].write_domains, ["build"])
         self.assertEqual(saved.subjects["admin@example.com"].admin_domains, ["corporate", "build", "personal"])
 
