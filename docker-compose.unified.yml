@@ -120,7 +120,7 @@ services:
       - .:/app
     working_dir: /app
     environment:
-      - INTERNAL_API_KEY=0FABJMzqD2cvBOC_dYbjKCnb51nDVlqo--f44nVwWrI
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
       - METRICS_UPSTREAM_URL=http://unified-server:80/metrics
       - METRICS_LISTEN_HOST=0.0.0.0
       - METRICS_LISTEN_PORT=9180
