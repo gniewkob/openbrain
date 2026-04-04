@@ -13,8 +13,7 @@ from typing import Any
 
 import structlog
 from fastapi import Body, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse, Response
-from sqlalchemy import text
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .app_factory import create_app
@@ -29,7 +28,7 @@ from .auth import (
     require_auth,
     set_policy_registry,
 )
-from .db import AsyncSessionLocal, get_session
+from .db import get_session
 from .lifespan import lifespan
 from .middleware import MetricsMiddleware, RequestIDMiddleware
 from .memory_reads import (
@@ -863,31 +862,8 @@ async def oauth_authorization_server() -> dict:
     }
 
 # ---------------------------------------------------------------------------
-# Health
+# Health & Diagnostics
 # ---------------------------------------------------------------------------
-
-async def healthz() -> dict:
-    return {"status": "ok", "service": "openbrain-unified"}
-
-
-async def readyz() -> dict:
-    try:
-        async with AsyncSessionLocal() as session:
-            await session.execute(text("SELECT 1"))
-        return {"status": "ok", "service": "openbrain-unified", "db": "ok"}
-    except Exception as exc:
-        log.error("readyz_db_check_failed", error=str(exc))
-        return JSONResponse(
-            status_code=503,
-            content={"status": "degraded", "service": "openbrain-unified", "db": "error"},
-        )
-
-
-async def health(
-    _user: dict = Depends(require_auth),
-) -> dict:
-    return await readyz()
-
 
 async def diagnostics_metrics(
     session: AsyncSession = Depends(get_session),
