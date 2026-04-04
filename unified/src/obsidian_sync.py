@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from .common.obsidian_adapter import ObsidianCliAdapter
     from .schemas import MemoryOut
 
+# Imports used in helper functions
+from .memory_reads import list_memories
+
 log = logging.getLogger(__name__)
 
 
@@ -243,6 +246,170 @@ class ObsidianChangeTracker:
         }
 
 
+async def _get_openbrain_memories(
+    session: "AsyncSession",
+    vault: str,
+) -> dict[str, "MemoryOut"]:
+    """
+    Fetch all memories from OpenBrain that have obsidian_ref.
+    
+    Args:
+        session: Database session
+        vault: Obsidian vault name
+        
+    Returns:
+        Dictionary mapping obsidian_ref to MemoryOut
+    """
+    all_memories = await list_memories(session, {}, limit=1000)
+    return {m.obsidian_ref: m for m in all_memories if m.obsidian_ref}
+
+
+async def _get_obsidian_files(
+    adapter: "ObsidianCliAdapter",
+    vault: str,
+) -> set[str]:
+    """
+    Fetch list of files from Obsidian vault.
+    
+    Args:
+        adapter: Obsidian CLI adapter
+        vault: Obsidian vault name
+        
+    Returns:
+        Set of file paths in the vault
+    """
+    try:
+        files = await adapter.list_files(vault, limit=1000)
+        return set(files)
+    except Exception as e:
+        log.warning("obsidian_list_files_failed: %s (vault=%s)", str(e), vault)
+        return set()
+
+
+def _check_memory_changed(
+    state: SyncState,
+    memory: "MemoryOut | None",
+    compute_hash: Any,
+) -> bool:
+    """
+    Check if memory content has changed since last sync.
+    
+    Args:
+        state: Last known sync state
+        memory: Current memory from OpenBrain (None if deleted)
+        compute_hash: Function to compute content hash
+        
+    Returns:
+        True if memory has changed
+    """
+    if not memory:
+        return False
+    
+    current_hash = compute_hash(memory.content)
+    if current_hash != state.content_hash:
+        return True
+    
+    if memory.updated_at and memory.updated_at > state.memory_updated_at:
+        return True
+    
+    return False
+
+
+def _create_sync_change(
+    state: SyncState,
+    change_type: ChangeType,
+    source: Literal["openbrain", "obsidian", "both"],
+    conflict: bool = False,
+) -> SyncChange:
+    """
+    Create a SyncChange object for a tracked item.
+    
+    Args:
+        state: Sync state for the item
+        change_type: Type of change detected
+        source: Where the change originated
+        conflict: Whether this is a conflict
+        
+    Returns:
+        New SyncChange instance
+    """
+    return SyncChange(
+        memory_id=state.memory_id,
+        obsidian_path=state.obsidian_path,
+        vault=state.vault,
+        change_type=change_type,
+        source=source,
+        openbrain_state=state if conflict else None,
+        conflict=conflict,
+    )
+
+
+def _detect_new_obsidian_files(
+    obsidian_files: set[str],
+    tracked_paths: set[str],
+    memory_map: dict[str, "MemoryOut"],
+    vault: str,
+) -> list[SyncChange]:
+    """
+    Find new files in Obsidian that are not yet tracked.
+    
+    Args:
+        obsidian_files: Set of all files in Obsidian
+        tracked_paths: Set of paths already being tracked
+        memory_map: Map of obsidian_ref to MemoryOut
+        vault: Vault name
+        
+    Returns:
+        List of SyncChange objects for new files
+    """
+    changes: list[SyncChange] = []
+    
+    for file_path in obsidian_files:
+        if file_path not in tracked_paths and file_path not in memory_map:
+            changes.append(SyncChange(
+                memory_id="",
+                obsidian_path=file_path,
+                vault=vault,
+                change_type=ChangeType.CREATED,
+                source="obsidian",
+            ))
+    
+    return changes
+
+
+def _detect_new_openbrain_memories(
+    memory_map: dict[str, "MemoryOut"],
+    tracked_paths: set[str],
+    since: datetime,
+    vault: str,
+) -> list[SyncChange]:
+    """
+    Find new memories in OpenBrain created since the given time.
+    
+    Args:
+        memory_map: Map of obsidian_ref to MemoryOut
+        tracked_paths: Set of paths already being tracked
+        since: Only include memories updated after this time
+        vault: Vault name
+        
+    Returns:
+        List of SyncChange objects for new memories
+    """
+    changes: list[SyncChange] = []
+    
+    for path, memory in memory_map.items():
+        if path not in tracked_paths and memory.updated_at > since:
+            changes.append(SyncChange(
+                memory_id=memory.id,
+                obsidian_path=path,
+                vault=vault,
+                change_type=ChangeType.CREATED,
+                source="openbrain",
+            ))
+    
+    return changes
+
+
 class BidirectionalSyncEngine:
     """
     Engine for bidirectional synchronization between OpenBrain and Obsidian.
@@ -277,108 +444,54 @@ class BidirectionalSyncEngine:
         - Modified items in either system
         - Deleted items
         """
-        from .memory_reads import list_memories
-
         changes: list[SyncChange] = []
         since = since or datetime.min.replace(tzinfo=timezone.utc)
 
-        # Get all memories from OpenBrain that have obsidian_ref
-        # This is a simplified version - in production, we'd need to track
-        # which memories are linked to Obsidian notes
-        all_memories = await list_memories(session, {}, limit=1000)
+        # Fetch data from both systems
+        memory_map = await _get_openbrain_memories(session, vault)
+        obsidian_files = await _get_obsidian_files(adapter, vault)
 
-        # Get all notes from Obsidian vault
-        try:
-            obsidian_files = await adapter.list_files(vault, limit=1000)
-        except Exception as e:
-            log.warning("obsidian_list_files_failed", error=str(e), vault=vault)
-            obsidian_files = []
+        # Get tracked states for this vault
+        tracked_states = [
+            s for s in self.tracker.get_all_states() if s.vault == vault
+        ]
 
-        # Build lookup maps
-        memory_map: dict[str, MemoryOut] = {
-            m.obsidian_ref: m for m in all_memories if m.obsidian_ref
-        }
-
-        # Check each tracked item
-        for state in self.tracker.get_all_states():
-            if state.vault != vault:
-                continue
-
+        # Process tracked items
+        for state in tracked_states:
             memory = memory_map.get(state.obsidian_path)
             obsidian_exists = state.obsidian_path in obsidian_files
 
-            # Check OpenBrain changes
-            memory_changed = False
-            if memory:
-                current_hash = self.compute_content_hash(memory.content)
-                if current_hash != state.content_hash:
-                    memory_changed = True
-                if memory.updated_at and memory.updated_at > state.memory_updated_at:
-                    memory_changed = True
+            # Check for changes
+            memory_changed = _check_memory_changed(
+                state, memory, self.compute_content_hash
+            )
+            # Obsidian change detection: file exists but we haven't tracked
+            # a modification time comparison. In production, this should
+            # compare mtime with obsidian_modified_at from state.
+            obsidian_changed = False  # Simplified for now
 
-            # Check Obsidian changes (simplified - in production, check mtime)
-            obsidian_changed = state.obsidian_path in obsidian_files
-
-            # Determine change type
-            if not memory and not obsidian_exists:
-                # Both deleted
-                change = SyncChange(
-                    memory_id=state.memory_id,
-                    obsidian_path=state.obsidian_path,
-                    vault=vault,
-                    change_type=ChangeType.DELETED,
-                    source="both",
-                )
-                changes.append(change)
-                self.tracker.remove_state(vault, state.obsidian_path)
-
-            elif memory_changed and obsidian_changed:
-                # Conflict: both changed
-                change = SyncChange(
-                    memory_id=state.memory_id,
-                    obsidian_path=state.obsidian_path,
-                    vault=vault,
-                    change_type=ChangeType.UPDATED,
-                    source="both",
-                    openbrain_state=state,
-                    conflict=True,
-                )
+            # Determine change type and create change record
+            change = self._determine_change(
+                state, memory, obsidian_exists, memory_changed, obsidian_changed
+            )
+            
+            if change:
                 changes.append(change)
 
-            elif memory_changed:
-                # Only OpenBrain changed
-                change = SyncChange(
-                    memory_id=state.memory_id,
-                    obsidian_path=state.obsidian_path,
-                    vault=vault,
-                    change_type=ChangeType.UPDATED,
-                    source="openbrain",
-                )
-                changes.append(change)
-
-            elif obsidian_changed:
-                # Only Obsidian changed
-                change = SyncChange(
-                    memory_id=state.memory_id,
-                    obsidian_path=state.obsidian_path,
-                    vault=vault,
-                    change_type=ChangeType.UPDATED,
-                    source="obsidian",
-                )
-                changes.append(change)
-
-        # Find new items in OpenBrain
-        tracked_paths = {s.obsidian_path for s in self.tracker.get_all_states()}
-        for path, memory in memory_map.items():
-            if path not in tracked_paths and memory.updated_at > since:
-                change = SyncChange(
-                    memory_id=memory.id,
-                    obsidian_path=path,
-                    vault=vault,
-                    change_type=ChangeType.CREATED,
-                    source="openbrain",
-                )
-                changes.append(change)
+        # Find new items
+        tracked_paths = {s.obsidian_path for s in tracked_states}
+        
+        # New items in OpenBrain
+        new_openbrain = _detect_new_openbrain_memories(
+            memory_map, tracked_paths, since, vault
+        )
+        changes.extend(new_openbrain)
+        
+        # New items in Obsidian
+        new_obsidian = _detect_new_obsidian_files(
+            obsidian_files, tracked_paths, memory_map, vault
+        )
+        changes.extend(new_obsidian)
 
         # Find new items in Obsidian (files not yet tracked)
         for file_path in obsidian_files:
@@ -394,6 +507,50 @@ class BidirectionalSyncEngine:
                 changes.append(change)
 
         return changes
+
+    def _determine_change(
+        self,
+        state: SyncState,
+        memory: "MemoryOut | None",
+        obsidian_exists: bool,
+        memory_changed: bool,
+        obsidian_changed: bool,
+    ) -> SyncChange | None:
+        """
+        Determine the type of change for a tracked item.
+        
+        Args:
+            state: Last known sync state
+            memory: Current memory from OpenBrain (None if deleted)
+            obsidian_exists: Whether the file exists in Obsidian
+            memory_changed: Whether OpenBrain content has changed
+            obsidian_changed: Whether Obsidian content has changed
+            
+        Returns:
+            SyncChange if a change is detected, None otherwise
+        """
+        # Both deleted
+        if not memory and not obsidian_exists:
+            change = _create_sync_change(state, ChangeType.DELETED, "both")
+            self.tracker.remove_state(state.vault, state.obsidian_path)
+            return change
+
+        # Conflict: both changed
+        if memory_changed and obsidian_changed:
+            return _create_sync_change(
+                state, ChangeType.UPDATED, "both", conflict=True
+            )
+
+        # Only OpenBrain changed
+        if memory_changed:
+            return _create_sync_change(state, ChangeType.UPDATED, "openbrain")
+
+        # Only Obsidian changed
+        if obsidian_changed:
+            return _create_sync_change(state, ChangeType.UPDATED, "obsidian")
+
+        # No change detected
+        return None
 
     def resolve_conflict(
         self,
