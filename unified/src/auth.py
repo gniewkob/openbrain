@@ -5,6 +5,7 @@ When PUBLIC_MODE=true or PUBLIC_BASE_URL is set, all protected endpoints require
 a valid Auth0 JWT or the trusted internal key. Otherwise all requests pass
 through for local use.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -14,7 +15,6 @@ import logging
 import os
 import time
 from pathlib import Path
-from threading import Lock
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -32,9 +32,7 @@ PUBLIC_EXPOSURE = PUBLIC_MODE or bool(PUBLIC_BASE_URL)
 LOCAL_DEV_INTERNAL_API_KEY = "openbrain-local-dev"
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "").strip()
 
-OIDC_ISSUER_URL = os.environ.get(
-    "OIDC_ISSUER_URL", ""
-).strip().rstrip("/")
+OIDC_ISSUER_URL = os.environ.get("OIDC_ISSUER_URL", "").strip().rstrip("/")
 OIDC_AUDIENCE = os.environ.get("OIDC_AUDIENCE", "https://openbrain-mcp").strip()
 OIDC_DISCOVERY_CACHE_S = int(os.environ.get("OIDC_DISCOVERY_CACHE_S", "600"))
 POLICY_REGISTRY_JSON = os.environ.get("OPENBRAIN_POLICY_REGISTRY_JSON", "").strip()
@@ -55,7 +53,9 @@ class OIDCMetadata:
 
 
 class OIDCVerifier:
-    def __init__(self, issuer_url: str, audience: str = "", discovery_cache_s: int = 600):
+    def __init__(
+        self, issuer_url: str, audience: str = "", discovery_cache_s: int = 600
+    ):
         self.issuer_url = issuer_url.rstrip("/")
         self.audience = audience
         self.discovery_cache_s = max(60, discovery_cache_s)
@@ -71,14 +71,20 @@ class OIDCVerifier:
 
     async def metadata(self) -> OIDCMetadata:
         now = time.time()
-        if self._metadata and (now - self._metadata_fetched_at) < self.discovery_cache_s:
+        if (
+            self._metadata
+            and (now - self._metadata_fetched_at) < self.discovery_cache_s
+        ):
             return self._metadata
 
         # Lock prevents concurrent requests from all issuing discovery calls.
         async with self._get_refresh_lock():
             # Re-check inside lock — another coroutine may have refreshed first.
             now = time.time()
-            if self._metadata and (now - self._metadata_fetched_at) < self.discovery_cache_s:
+            if (
+                self._metadata
+                and (now - self._metadata_fetched_at) < self.discovery_cache_s
+            ):
                 return self._metadata
 
             openid_cfg = f"{self.issuer_url}/.well-known/openid-configuration"
@@ -92,7 +98,9 @@ class OIDCVerifier:
                     logger.error("OIDC discovery failed: %s", e)
 
             if payload is None:
-                raise RuntimeError(f"OIDC discovery failed for issuer: {self.issuer_url}")
+                raise RuntimeError(
+                    f"OIDC discovery failed for issuer: {self.issuer_url}"
+                )
 
             self._metadata = OIDCMetadata(
                 issuer=payload["issuer"],
@@ -148,10 +156,14 @@ _oidc: OIDCVerifier | None = (
 )
 
 
-_policy_registry_lock = Lock()
+# asyncio.Lock for async write path — never blocks the event loop.
+# Reads use direct dict reference (atomic under CPython GIL, no lock needed).
+_policy_registry_write_lock = asyncio.Lock()
 
 
-def _merge_policy_registry(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+def _merge_policy_registry(
+    base: dict[str, Any], overlay: dict[str, Any]
+) -> dict[str, Any]:
     merged = {
         "tenants": dict(base.get("tenants", {})),
         "subjects": dict(base.get("subjects", {})),
@@ -183,7 +195,9 @@ def _load_policy_registry_from_file() -> dict[str, Any]:
     try:
         parsed = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise RuntimeError("OPENBRAIN_POLICY_REGISTRY_PATH does not contain valid JSON") from exc
+        raise RuntimeError(
+            "OPENBRAIN_POLICY_REGISTRY_PATH does not contain valid JSON"
+        ) from exc
     if not isinstance(parsed, dict):
         raise RuntimeError("OPENBRAIN_POLICY_REGISTRY_PATH must contain a JSON object")
     return parsed
@@ -199,9 +213,11 @@ POLICY_REGISTRY: dict[str, Any] = _load_policy_registry()
 
 
 def _current_registry() -> dict[str, Any]:
-    """Return the current policy registry snapshot under lock (thread-safe)."""
-    with _policy_registry_lock:
-        return POLICY_REGISTRY
+    """Return the current policy registry snapshot.
+
+    Dict reference replacement is atomic under CPython GIL — no lock required for reads.
+    """
+    return POLICY_REGISTRY
 
 
 def get_policy_registry() -> dict[str, Any]:
@@ -218,15 +234,22 @@ async def set_policy_registry(registry: dict[str, Any]) -> dict[str, Any]:
         "tenants": dict(registry.get("tenants", {})),
         "subjects": dict(registry.get("subjects", {})),
     }
-    with _policy_registry_lock:
+    async with _policy_registry_write_lock:
         # Atomic reference replacement — no clear()+update() race window.
         POLICY_REGISTRY = normalized
     if POLICY_REGISTRY_PATH:
         # Disk write is blocking I/O — run in thread pool to avoid blocking the event loop.
         def _write() -> None:
+            import stat
+
             path = Path(POLICY_REGISTRY_PATH)
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(normalized, indent=2, sort_keys=True), encoding="utf-8")
+            path.write_text(
+                json.dumps(normalized, indent=2, sort_keys=True), encoding="utf-8"
+            )
+            # Restrict to owner-only (rw-------) — contains access control rules
+            path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
         await asyncio.to_thread(_write)
     return get_policy_registry()
 
@@ -278,7 +301,9 @@ def _claim_values(claims: dict[str, Any], *keys: str) -> list[str]:
     for key in keys:
         value = claims.get(key)
         if isinstance(value, str):
-            values.extend(part.strip() for part in value.replace(",", " ").split() if part.strip())
+            values.extend(
+                part.strip() for part in value.replace(",", " ").split() if part.strip()
+            )
         elif isinstance(value, list):
             values.extend(str(part).strip() for part in value if str(part).strip())
     return values
@@ -287,13 +312,30 @@ def _claim_values(claims: dict[str, Any], *keys: str) -> list[str]:
 def get_domain_scope(claims: dict[str, Any], action: str) -> set[str]:
     action = action.lower()
     direct_keys = {
-        "read": ("read_domains", "allowed_domains", "https://openbrain/read_domains", "https://openbrain/allowed_domains"),
-        "write": ("write_domains", "allowed_domains", "https://openbrain/write_domains", "https://openbrain/allowed_domains"),
-        "admin": ("admin_domains", "allowed_domains", "https://openbrain/admin_domains", "https://openbrain/allowed_domains"),
+        "read": (
+            "read_domains",
+            "allowed_domains",
+            "https://openbrain/read_domains",
+            "https://openbrain/allowed_domains",
+        ),
+        "write": (
+            "write_domains",
+            "allowed_domains",
+            "https://openbrain/write_domains",
+            "https://openbrain/allowed_domains",
+        ),
+        "admin": (
+            "admin_domains",
+            "allowed_domains",
+            "https://openbrain/admin_domains",
+            "https://openbrain/allowed_domains",
+        ),
     }
     values = _claim_values(claims, *direct_keys.get(action, ()))
     normalized = {value.lower() for value in values if value.strip()}
-    return {value for value in normalized if value in {"corporate", "build", "personal"}}
+    return {
+        value for value in normalized if value in {"corporate", "build", "personal"}
+    }
 
 
 def get_registry_domain_scope(subject: str, tenant_id: str, action: str) -> set[str]:
@@ -305,10 +347,18 @@ def get_registry_domain_scope(subject: str, tenant_id: str, action: str) -> set[
             return set()
         values = entry.get(f"{action}_domains") or entry.get("allowed_domains") or []
         if isinstance(values, str):
-            values = [part.strip() for part in values.replace(",", " ").split() if part.strip()]
+            values = [
+                part.strip()
+                for part in values.replace(",", " ").split()
+                if part.strip()
+            ]
         if not isinstance(values, list):
             return set()
-        return {str(value).lower() for value in values if str(value).lower() in allowed_domains}
+        return {
+            str(value).lower()
+            for value in values
+            if str(value).lower() in allowed_domains
+        }
 
     # Read a consistent snapshot under lock to avoid race with set_policy_registry.
     registry = _current_registry()
@@ -331,15 +381,27 @@ def is_privileged_user(claims: dict[str, Any]) -> bool:
         return True
 
     role_values: list[str] = []
-    for key in ("roles", "role", "permissions", "permission", "scope", "scp", "https://openbrain/roles"):
+    for key in (
+        "roles",
+        "role",
+        "permissions",
+        "permission",
+        "scope",
+        "scp",
+        "https://openbrain/roles",
+    ):
         value = claims.get(key)
         if isinstance(value, str):
-            role_values.extend(part.strip() for part in value.replace(",", " ").split() if part.strip())
+            role_values.extend(
+                part.strip() for part in value.replace(",", " ").split() if part.strip()
+            )
         elif isinstance(value, list):
             role_values.extend(str(part).strip() for part in value if str(part).strip())
 
     normalized = {value.lower() for value in role_values}
-    return any(value in normalized for value in {"admin", "openbrain:admin", "maintain:admin"})
+    return any(
+        value in normalized for value in {"admin", "openbrain:admin", "maintain:admin"}
+    )
 
 
 async def require_auth(
@@ -369,11 +431,17 @@ async def require_auth(
     # _auth_via_internal_key is injected so is_privileged_user can distinguish
     # this path from a JWT whose sub happens to be "internal".
     internal_key = request.headers.get("X-Internal-Key", "")
-    if internal_key and INTERNAL_API_KEY and hmac.compare_digest(internal_key, INTERNAL_API_KEY):
+    if (
+        internal_key
+        and INTERNAL_API_KEY
+        and hmac.compare_digest(internal_key, INTERNAL_API_KEY)
+    ):
         return {"sub": "internal", "_auth_via_internal_key": True}
 
     if not _oidc:
-        raise HTTPException(status_code=503, detail="OIDC verifier is unavailable in public mode")
+        raise HTTPException(
+            status_code=503, detail="OIDC verifier is unavailable in public mode"
+        )
 
     if credentials is None:
         raise HTTPException(status_code=401, detail="Missing Authorization header")

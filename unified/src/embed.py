@@ -3,7 +3,9 @@ Ollama Embedding Client.
 Supports both old (/api/embeddings) and new (/api/embed) Ollama API.
 Includes LRU caching for embeddings to reduce redundant API calls.
 """
+
 import asyncio
+from collections import OrderedDict
 from functools import lru_cache
 from typing import List
 
@@ -33,6 +35,7 @@ def _get_cached_embedding(text_hash: str) -> tuple[List[float], str] | None:
 def _compute_text_hash(text: str) -> str:
     """Compute a hash of the text for cache key."""
     import hashlib
+
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
 
 
@@ -86,7 +89,7 @@ async def get_embedding(text: str) -> list[float]:
     Uses LRU cache to avoid redundant API calls for identical text.
     """
     config = get_config()
-    
+
     # Check cache first
     text_hash = _compute_text_hash(text)
     cached = _get_cached_embedding(text_hash)
@@ -94,7 +97,7 @@ async def get_embedding(text: str) -> list[float]:
         embedding, cached_model = cached
         if cached_model == config.embedding.model:
             return list(embedding)  # Return copy to prevent mutation
-    
+
     # Try new API first (/api/embed), fall back to old (/api/embeddings).
     response = await _post_with_retry(
         "/api/embed",
@@ -110,29 +113,34 @@ async def get_embedding(text: str) -> list[float]:
         data = response.json()
         # /api/embed returns {"embeddings": [[...]]}
         result = data["embeddings"][0]
-    
+
     # Store in cache (convert to tuple for hashability)
     # Note: lru_cache requires hashable types, so we use a simple wrapper
     # The cache is managed at module level for persistence
     await _update_embedding_cache(text_hash, tuple(result), config.embedding.model)
-    
+
     return result
 
 
-# Simple cache storage (module-level for persistence)
-_embedding_cache: dict[str, tuple[tuple[float, ...], str]] = {}
+# LRU cache: OrderedDict preserves insertion order; move_to_end on hit = true LRU
+_embedding_cache: OrderedDict[str, tuple[tuple[float, ...], str]] = OrderedDict()
 _embedding_cache_lock = asyncio.Lock()
 
 
-async def _update_embedding_cache(text_hash: str, embedding: tuple[float, ...], model: str) -> None:
-    """Update the embedding cache with a new entry."""
+async def _update_embedding_cache(
+    text_hash: str, embedding: tuple[float, ...], model: str
+) -> None:
+    """Update the embedding cache with a new entry (true LRU eviction)."""
     config = get_config()
     async with _embedding_cache_lock:
-        # Simple LRU eviction when cache is full
+        if text_hash in _embedding_cache:
+            # Refresh recency — move existing entry to most-recently-used position
+            _embedding_cache.move_to_end(text_hash)
+            _embedding_cache[text_hash] = (embedding, model)
+            return
         if len(_embedding_cache) >= config.embedding.cache_size:
-            # Remove oldest entry (simple FIFO for now)
-            oldest_key = next(iter(_embedding_cache))
-            del _embedding_cache[oldest_key]
+            # Evict least recently used (head of OrderedDict)
+            _embedding_cache.popitem(last=False)
         _embedding_cache[text_hash] = (embedding, model)
 
 

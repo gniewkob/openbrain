@@ -334,9 +334,10 @@ class ReadyzLoggingTest(unittest.IsolatedAsyncioTestCase):
         fake_ctx.__aenter__ = AsyncMock(return_value=fake_session)
         fake_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        with patch.object(main, "AsyncSessionLocal", return_value=fake_ctx):
-            with patch.object(main.log, "error", side_effect=_capture):
-                response = await main.readyz()
+        from src.api.v1 import health as health_mod
+        with patch.object(health_mod, "AsyncSessionLocal", return_value=fake_ctx):
+            with patch.object(health_mod.log, "error", side_effect=_capture):
+                response = await health_mod.readyz()
 
         # readyz returns a JSONResponse (with status_code) on error
         self.assertTrue(hasattr(response, "status_code"), "Expected JSONResponse on DB error")

@@ -22,6 +22,7 @@ Tools:
   brain_obsidian_read_note — read a local Obsidian note
   brain_obsidian_sync   — one-way sync from Obsidian into OpenBrain
 """
+
 from __future__ import annotations
 
 import os
@@ -84,15 +85,35 @@ class BrainMemory(BaseModel):
     governance: dict[str, Any] | None = None
 
 
-def _client() -> httpx.AsyncClient:
-    headers = {}
-    if INTERNAL_API_KEY:
-        headers["X-Internal-Key"] = INTERNAL_API_KEY
-    return httpx.AsyncClient(
-        base_url=BRAIN_URL,
-        timeout=BACKEND_TIMEOUT,
-        headers=headers,
-    )
+_http_client: httpx.AsyncClient | None = None
+
+
+class _SharedClient:
+    """Context-manager wrapper that lazily creates and reuses a single AsyncClient.
+
+    All 'async with _client() as c:' call sites work unchanged while the underlying
+    client (and its connection pool) is shared across requests.
+    """
+
+    async def __aenter__(self) -> httpx.AsyncClient:
+        global _http_client
+        if _http_client is None:
+            headers: dict[str, str] = {}
+            if INTERNAL_API_KEY:
+                headers["X-Internal-Key"] = INTERNAL_API_KEY
+            _http_client = httpx.AsyncClient(
+                base_url=BRAIN_URL,
+                timeout=BACKEND_TIMEOUT,
+                headers=headers,
+            )
+        return _http_client
+
+    async def __aexit__(self, *_: object) -> None:
+        pass  # Keep client alive for connection-pool reuse
+
+
+def _client() -> _SharedClient:
+    return _SharedClient()
 
 
 def _raise(r: httpx.Response) -> None:
@@ -119,7 +140,12 @@ def _raise(r: httpx.Response) -> None:
 
 
 def _obsidian_local_tools_enabled() -> bool:
-    return os.environ.get(OBSIDIAN_LOCAL_TOOLS_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+    return os.environ.get(OBSIDIAN_LOCAL_TOOLS_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def _require_obsidian_local_tools_enabled() -> None:
@@ -144,12 +170,18 @@ async def brain_capabilities() -> dict:
         tier_2_tools.extend(["obsidian_vaults", "obsidian_read_note", "obsidian_sync"])
     return {
         "platform": "OpenBrain V1 (Gateway)",
-        "tier_1_core": {"status": "stable", "tools": ["search", "get", "store", "update"]},
+        "tier_1_core": {
+            "status": "stable",
+            "tools": ["search", "get", "store", "update"],
+        },
         "tier_2_advanced": {
             "status": "active",
             "tools": tier_2_tools,
         },
-        "tier_3_admin": {"status": "guarded", "tools": ["store_bulk", "upsert_bulk", "maintain"]},
+        "tier_3_admin": {
+            "status": "guarded",
+            "tools": ["store_bulk", "upsert_bulk", "maintain"],
+        },
     }
 
 
@@ -187,23 +219,26 @@ async def brain_store(
     obsidian_ref — path to source note in Obsidian vault.
     """
     async with _client() as c:
-        r = await c.post("/api/v1/memory/write", json={
-            "record": {
-                "content": content,
-                "domain": domain,
-                "entity_type": entity_type,
-                "title": title,
-                "sensitivity": sensitivity,
-                "owner": owner,
-                "tenant_id": tenant_id,
-                "tags": tags or [],
-                "custom_fields": custom_fields or {},
-                "obsidian_ref": obsidian_ref,
-                "match_key": match_key,
-                "source": {"type": "agent", "system": MCP_SOURCE_SYSTEM},
+        r = await c.post(
+            "/api/v1/memory/write",
+            json={
+                "record": {
+                    "content": content,
+                    "domain": domain,
+                    "entity_type": entity_type,
+                    "title": title,
+                    "sensitivity": sensitivity,
+                    "owner": owner,
+                    "tenant_id": tenant_id,
+                    "tags": tags or [],
+                    "custom_fields": custom_fields or {},
+                    "obsidian_ref": obsidian_ref,
+                    "match_key": match_key,
+                    "source": {"type": "agent", "system": MCP_SOURCE_SYSTEM},
+                },
+                "write_mode": "upsert",
             },
-            "write_mode": "upsert",
-        })
+        )
         _raise(r)
         return BrainMemory(**r.json()["record"])
 
@@ -259,7 +294,10 @@ async def brain_list(
 async def brain_get_context(query: str, domain: str | None = None) -> dict:
     """Synthesize a grounding pack for the current conversation topic."""
     async with _client() as c:
-        r = await c.post("/api/v1/memory/get-context", json={"query": query, "domain": domain, "max_items": 10})
+        r = await c.post(
+            "/api/v1/memory/get-context",
+            json={"query": query, "domain": domain, "max_items": 10},
+        )
         _raise(r)
         return r.json()
 
@@ -286,11 +324,14 @@ async def brain_search(
         filters["sensitivity"] = sensitivity
 
     async with _client() as c:
-        r = await c.post("/api/v1/memory/find", json={
-            "query": query,
-            "limit": top_k,
-            "filters": filters,
-        })
+        r = await c.post(
+            "/api/v1/memory/find",
+            json={
+                "query": query,
+                "limit": top_k,
+                "filters": filters,
+            },
+        )
         _raise(r)
         # V1 /find returns [{record: ..., score: similarity}] — normalize to flat list
         hits = r.json()
@@ -355,7 +396,9 @@ async def brain_delete(memory_id: str) -> dict:
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         if r.status_code == 403:
-            raise ValueError("Cannot delete corporate memories. Use deprecation instead.")
+            raise ValueError(
+                "Cannot delete corporate memories. Use deprecation instead."
+            )
         _raise(r)
         return {"deleted": True, "id": memory_id}
 
@@ -372,13 +415,16 @@ async def brain_maintain(
     Always run with dry_run=True first to preview changes.
     """
     async with _client() as c:
-        r = await c.post("/api/admin/maintain", json={
-            "dry_run": dry_run,
-            "dedup_threshold": dedup_threshold,
-            "normalize_owners": normalize_owners or {},
-            "retype_rules": [],
-            "fix_superseded_links": fix_superseded_links,
-        })
+        r = await c.post(
+            "/api/admin/maintain",
+            json={
+                "dry_run": dry_run,
+                "dedup_threshold": dedup_threshold,
+                "normalize_owners": normalize_owners or {},
+                "retype_rules": [],
+                "fix_superseded_links": fix_superseded_links,
+            },
+        )
         _raise(r)
         return r.json()
 
@@ -468,7 +514,11 @@ async def brain_obsidian_sync(
     _require_obsidian_local_tools_enabled()
     adapter = ObsidianCliAdapter()
     try:
-        resolved_paths = (paths or [])[:limit] if paths else await adapter.list_files(vault, folder=folder, limit=limit)
+        resolved_paths = (
+            (paths or [])[:limit]
+            if paths
+            else await adapter.list_files(vault, folder=folder, limit=limit)
+        )
         notes = [await adapter.read_note(vault, path) for path in resolved_paths]
     except ObsidianCliError as e:
         raise ValueError(str(e))
@@ -511,7 +561,7 @@ async def brain_obsidian_write_note(
 ) -> dict:
     """
     Write a note to Obsidian vault.
-    
+
     Args:
         vault: Target vault name
         path: Note path (e.g., "Projects/Note.md")
@@ -522,27 +572,30 @@ async def brain_obsidian_write_note(
         overwrite: Overwrite existing note
     """
     _require_obsidian_local_tools_enabled()
-    
+
     # Build full content with title
     full_content = content
     if title:
         full_content = f"# {title}\n\n{content}"
-    
+
     # Merge frontmatter
     fm = frontmatter or {}
     if tags:
         fm["tags"] = tags
     if title:
         fm["title"] = title
-    
+
     async with _client() as c:
-        r = await c.post("/api/v1/obsidian/write-note", json={
-            "vault": vault,
-            "path": path,
-            "content": full_content,
-            "frontmatter": fm,
-            "overwrite": overwrite,
-        })
+        r = await c.post(
+            "/api/v1/obsidian/write-note",
+            json={
+                "vault": vault,
+                "path": path,
+                "content": full_content,
+                "frontmatter": fm,
+                "overwrite": overwrite,
+            },
+        )
         _raise(r)
         return r.json()
 
@@ -558,7 +611,7 @@ async def brain_obsidian_export(
 ) -> dict:
     """
     Export memories from OpenBrain to Obsidian notes.
-    
+
     Args:
         vault: Target vault
         folder: Target folder in vault
@@ -568,16 +621,19 @@ async def brain_obsidian_export(
         max_items: Maximum number of memories to export
     """
     _require_obsidian_local_tools_enabled()
-    
+
     async with _client() as c:
-        r = await c.post("/api/v1/obsidian/export", json={
-            "vault": vault,
-            "folder": folder,
-            "memory_ids": memory_ids,
-            "query": query,
-            "domain": domain,
-            "max_items": max_items,
-        })
+        r = await c.post(
+            "/api/v1/obsidian/export",
+            json={
+                "vault": vault,
+                "folder": folder,
+                "memory_ids": memory_ids,
+                "query": query,
+                "domain": domain,
+                "max_items": max_items,
+            },
+        )
         _raise(r)
         return r.json()
 
@@ -594,9 +650,9 @@ async def brain_obsidian_collection(
 ) -> dict:
     """
     Create a collection (index note) from OpenBrain memories.
-    
+
     Creates a single index note with links to exported memory notes.
-    
+
     Args:
         query: Search query
         collection_name: Name for the collection
@@ -607,17 +663,20 @@ async def brain_obsidian_collection(
         group_by: How to group (entity_type, owner, tags)
     """
     _require_obsidian_local_tools_enabled()
-    
+
     async with _client() as c:
-        r = await c.post("/api/v1/obsidian/collection", json={
-            "query": query,
-            "collection_name": collection_name,
-            "vault": vault,
-            "folder": folder,
-            "domain": domain,
-            "max_items": max_items,
-            "group_by": group_by,
-        })
+        r = await c.post(
+            "/api/v1/obsidian/collection",
+            json={
+                "query": query,
+                "collection_name": collection_name,
+                "vault": vault,
+                "folder": folder,
+                "domain": domain,
+                "max_items": max_items,
+                "group_by": group_by,
+            },
+        )
         _raise(r)
         return r.json()
 
@@ -626,7 +685,9 @@ async def brain_obsidian_collection(
 async def brain_store_bulk(items: list[dict[str, Any]]) -> dict:
     """Bulk store memories. Use for archiving or synchronization."""
     async with _client() as c:
-        r = await c.post("/api/v1/memory/write-many", json={"records": items, "write_mode": "upsert"})
+        r = await c.post(
+            "/api/v1/memory/write-many", json={"records": items, "write_mode": "upsert"}
+        )
         _raise(r)
         return r.json()
 
@@ -648,25 +709,28 @@ async def brain_obsidian_bidirectional_sync(
 ) -> dict:
     """
     Bidirectional sync between OpenBrain and Obsidian.
-    
+
     Detects and resolves changes in both systems.
-    
+
     Args:
         vault: Target vault name
         strategy: Conflict resolution strategy (last_write_wins, domain_based, manual_review)
         dry_run: If True, only detect changes without applying
-    
+
     Returns:
         Sync result with detected changes, conflicts, and applied updates.
     """
     _require_obsidian_local_tools_enabled()
-    
+
     async with _client() as c:
-        r = await c.post("/api/v1/obsidian/bidirectional-sync", json={
-            "vault": vault,
-            "strategy": strategy,
-            "dry_run": dry_run,
-        })
+        r = await c.post(
+            "/api/v1/obsidian/bidirectional-sync",
+            json={
+                "vault": vault,
+                "strategy": strategy,
+                "dry_run": dry_run,
+            },
+        )
         _raise(r)
         return r.json()
 
@@ -675,11 +739,11 @@ async def brain_obsidian_bidirectional_sync(
 async def brain_obsidian_sync_status() -> dict:
     """
     Get bidirectional sync status.
-    
+
     Returns statistics about tracked items and sync state.
     """
     _require_obsidian_local_tools_enabled()
-    
+
     async with _client() as c:
         r = await c.get("/api/v1/obsidian/sync-status")
         _raise(r)
@@ -696,7 +760,7 @@ async def brain_obsidian_update_note(
 ) -> dict:
     """
     Update an existing note in Obsidian.
-    
+
     Args:
         vault: Target vault name
         path: Note path
@@ -705,15 +769,18 @@ async def brain_obsidian_update_note(
         tags: Tags to update in frontmatter
     """
     _require_obsidian_local_tools_enabled()
-    
+
     async with _client() as c:
-        r = await c.post("/api/v1/obsidian/update-note", json={
-            "vault": vault,
-            "path": path,
-            "content": content,
-            "append": append,
-            "tags": tags,
-        })
+        r = await c.post(
+            "/api/v1/obsidian/update-note",
+            json={
+                "vault": vault,
+                "path": path,
+                "content": content,
+                "append": append,
+                "tags": tags,
+            },
+        )
         _raise(r)
         return r.json()
 

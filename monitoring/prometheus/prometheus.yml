@@ -13,7 +13,7 @@ scrape_configs:
           # Bridge proxy running on host at 127.0.0.1:9180.
           # It adds X-Internal-Key and forwards to unified-server.
           # See monitoring/openbrain-metrics-bridge.py
-          - host.docker.internal:9180
+          - metrics-bridge:9180
 
   - job_name: mailai
     metrics_path: /metrics

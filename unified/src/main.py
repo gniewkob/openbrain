@@ -72,6 +72,7 @@ from .security import (
     apply_owner_scope as _apply_owner_scope,
     enforce_memory_access as _enforce_memory_access,
     hide_memory_access_denied as _hide_memory_access_denied,
+    _effective_domain_scope,
 )
 from .telemetry import (
     get_metrics_snapshot,

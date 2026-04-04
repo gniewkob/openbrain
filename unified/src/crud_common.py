@@ -7,7 +7,13 @@ from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import AuditLog, DomainEnum, Memory
-from .schemas import GovernanceMetadata, MemoryOut, MemoryRecord, MemoryRelations, SourceMetadata
+from .schemas import (
+    GovernanceMetadata,
+    MemoryOut,
+    MemoryRecord,
+    MemoryRelations,
+    SourceMetadata,
+)
 
 EXPORT_POLICY: dict[str, dict[str, Any]] = {
     "public": {
@@ -197,12 +203,18 @@ async def _audit(
     actor: str = "agent",
     tool_name: str = "",
     meta: dict | None = None,
+    actor_ip: str | None = None,
+    request_id: str | None = None,
+    authorization_context: str | None = None,
 ) -> None:
     entry = AuditLog(
         operation=operation,
         tool_name=tool_name,
         memory_id=memory_id,
         actor=actor,
+        actor_ip=actor_ip,
+        request_id=request_id,
+        authorization_context=authorization_context,
         meta=meta or {},
     )
     maybe_result = session.add(entry)
@@ -210,11 +222,15 @@ async def _audit(
         await maybe_result
 
 
-def _export_record(record: dict[str, Any], sensitivity: str, role: str) -> dict[str, Any]:
+def _export_record(
+    record: dict[str, Any], sensitivity: str, role: str
+) -> dict[str, Any]:
     if role == "admin":
         return record
     policy = EXPORT_POLICY.get(sensitivity, EXPORT_POLICY["restricted"])
-    exported = {field: record.get(field) for field in (policy["allow_fields"] or record.keys())}
+    exported = {
+        field: record.get(field) for field in (policy["allow_fields"] or record.keys())
+    }
     if policy["redact_content"]:
         exported["content"] = f"[REDACTED — {sensitivity} sensitivity]"
     exported["owner"] = "[REDACTED]"

@@ -8,6 +8,7 @@ volumes:
   openbrain_ollama:
   openbrain_grafana_data:
   openbrain_prometheus_data:
+  openbrain_redis_data:
 
 services:
   db:
@@ -58,6 +59,7 @@ services:
       - OIDC_AUDIENCE=${OIDC_AUDIENCE:-https://openbrain-mcp}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
     ports:
       - "127.0.0.1:7010:80"
     networks:
@@ -67,6 +69,25 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: openbrain-unified-redis
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - openbrain_redis_data:/data
+    networks:
+      - net_unified
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
 
   embedding-service:
     image: ollama/ollama:latest
@@ -89,6 +110,23 @@ services:
       - net_unified
     depends_on:
       - unified-server
+    restart: unless-stopped
+
+
+  metrics-bridge:
+    image: python:3.11-slim
+    container_name: openbrain-metrics-bridge
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - INTERNAL_API_KEY=0FABJMzqD2cvBOC_dYbjKCnb51nDVlqo--f44nVwWrI
+      - METRICS_UPSTREAM_URL=http://unified-server:80/metrics
+      - METRICS_LISTEN_HOST=0.0.0.0
+      - METRICS_LISTEN_PORT=9180
+    command: python3 monitoring/openbrain-metrics-bridge.py
+    networks:
+      - net_unified
     restart: unless-stopped
 
   prometheus:

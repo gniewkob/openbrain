@@ -1,0 +1,5 @@
+FROM python:3.11-slim
+WORKDIR /app
+COPY bridge_final.py /app/bridge.py
+EXPOSE 9180
+ENTRYPOINT ["python3", "/app/bridge.py"]

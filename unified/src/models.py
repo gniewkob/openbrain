@@ -5,6 +5,7 @@ Single Memory table with domain-aware governance:
   - corporate: append-only versioning, audit trail, sensitivity levels
   - build/personal: mutable, delete allowed, lightweight
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -54,9 +55,7 @@ class DomainEnum(str, PyEnum):
 class Memory(Base):
     __tablename__ = "memories"
 
-    id: Mapped[str] = mapped_column(
-        String(), primary_key=True, default=_uuid
-    )
+    id: Mapped[str] = mapped_column(String(), primary_key=True, default=_uuid)
 
     # --- Domain ---
     domain: Mapped[DomainEnum] = mapped_column(
@@ -72,8 +71,12 @@ class Memory(Base):
 
     # --- Governance (from old work-brain) ---
     owner: Mapped[str] = mapped_column(String(128), nullable=False, default="")
-    tenant_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
-    created_by: Mapped[str] = mapped_column(String(128), nullable=False, default="agent")
+    tenant_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, index=True
+    )
+    created_by: Mapped[str] = mapped_column(
+        String(128), nullable=False, default="agent"
+    )
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="active", index=True
     )
@@ -82,13 +85,16 @@ class Memory(Base):
         String(32), nullable=False, default="internal"
     )
     superseded_by: Mapped[str | None] = mapped_column(
-        String(), nullable=True,
+        String(),
+        nullable=True,
     )
 
     # --- Tagging & relations ---
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     relations: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
+    metadata_: Mapped[dict] = mapped_column(
+        "metadata", JSONB, nullable=False, default=dict
+    )
 
     # --- Obsidian sync ---
     obsidian_ref: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
@@ -142,15 +148,14 @@ class AuditLog(Base):
 
     __tablename__ = "audit_log"
 
-    id: Mapped[str] = mapped_column(
-        String(), primary_key=True, default=_uuid
-    )
+    id: Mapped[str] = mapped_column(String(), primary_key=True, default=_uuid)
     operation: Mapped[str] = mapped_column(String(32), nullable=False)
     tool_name: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    memory_id: Mapped[str | None] = mapped_column(
-        String(), nullable=True
-    )
+    memory_id: Mapped[str | None] = mapped_column(String(), nullable=True)
     actor: Mapped[str] = mapped_column(String(128), nullable=False, default="agent")
+    actor_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    authorization_context: Mapped[str | None] = mapped_column(String(64), nullable=True)
     meta: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_now

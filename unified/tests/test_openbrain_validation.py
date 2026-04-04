@@ -157,8 +157,9 @@ class TestEmbedCache:
     
     def test_cache_size(self) -> None:
         """Test cache size configuration."""
-        from src.embed import _EMBED_CACHE_SIZE
-        assert _EMBED_CACHE_SIZE == 1000
+        from src.config import get_config
+        get_config.cache_clear()
+        assert get_config().embedding.cache_size == 1000
     
     def test_cache_function_exists(self) -> None:
         """Test cache function exists."""

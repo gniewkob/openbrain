@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager, suppress
 
 import structlog
 
+from .config import get_config
 from .db import AsyncSessionLocal
 from .embed import close_embedding_client
 from .telemetry import (
@@ -66,20 +67,35 @@ async def lifespan(app):
         # Broad exception catch because this is startup telemetry only
         log.error("telemetry_load_failed", error=str(exc), exc_info=True)
 
+    cfg = get_config()
+    is_public = cfg.auth.public_mode or bool(cfg.auth.public_base_url)
+    if is_public and cfg.redis.url == "memory://":
+        log.critical(
+            "redis_required_in_public_mode",
+            detail="Set REDIS_URL to a real Redis instance — in-memory rate limiting "
+            "does not survive restarts and breaks under multi-worker deployments.",
+        )
+        raise RuntimeError(
+            "REDIS_URL must not be 'memory://' when PUBLIC_MODE=true or PUBLIC_BASE_URL is set"
+        )
+
     sync_task = asyncio.create_task(periodic_telemetry_sync())
     yield
 
     sync_task.cancel()
     with suppress(asyncio.CancelledError):
-        await sync_task
+        await asyncio.wait_for(sync_task, timeout=5.0)
 
     try:
         snapshot = get_metrics_snapshot()
         async with AsyncSessionLocal() as session:
-            await upsert_telemetry_metrics(
-                session,
-                counters=snapshot["counters"],
-                histograms=snapshot["histograms"],
+            await asyncio.wait_for(
+                upsert_telemetry_metrics(
+                    session,
+                    counters=snapshot["counters"],
+                    histograms=snapshot["histograms"],
+                ),
+                timeout=10.0,
             )
             log.info("telemetry_final_flush_complete")
     except Exception as exc:

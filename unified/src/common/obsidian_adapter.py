@@ -2,6 +2,7 @@
 Shared Obsidian CLI adapter for local vault access and one-way sync into OpenBrain.
 Used by both the main unified service and MCP gateway.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -100,7 +101,9 @@ def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         if not stripped:
             continue
         if stripped.lstrip().startswith("- ") and current_list_key:
-            metadata.setdefault(current_list_key, []).append(stripped.lstrip()[2:].strip().strip("'\""))
+            metadata.setdefault(current_list_key, []).append(
+                stripped.lstrip()[2:].strip().strip("'\"")
+            )
             continue
         if ":" not in stripped:
             current_list_key = None
@@ -123,9 +126,13 @@ def _merge_tags(frontmatter: dict[str, Any], cli_tags: list[str]) -> list[str]:
     tags: list[str] = []
     fm_tags = frontmatter.get("tags")
     if isinstance(fm_tags, str):
-        tags.extend([part.strip().lstrip("#") for part in fm_tags.split(",") if part.strip()])
+        tags.extend(
+            [part.strip().lstrip("#") for part in fm_tags.split(",") if part.strip()]
+        )
     elif isinstance(fm_tags, list):
-        tags.extend([str(item).strip().lstrip("#") for item in fm_tags if str(item).strip()])
+        tags.extend(
+            [str(item).strip().lstrip("#") for item in fm_tags if str(item).strip()]
+        )
     tags.extend(tag.lstrip("#") for tag in cli_tags if tag)
     deduped: list[str] = []
     seen: set[str] = set()
@@ -159,7 +166,9 @@ def note_to_write_payload(
     domain = str(frontmatter.get("domain") or default_domain)
     if domain not in _VALID_DOMAINS:
         domain = default_domain
-    entity_type = str(frontmatter.get("entity_type") or frontmatter.get("type") or default_entity_type)
+    entity_type = str(
+        frontmatter.get("entity_type") or frontmatter.get("type") or default_entity_type
+    )
     owner = str(frontmatter.get("owner") or default_owner)
     tags = list(default_tags or [])
     tags.extend(note.tags)
@@ -197,7 +206,9 @@ def note_to_memory_write_record(
     domain = str(frontmatter.get("domain") or default_domain)
     if domain not in _VALID_DOMAINS:
         domain = default_domain
-    entity_type = str(frontmatter.get("entity_type") or frontmatter.get("type") or default_entity_type)
+    entity_type = str(
+        frontmatter.get("entity_type") or frontmatter.get("type") or default_entity_type
+    )
     owner = str(frontmatter.get("owner") or default_owner)
     tags = list(default_tags or [])
     tags.extend(note.tags)
@@ -227,6 +238,7 @@ class ObsidianCliAdapter:
             self.command = command
         else:
             from ..config import get_config
+
             config = get_config()
             self.command = config.obsidian.cli_command
         self.timeout_s = timeout_s
@@ -245,11 +257,15 @@ class ObsidianCliAdapter:
                 "Configure OBSIDIAN_CLI_COMMAND or run this integration on a host with Obsidian installed."
             ) from exc
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self.timeout_s)
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=self.timeout_s
+            )
         except asyncio.TimeoutError as exc:
             proc.kill()
             await proc.communicate()
-            raise ObsidianCliError(f"Obsidian CLI timed out after {self.timeout_s:.0f}s") from exc
+            raise ObsidianCliError(
+                f"Obsidian CLI timed out after {self.timeout_s:.0f}s"
+            ) from exc
 
         cleaned_stdout = _clean_cli_output(stdout.decode("utf-8", errors="replace"))
         cleaned_stderr = _clean_cli_output(stderr.decode("utf-8", errors="replace"))
@@ -272,7 +288,9 @@ class ObsidianCliAdapter:
             if ".." in parts or (parts and parts[0] == "/"):
                 raise ObsidianCliError(f"Invalid note path: {path!r}")
 
-    async def list_files(self, vault: str, folder: str | None = None, limit: int | None = None) -> list[str]:
+    async def list_files(
+        self, vault: str, folder: str | None = None, limit: int | None = None
+    ) -> list[str]:
         self._validate_vault_path(vault, folder)
         args = ["files", "ext=md", f"vault={vault}"]
         if folder:
@@ -286,7 +304,9 @@ class ObsidianCliAdapter:
     async def read_note(self, vault: str, path: str) -> ObsidianNote:
         self._validate_vault_path(vault, path)
         content = await self._run("read", f"path={path}", f"vault={vault}")
-        tags_raw = await self._run("tags", f"path={path}", "format=json", f"vault={vault}")
+        tags_raw = await self._run(
+            "tags", f"path={path}", "format=json", f"vault={vault}"
+        )
         frontmatter, body = _parse_frontmatter(content)
         cli_tags: list[str] = []
         if tags_raw:
@@ -295,11 +315,23 @@ class ObsidianCliAdapter:
             except json.JSONDecodeError:
                 parsed = None
             if isinstance(parsed, list):
-                cli_tags = [str(item).strip().lstrip("#") for item in parsed if str(item).strip()]
+                cli_tags = [
+                    str(item).strip().lstrip("#")
+                    for item in parsed
+                    if str(item).strip()
+                ]
             elif isinstance(parsed, dict):
-                cli_tags = [str(key).strip().lstrip("#") for key in parsed.keys() if str(key).strip()]
+                cli_tags = [
+                    str(key).strip().lstrip("#")
+                    for key in parsed.keys()
+                    if str(key).strip()
+                ]
             else:
-                cli_tags = [line.strip().strip('"').lstrip("#") for line in tags_raw.splitlines() if line.strip()]
+                cli_tags = [
+                    line.strip().strip('"').lstrip("#")
+                    for line in tags_raw.splitlines()
+                    if line.strip()
+                ]
         tags = _merge_tags(frontmatter, cli_tags)
         title = _derive_title(path, frontmatter, body)
         return ObsidianNote(
@@ -409,22 +441,22 @@ class ObsidianCliAdapter:
     ) -> ObsidianNote:
         """
         Update an existing note in Obsidian vault.
-        
+
         Args:
             vault: Vault name
             path: Note path
             content: New content (if None, keeps existing)
             frontmatter: New frontmatter (if None, keeps existing)
             append: If True, append content instead of replacing
-        
+
         Returns:
             ObsidianNote: Updated note metadata
         """
         self._validate_vault_path(vault, path)
-        
+
         # Read existing note
         existing = await self.read_note(vault, path)
-        
+
         # Determine new content
         if content is None:
             new_content = existing.content
@@ -432,7 +464,7 @@ class ObsidianCliAdapter:
             new_content = existing.content + "\n\n" + content
         else:
             new_content = content
-        
+
         # Determine new frontmatter
         if frontmatter is None:
             new_frontmatter = existing.frontmatter
@@ -441,11 +473,11 @@ class ObsidianCliAdapter:
             new_frontmatter = {**existing.frontmatter, **frontmatter}
             new_frontmatter["updated_at"] = datetime.now().isoformat()
             new_frontmatter["updated_by"] = "openbrain-sync"
-        
+
         # Write updated content
         full_content = _build_note_content(new_content, new_frontmatter)
         await self._write_note_to_filesystem(vault, path, full_content)
-        
+
         # Return updated note
         return await self.read_note(vault, path)
 
@@ -457,42 +489,43 @@ class ObsidianCliAdapter:
     ) -> bool:
         """
         Delete a note from Obsidian vault.
-        
+
         Args:
             vault: Vault name
             path: Note path
             backup: If True, move to .trash instead of permanent deletion
-        
+
         Returns:
             True if deleted, False otherwise
         """
         self._validate_vault_path(vault, path)
-        
+
         vault_root = await self._get_vault_path(vault)
         if not vault_root:
             raise ObsidianCliError(f"Cannot determine path for vault: {vault}")
-        
+
         full_path = Path(vault_root) / path
-        
+
         if not full_path.exists():
             return False
-        
+
         try:
             if backup:
                 # Move to .trash folder
                 trash_path = Path(vault_root) / ".trash" / path
                 trash_path.parent.mkdir(parents=True, exist_ok=True)
-                
+
                 # Add timestamp to avoid conflicts
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 trash_path = trash_path.with_suffix(f".trash_{timestamp}.md")
-                
+
                 import shutil
+
                 shutil.move(str(full_path), str(trash_path))
             else:
                 # Permanent deletion
                 full_path.unlink()
-            
+
             return True
         except Exception as e:
             raise ObsidianCliError(f"Failed to delete note: {e}") from e
@@ -522,10 +555,12 @@ class ObsidianCliAdapter:
         if not vault_path.is_dir():
             raise ObsidianCliError(f"Vault path is not a directory: {vault_root}")
 
-        # Build full path and validate it's within vault
-        full_path = vault_path / path
+        # Build full path and validate it's within vault.
+        # resolve() follows symlinks — prevents traversal via symlinked dirs.
+        full_path = (vault_path / path).resolve()
+        vault_resolved = vault_path.resolve()
         try:
-            full_path.relative_to(vault_path)
+            full_path.relative_to(vault_resolved)
         except ValueError:
             raise ObsidianCliError(f"Path escapes vault directory: {path}")
 
@@ -536,21 +571,23 @@ class ObsidianCliAdapter:
         # Import here to avoid dependency issues if aiofiles not installed
         try:
             import aiofiles
-            async with aiofiles.open(full_path, 'w', encoding='utf-8') as f:
+
+            async with aiofiles.open(full_path, "w", encoding="utf-8") as f:
                 await f.write(content)
         except ImportError:
             # Fallback to sync file write with thread pool
             import asyncio
+
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
                 None,  # Default executor
-                lambda: _sync_write_file(full_path, content)
+                lambda: _sync_write_file(full_path, content),
             )
 
 
 def _sync_write_file(path: Path, content: str) -> None:
     """Synchronous file write (used as fallback)."""
-    path.write_text(content, encoding='utf-8')
+    path.write_text(content, encoding="utf-8")
 
 
 def _build_note_content(
@@ -576,7 +613,32 @@ def _build_note_content(
         else:
             # Escape strings containing special characters
             str_val = str(value)
-            if any(c in str_val for c in [':', '#', '"', "'", '[', ']', '{', '}', ',', '&', '*', '?', '|', '-', '<', '>', '=', '!', '%', '@', '`']):
+            if any(
+                c in str_val
+                for c in [
+                    ":",
+                    "#",
+                    '"',
+                    "'",
+                    "[",
+                    "]",
+                    "{",
+                    "}",
+                    ",",
+                    "&",
+                    "*",
+                    "?",
+                    "|",
+                    "-",
+                    "<",
+                    ">",
+                    "=",
+                    "!",
+                    "%",
+                    "@",
+                    "`",
+                ]
+            ):
                 str_val = f'"{str_val.replace("\\", "\\\\").replace('"', '\\"')}"'
             fm_lines.append(f"{key}: {str_val}")
     fm_lines.append("---")
