@@ -39,7 +39,9 @@ async def periodic_telemetry_sync() -> None:
                     histogram_count=len(snapshot["histograms"]),
                 )
         except Exception as exc:
-            log.error("telemetry_sync_failed", error=str(exc))
+            # Telemetry sync errors are non-critical, just log them
+            # Broad exception catch because any error here shouldn't crash the app
+            log.error("telemetry_sync_failed", error=str(exc), exc_info=True)
 
 
 @asynccontextmanager
@@ -60,7 +62,9 @@ async def lifespan(app):
                     histogram_count=len(persisted_histograms),
                 )
     except Exception as exc:
-        log.error("telemetry_load_failed", error=str(exc))
+        # Telemetry load errors are non-critical, just log them
+        # Broad exception catch because this is startup telemetry only
+        log.error("telemetry_load_failed", error=str(exc), exc_info=True)
 
     sync_task = asyncio.create_task(periodic_telemetry_sync())
     yield
@@ -79,9 +83,13 @@ async def lifespan(app):
             )
             log.info("telemetry_final_flush_complete")
     except Exception as exc:
-        log.error("telemetry_final_flush_failed", error=str(exc))
+        # Final flush errors are non-critical during shutdown
+        # Broad exception catch during shutdown cleanup
+        log.error("telemetry_final_flush_failed", error=str(exc), exc_info=True)
 
     try:
         await close_embedding_client()
     except Exception as exc:
-        log.error("embedding_client_shutdown_failed", error=str(exc))
+        # Shutdown errors are logged but not raised
+        # Broad exception catch during cleanup to ensure graceful shutdown
+        log.error("embedding_client_shutdown_failed", error=str(exc), exc_info=True)

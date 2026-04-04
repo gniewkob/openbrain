@@ -97,11 +97,25 @@ def _client() -> httpx.AsyncClient:
 
 def _raise(r: httpx.Response) -> None:
     if r.is_error:
-        try:
-            detail = r.json()
-        except Exception:
-            detail = r.text
-        raise ValueError(f"Backend {r.status_code}: {detail}")
+        # In production, hide internal details to prevent information leakage
+        is_production = os.environ.get("ENV", "development").lower() == "production"
+        if is_production:
+            if r.status_code >= 500:
+                raise ValueError(f"Backend error: Internal server error")
+            elif r.status_code == 404:
+                raise ValueError(f"Backend error: Resource not found")
+            elif r.status_code == 401:
+                raise ValueError(f"Backend error: Authentication required")
+            elif r.status_code == 403:
+                raise ValueError(f"Backend error: Access denied")
+            else:
+                raise ValueError(f"Backend error: Request failed")
+        else:
+            try:
+                detail = r.json()
+            except Exception:
+                detail = r.text
+            raise ValueError(f"Backend {r.status_code}: {detail}")
 
 
 def _obsidian_local_tools_enabled() -> bool:
@@ -486,6 +500,129 @@ async def brain_obsidian_sync(
 
 
 @mcp.tool()
+async def brain_obsidian_write_note(
+    vault: str,
+    path: str,
+    content: str,
+    title: str | None = None,
+    tags: list[str] | None = None,
+    frontmatter: dict[str, Any] | None = None,
+    overwrite: bool = False,
+) -> dict:
+    """
+    Write a note to Obsidian vault.
+    
+    Args:
+        vault: Target vault name
+        path: Note path (e.g., "Projects/Note.md")
+        content: Markdown content
+        title: Optional title (added as H1 if provided)
+        tags: Optional tags for frontmatter
+        frontmatter: Optional additional frontmatter fields
+        overwrite: Overwrite existing note
+    """
+    _require_obsidian_local_tools_enabled()
+    
+    # Build full content with title
+    full_content = content
+    if title:
+        full_content = f"# {title}\n\n{content}"
+    
+    # Merge frontmatter
+    fm = frontmatter or {}
+    if tags:
+        fm["tags"] = tags
+    if title:
+        fm["title"] = title
+    
+    async with _client() as c:
+        r = await c.post("/api/v1/obsidian/write-note", json={
+            "vault": vault,
+            "path": path,
+            "content": full_content,
+            "frontmatter": fm,
+            "overwrite": overwrite,
+        })
+        _raise(r)
+        return r.json()
+
+
+@mcp.tool()
+async def brain_obsidian_export(
+    vault: str,
+    folder: str = "OpenBrain Export",
+    memory_ids: list[str] | None = None,
+    query: str | None = None,
+    domain: str | None = None,
+    max_items: int = 50,
+) -> dict:
+    """
+    Export memories from OpenBrain to Obsidian notes.
+    
+    Args:
+        vault: Target vault
+        folder: Target folder in vault
+        memory_ids: Specific memory IDs to export
+        query: Search query to find memories
+        domain: Filter by domain (corporate/build/personal)
+        max_items: Maximum number of memories to export
+    """
+    _require_obsidian_local_tools_enabled()
+    
+    async with _client() as c:
+        r = await c.post("/api/v1/obsidian/export", json={
+            "vault": vault,
+            "folder": folder,
+            "memory_ids": memory_ids,
+            "query": query,
+            "domain": domain,
+            "max_items": max_items,
+        })
+        _raise(r)
+        return r.json()
+
+
+@mcp.tool()
+async def brain_obsidian_collection(
+    query: str,
+    collection_name: str,
+    vault: str = "Documents",
+    folder: str = "Collections",
+    domain: str | None = None,
+    max_items: int = 50,
+    group_by: str | None = None,
+) -> dict:
+    """
+    Create a collection (index note) from OpenBrain memories.
+    
+    Creates a single index note with links to exported memory notes.
+    
+    Args:
+        query: Search query
+        collection_name: Name for the collection
+        vault: Target vault
+        folder: Target folder
+        domain: Filter by domain
+        max_items: Maximum memories
+        group_by: How to group (entity_type, owner, tags)
+    """
+    _require_obsidian_local_tools_enabled()
+    
+    async with _client() as c:
+        r = await c.post("/api/v1/obsidian/collection", json={
+            "query": query,
+            "collection_name": collection_name,
+            "vault": vault,
+            "folder": folder,
+            "domain": domain,
+            "max_items": max_items,
+            "group_by": group_by,
+        })
+        _raise(r)
+        return r.json()
+
+
+@mcp.tool()
 async def brain_store_bulk(items: list[dict[str, Any]]) -> dict:
     """Bulk store memories. Use for archiving or synchronization."""
     async with _client() as c:
@@ -499,6 +636,84 @@ async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict:
     """Idempotent bulk synchronization using match_key."""
     async with _client() as c:
         r = await c.post("/api/memories/bulk-upsert", json=items)
+        _raise(r)
+        return r.json()
+
+
+@mcp.tool()
+async def brain_obsidian_bidirectional_sync(
+    vault: str = "Memory",
+    strategy: str = "domain_based",
+    dry_run: bool = False,
+) -> dict:
+    """
+    Bidirectional sync between OpenBrain and Obsidian.
+    
+    Detects and resolves changes in both systems.
+    
+    Args:
+        vault: Target vault name
+        strategy: Conflict resolution strategy (last_write_wins, domain_based, manual_review)
+        dry_run: If True, only detect changes without applying
+    
+    Returns:
+        Sync result with detected changes, conflicts, and applied updates.
+    """
+    _require_obsidian_local_tools_enabled()
+    
+    async with _client() as c:
+        r = await c.post("/api/v1/obsidian/bidirectional-sync", json={
+            "vault": vault,
+            "strategy": strategy,
+            "dry_run": dry_run,
+        })
+        _raise(r)
+        return r.json()
+
+
+@mcp.tool()
+async def brain_obsidian_sync_status() -> dict:
+    """
+    Get bidirectional sync status.
+    
+    Returns statistics about tracked items and sync state.
+    """
+    _require_obsidian_local_tools_enabled()
+    
+    async with _client() as c:
+        r = await c.get("/api/v1/obsidian/sync-status")
+        _raise(r)
+        return r.json()
+
+
+@mcp.tool()
+async def brain_obsidian_update_note(
+    vault: str,
+    path: str,
+    content: str | None = None,
+    append: bool = False,
+    tags: list[str] | None = None,
+) -> dict:
+    """
+    Update an existing note in Obsidian.
+    
+    Args:
+        vault: Target vault name
+        path: Note path
+        content: New content (or content to append if append=True)
+        append: If True, append to existing content
+        tags: Tags to update in frontmatter
+    """
+    _require_obsidian_local_tools_enabled()
+    
+    async with _client() as c:
+        r = await c.post("/api/v1/obsidian/update-note", json={
+            "vault": vault,
+            "path": path,
+            "content": content,
+            "append": append,
+            "tags": tags,
+        })
         _raise(r)
         return r.json()
 

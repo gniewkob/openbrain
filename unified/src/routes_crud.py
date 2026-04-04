@@ -64,7 +64,8 @@ def register_crud_routes(app: FastAPI, handlers) -> None:
         "/api/memories/{memory_id}",
         handlers.delete,
         methods=["DELETE"],
-        status_code=204,
+        status_code=200,  # Changed from 204 to allow response body
+        response_model=dict,  # Return {"deleted": true} or similar
     )
     app.add_api_route(
         "/api/memories/sync-check",

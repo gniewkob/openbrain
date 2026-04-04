@@ -123,6 +123,12 @@ class OIDCVerifier:
                 algorithms=["RS256"],
                 audience=self.audience or None,
                 issuer=self._metadata.issuer,  # type: ignore[union-attr]
+                options={
+                    "require": ["exp", "iat"],
+                    "verify_exp": True,
+                    "verify_iat": True,
+                    "verify_nbf": True,
+                },
             )
             return claims
         except Exception as e:

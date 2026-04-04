@@ -98,7 +98,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             owner="alice",
             match_key="corp:decision:approved-2026",
         )
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
             result = await memory_writes.handle_memory_write(
                 session, MemoryWriteRequest(record=rec, write_mode="upsert")
             )
@@ -126,7 +126,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
         session.flush = AsyncMock(side_effect=_flush)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
             result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
@@ -168,7 +168,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
         session.flush = AsyncMock(side_effect=_flush)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
             result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
@@ -244,7 +244,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
 
-        with patch.object(crud, "_audit", new=AsyncMock()) as audit:
+        with patch.object(memory_writes, "_audit_compat", new=AsyncMock()) as audit:
             deleted = await memory_writes.delete_memory(session, "mem-1", actor="admin-user")
 
         self.assertTrue(deleted)
@@ -421,8 +421,8 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             warning_events.append(event)
 
         from unittest.mock import patch
-        with patch.object(crud.log, "warning", side_effect=_capture_warning):
-            with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1])):
+        with patch.object(memory_writes.log, "warning", side_effect=_capture_warning):
+            with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1])):
                 rec = MemoryWriteRecord(
                     content="no match key write",
                     domain="build",

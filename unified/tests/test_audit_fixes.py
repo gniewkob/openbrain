@@ -131,7 +131,7 @@ class UpdateMemoryErrorPropagationTest(unittest.IsolatedAsyncioTestCase):
             status="failed",
             errors=["Owner is required for corporate domain."],
         )
-        with patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=failed_response)):
+        with patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=failed_response)):
             with self.assertRaises(ValueError) as ctx:
                 await memory_writes.update_memory(session, "mem-1", MemoryUpdate(content="new"))
 
@@ -151,7 +151,7 @@ class UpdateMemoryErrorPropagationTest(unittest.IsolatedAsyncioTestCase):
 
         skipped_response = MemoryWriteResponse(status="skipped", record=_record())
         with (
-            patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=skipped_response)),
+            patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=skipped_response)),
             patch.object(memory_writes, "get_memory", new=AsyncMock()) as mock_get,
         ):
             result = await memory_writes.update_memory(session, "mem-1", MemoryUpdate(content="unchanged"))
@@ -185,7 +185,7 @@ class AtomicWriteManyTest(unittest.IsolatedAsyncioTestCase):
         ]
         request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=True)
 
-        with patch.object(crud, "handle_memory_write", side_effect=_write_side_effect):
+        with patch.object(memory_writes, "handle_memory_write", side_effect=_write_side_effect):
             result = await memory_writes.handle_memory_write_many(session, request)
 
         # Batch must be rolled back
@@ -212,7 +212,7 @@ class AtomicWriteManyTest(unittest.IsolatedAsyncioTestCase):
         ]
         request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=False)
 
-        with patch.object(crud, "handle_memory_write", side_effect=_write_side_effect):
+        with patch.object(memory_writes, "handle_memory_write", side_effect=_write_side_effect):
             result = await memory_writes.handle_memory_write_many(session, request)
 
         self.assertEqual(result.status, "partial_success")
@@ -249,7 +249,7 @@ class MatchKeySelectForUpdateTest(unittest.IsolatedAsyncioTestCase):
         )
         req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
             # The SELECT FOR UPDATE statement should be the first executed
             try:
                 await memory_writes.handle_memory_write(session, req)
@@ -300,9 +300,9 @@ class StoreBulkFieldMappingTest(unittest.IsolatedAsyncioTestCase):
         ]
 
         with (
-            patch.object(crud, "handle_memory_write", side_effect=_capture_write),
-            patch.object(crud, "handle_memory_write_many", wraps=memory_writes.handle_memory_write_many),
-            patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1])),
+            patch.object(memory_writes, "handle_memory_write", side_effect=_capture_write),
+            patch.object(memory_writes, "handle_memory_write_many", wraps=memory_writes.handle_memory_write_many),
+            patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1])),
         ):
             # Call store_memories_bulk directly
             session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
@@ -406,7 +406,7 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
         )
         req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
             result = await memory_writes.handle_memory_write(session, req)
 
         self.assertNotEqual(result.status, "skipped", "sensitivity-only change must not be skipped")
@@ -448,7 +448,7 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
         )
         req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
             result = await memory_writes.handle_memory_write(session, req)
 
         self.assertNotEqual(result.status, "skipped", "metadata-only change must not be skipped")
@@ -477,7 +477,7 @@ class NonAtomicSessionRollbackTest(unittest.IsolatedAsyncioTestCase):
         ]
         request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=False)
 
-        with patch.object(crud, "handle_memory_write", side_effect=_write_side_effect):
+        with patch.object(memory_writes, "handle_memory_write", side_effect=_write_side_effect):
             result = await memory_writes.handle_memory_write_many(session, request)
 
         session.rollback.assert_awaited_once()
@@ -541,7 +541,7 @@ class SearchScoreSemanticsTest(unittest.IsolatedAsyncioTestCase):
 
         session = SimpleNamespace(execute=_execute)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
             results = await memory_reads.search_memories(session, SearchRequest(query="test", top_k=1))
 
         self.assertEqual(len(results), 1)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from collections import Counter
 from threading import Lock
 from typing import Any

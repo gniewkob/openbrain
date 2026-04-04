@@ -32,7 +32,7 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
 
         session.flush = AsyncMock(side_effect=_flush)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
             result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
@@ -101,7 +101,7 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
 
         session.flush = AsyncMock(side_effect=_flush)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.3, 0.4])):
+        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.3, 0.4])):
             result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
@@ -149,7 +149,7 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
             updated_at=datetime.now(timezone.utc),
         )
         with (
-            patch.object(crud, "handle_memory_write", new=AsyncMock()) as handle_write,
+            patch.object(memory_writes, "handle_memory_write", new=AsyncMock()) as handle_write,
             patch.object(memory_writes, "get_memory_raw", new=AsyncMock(return_value=created)),
         ):
             handle_write.return_value = SimpleNamespace(status="created", errors=[], record=SimpleNamespace(id="mem-1"))

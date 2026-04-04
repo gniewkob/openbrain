@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import AuditLog, DomainEnum, Memory, compute_hash
+from .models import AuditLog, DomainEnum, Memory
 from .schemas import GovernanceMetadata, MemoryOut, MemoryRecord, MemoryRelations, SourceMetadata
 
 EXPORT_POLICY: dict[str, dict[str, Any]] = {

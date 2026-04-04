@@ -99,7 +99,7 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="updated", record=updated_record))) as handle_write,
+            patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="updated", record=updated_record))) as handle_write,
             patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=expected_out)) as get_memory,
         ):
             result = await crud.update_memory(
@@ -175,7 +175,7 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="versioned", record=versioned_record))) as handle_write,
+            patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="versioned", record=versioned_record))) as handle_write,
             patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=MemoryOut(
                 id="mem-2",
                 domain="corporate",
@@ -236,7 +236,7 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
 
         with (
-            patch.object(crud, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="updated", record=None))) as handle_write,
+            patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="updated", record=None))) as handle_write,
             patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=None)),
         ):
             await crud.update_memory(session, "mem-1", MemoryUpdate(content="after"), actor="auth-sub")

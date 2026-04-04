@@ -21,7 +21,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         session = SimpleNamespace(execute=execute)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
+        with patch.object(memory_reads, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
             await memory_reads.search_memories(
                 session,
                 SearchRequest(query="policy", top_k=5, filters={"owner": "owner-a"}),
@@ -41,7 +41,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         session = SimpleNamespace(execute=execute)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
+        with patch.object(memory_reads, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
             result = await memory_reads.search_memories(session, SearchRequest(query="policy", top_k=5))
 
         self.assertEqual(result, [])
@@ -60,7 +60,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         session = SimpleNamespace(execute=execute)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
+        with patch.object(memory_reads, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2, 0.3])):
             result = await memory_reads.find_memories_v1(session, MemoryFindRequest(query="policy", limit=5))
 
         self.assertEqual(result, [])
@@ -113,7 +113,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         session.flush = AsyncMock(side_effect=_flush)
 
-        with patch.object(crud, "get_embedding", new=AsyncMock(return_value=[0.3, 0.4])):
+        with patch.object(memory_reads, "_get_embedding_compat", new=AsyncMock(return_value=[0.3, 0.4])):
             result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(

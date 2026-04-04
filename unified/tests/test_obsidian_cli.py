@@ -2,7 +2,7 @@ import sys
 import types
 import unittest
 
-from src.obsidian_cli import _clean_cli_output, _parse_frontmatter, note_to_memory_write_record, ObsidianNote
+from src.common.obsidian_adapter import _clean_cli_output, _parse_frontmatter, note_to_memory_write_record, ObsidianNote
 
 
 class ObsidianCliHelperTests(unittest.TestCase):

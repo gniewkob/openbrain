@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from importlib import import_module
 from inspect import isawaitable
 
 import structlog
@@ -43,22 +42,15 @@ from .schemas import (
 log = structlog.get_logger()
 
 
-def _crud_module():
-    return import_module(f"{__package__}.crud")
-
-
-def _warning_logger():
-    return getattr(_crud_module(), "log", log)
-
-
+# Direct function references - no circular imports
 async def _get_embedding_compat(text: str):
-    func = getattr(_crud_module(), "get_embedding", get_embedding)
-    return await func(text)
+    """Get embedding using local import."""
+    return await get_embedding(text)
 
 
 async def _audit_compat(*args, **kwargs):
-    func = getattr(_crud_module(), "_audit", _audit)
-    return await func(*args, **kwargs)
+    """Audit using direct reference."""
+    return await _audit(*args, **kwargs)
 
 
 def _session_add(session: AsyncSession, obj) -> None:
@@ -74,6 +66,21 @@ async def handle_memory_write(
     actor: str = "agent",
     _commit: bool = True,
 ) -> MemoryWriteResponse:
+    """
+    Handle single memory write with domain-aware governance.
+    
+    Args:
+        session: Database session
+        request: Memory write request containing record and write mode
+        actor: Actor performing the write (default: "agent")
+        _commit: Whether to commit transaction (for batch operations)
+    
+    Returns:
+        MemoryWriteResponse with status and record info
+    
+    Raises:
+        ValueError: For invalid write operations
+    """
     rec = request.record
     mode = request.write_mode
     domain = rec.domain
@@ -115,7 +122,7 @@ async def handle_memory_write(
     content_hash = compute_hash(rec.content)
 
     if not rec.match_key and rec.domain != "corporate":
-        _warning_logger().warning(
+        log.warning(
             "duplicate_risk_write",
             domain=rec.domain,
             entity_type=rec.entity_type,
@@ -254,20 +261,34 @@ async def handle_memory_write_many(
     request: MemoryWriteManyRequest,
     actor: str = "agent",
 ) -> MemoryWriteManyResponse:
+    """
+    Batch write many memories with optimized batch lookup for match_keys.
+    Reduces N+1 queries to single batch query.
+    """
     results = []
     summary = {"received": len(request.records), "created": 0, "updated": 0, "versioned": 0, "skipped": 0, "failed": 0}
     atomic = request.atomic
+    
+    # Batch lookup: collect all match_keys first to avoid N+1 queries
+    match_keys = [r.match_key for r in request.records if r.match_key]
+    existing_id_map: dict[str, str | None] = {}
+    
+    if match_keys:
+        # Single query to fetch all existing records by match_key
+        batch_lookup_stmt = (
+            select(Memory.match_key, Memory.id)
+            .where(Memory.match_key.in_(match_keys), Memory.status == "active")
+        )
+        batch_result = await session.execute(batch_lookup_stmt)
+        existing_id_map = {row[0]: row[1] for row in batch_result.all()}
 
     async def _process_records(commit_each: bool) -> None:
         for index, record in enumerate(request.records):
             try:
-                existing_id = None
-                if record.match_key:
-                    existing_stmt = select(Memory.id).where(Memory.match_key == record.match_key, Memory.status == "active")
-                    existing_res = await session.execute(existing_stmt)
-                    existing_id = existing_res.scalar_one_or_none()
+                # Use pre-fetched existing_id from batch lookup
+                existing_id = existing_id_map.get(record.match_key) if record.match_key else None
 
-                write_func = getattr(_crud_module(), "handle_memory_write", handle_memory_write)
+                write_func = handle_memory_write
                 res = await write_func(
                     session,
                     MemoryWriteRequest(record=record, write_mode=request.write_mode),
@@ -287,6 +308,12 @@ async def handle_memory_write_many(
                 )
                 summary[res.status] = summary.get(res.status, 0) + 1
             except Exception as exc:
+                log.warning(
+                    "batch_record_failed",
+                    input_index=index,
+                    match_key=record.match_key,
+                    error=str(exc),
+                )
                 results.append(
                     BatchResultItem(
                         input_index=index,
@@ -304,7 +331,8 @@ async def handle_memory_write_many(
         try:
             await _process_records(commit_each=False)
             await session.commit()
-        except Exception:
+        except Exception as exc:
+            log.error("batch_atomic_operation_failed", error=str(exc))
             await session.rollback()
             return MemoryWriteManyResponse(status="failed", summary=summary, results=results)
     else:
@@ -327,7 +355,7 @@ async def store_memory(session: AsyncSession, data: MemoryCreate, actor: str = "
         sensitivity=data.sensitivity,
         custom_fields=data.custom_fields,
     )
-    write_func = getattr(_crud_module(), "handle_memory_write", handle_memory_write)
+    write_func = handle_memory_write
     res = await write_func(session, MemoryWriteRequest(record=write_record, write_mode=WriteMode.upsert), actor=actor)
     if res.status == "failed":
         raise ValueError(f"Write failed: {res.errors}")
@@ -351,7 +379,7 @@ async def store_memories_bulk(session: AsyncSession, items: list[MemoryCreate]) 
         )
         for item in items
     ]
-    write_many_func = getattr(_crud_module(), "handle_memory_write_many", handle_memory_write_many)
+    write_many_func = handle_memory_write_many
     res = await write_many_func(session, MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert))
     ids = [result.record_id for result in res.results if result.record_id]
     if not ids:
@@ -385,7 +413,7 @@ async def update_memory(session: AsyncSession, memory_id: str, data: MemoryUpdat
         custom_fields=data.custom_fields if data.custom_fields is not None else (metadata.get("custom_fields") or {}),
     )
     write_mode = WriteMode.append_version if _requires_append_only(memory.domain, memory.entity_type) else WriteMode.upsert
-    write_func = getattr(_crud_module(), "handle_memory_write", handle_memory_write)
+    write_func = handle_memory_write
     res_v1 = await write_func(session, MemoryWriteRequest(record=write_record, write_mode=write_mode), actor=actor)
     if res_v1.status == "failed":
         raise ValueError(f"Update failed: {'; '.join(res_v1.errors)}")
@@ -444,7 +472,7 @@ async def upsert_memories_bulk(session: AsyncSession, items: list[MemoryUpsertIt
         )
         for item in items
     ]
-    write_many_func = getattr(_crud_module(), "handle_memory_write_many", handle_memory_write_many)
+    write_many_func = handle_memory_write_many
     res = await write_many_func(session, MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert))
     ids = [result.record_id for result in res.results if result.record_id and result.status in {"created", "updated", "versioned"}]
     if ids:

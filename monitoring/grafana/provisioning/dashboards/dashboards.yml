@@ -20,3 +20,13 @@ providers:
     updateIntervalSeconds: 30
     options:
       path: /var/lib/grafana/dashboards/mail
+
+  - name: SalonBW
+    orgId: 1
+    folder: SalonBW
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/salonbw

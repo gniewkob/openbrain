@@ -6,14 +6,14 @@ Runs in Docker on port 80 (mapped to 7010 externally).
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
+from datetime import datetime
 from typing import Any
 
 import structlog
-from fastapi import Body, Depends, FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi import Body, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,10 +29,9 @@ from .auth import (
     require_auth,
     set_policy_registry,
 )
-from .crud_common import _to_out
 from .db import AsyncSessionLocal, get_session
-from .lifespan import lifespan, periodic_telemetry_sync
-from .middleware import MetricsMiddleware, REQUEST_ID_RE as _REQ_ID_RE, RequestIDMiddleware
+from .lifespan import lifespan
+from .middleware import MetricsMiddleware, RequestIDMiddleware
 from .memory_reads import (
     export_memories,
     find_memories_v1,
@@ -59,8 +58,10 @@ from .memory_writes import (
 )
 from .obsidian_cli import ObsidianCliAdapter, ObsidianCliError, note_to_memory_write_record
 from .routes_crud import register_crud_routes
+from .api.v1 import health_router, memory_router, obsidian_router
 from .routes_ops import register_ops_routes
 from .routes_v1 import register_v1_routes
+from .obsidian_sync import BidirectionalSyncEngine, ObsidianChangeTracker, SyncStrategy
 from .schemas import (
     BulkUpsertResult,
     ExportRequest,
@@ -80,10 +81,21 @@ from .schemas import (
     MemoryWriteManyResponse,
     MemoryWriteRequest,
     MemoryWriteResponse,
+    ObsidianBidirectionalSyncRequest,
+    ObsidianBidirectionalSyncResponse,
+    ObsidianCollectionRequest,
+    ObsidianSyncChange,
+    ObsidianCollectionResponse,
+    ObsidianExportItem,
+    ObsidianExportRequest,
+    ObsidianExportResponse,
     ObsidianNoteResponse,
     ObsidianReadRequest,
     ObsidianSyncRequest,
     ObsidianSyncResponse,
+    ObsidianSyncStatus,
+    ObsidianWriteRequest,
+    ObsidianWriteResponse,
     PolicyRegistry,
     SearchRequest,
     SearchResult,
@@ -356,7 +368,15 @@ app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 # ---------------------------------------------------------------------------
-# API V1 (Canonical)
+# New Modular V1 Routers (Refactored)
+# ---------------------------------------------------------------------------
+
+app.include_router(health_router)
+app.include_router(memory_router, prefix="/api/v1")
+app.include_router(obsidian_router, prefix="/api/v1")
+
+# ---------------------------------------------------------------------------
+# Legacy API V1 (Inline - to be migrated)
 # ---------------------------------------------------------------------------
 
 async def v1_write(
@@ -513,6 +533,308 @@ async def v1_obsidian_sync(
         summary=result.summary,
         results=result.results,
     )
+
+
+# ---------------------------------------------------------------------------
+# Obsidian Export (OpenBrain → Obsidian)
+# ---------------------------------------------------------------------------
+
+async def v1_obsidian_write_note(
+    req: ObsidianWriteRequest,
+    _user: dict = Depends(require_auth),
+) -> ObsidianWriteResponse:
+    """Write a single note to Obsidian vault."""
+    _require_admin(_user)
+    adapter = ObsidianCliAdapter()
+    try:
+        # Check if note exists
+        exists = await adapter.note_exists(req.vault, req.path)
+        
+        note = await adapter.write_note(
+            vault=req.vault,
+            path=req.path,
+            content=req.content,
+            frontmatter=req.frontmatter,
+            overwrite=req.overwrite,
+        )
+    except ObsidianCliError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    return ObsidianWriteResponse(
+        vault=note.vault,
+        path=note.path,
+        title=note.title,
+        content=note.content,
+        frontmatter=note.frontmatter,
+        tags=note.tags,
+        file_hash=note.file_hash,
+        created=not exists,  # True if new, False if updated
+    )
+
+
+async def v1_obsidian_export(
+    req: ObsidianExportRequest,
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> ObsidianExportResponse:
+    """Export memories from OpenBrain to Obsidian notes."""
+    _require_admin(_user)
+
+    # Get memories to export
+    memories: list[MemoryOut] = []
+    if req.memory_ids:
+        for mid in req.memory_ids:
+            mem = await get_memory(session, mid)
+            if mem:
+                memories.append(mem)
+    elif req.query:
+        search_results = await search_memories(
+            session,
+            SearchRequest(query=req.query, top_k=req.max_items, filters={}),
+        )
+        memories = [mem for mem, _ in search_results]
+        
+        # Filter by domain if specified
+        if req.domain:
+            memories = [m for m in memories if m.domain == req.domain]
+    else:
+        raise HTTPException(status_code=422, detail="Either memory_ids or query must be provided")
+
+    # Export to Obsidian
+    adapter = ObsidianCliAdapter()
+    exported: list[ObsidianExportItem] = []
+    errors: list[dict[str, str]] = []
+
+    for memory in memories:
+        try:
+            # Generate note path
+            safe_title = _sanitize_filename(memory.title or memory.id)
+            path = f"{req.folder}/{safe_title}.md" if req.folder else f"{safe_title}.md"
+
+            # Generate content and frontmatter
+            content = _memory_to_note_content(memory, req.template)
+            frontmatter = _memory_to_frontmatter(memory)
+
+            # Check if exists
+            exists = await adapter.note_exists(req.vault, path)
+            
+            note = await adapter.write_note(
+                vault=req.vault,
+                path=path,
+                content=content,
+                frontmatter=frontmatter,
+                overwrite=True,
+            )
+            exported.append(ObsidianExportItem(
+                memory_id=memory.id,
+                path=note.path,
+                title=note.title,
+                created=not exists,
+            ))
+        except Exception as e:
+            log.warning("export_memory_failed", memory_id=memory.id, error=str(e))
+            errors.append({"memory_id": memory.id, "error": str(e)})
+
+    return ObsidianExportResponse(
+        vault=req.vault,
+        folder=req.folder,
+        exported_count=len(exported),
+        exported=exported,
+        errors=errors,
+    )
+
+
+async def v1_obsidian_collection(
+    req: ObsidianCollectionRequest,
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> ObsidianCollectionResponse:
+    """Create a collection (index note) from memories."""
+    _require_admin(_user)
+
+    # First export memories
+    export_req = ObsidianExportRequest(
+        vault=req.vault,
+        folder=f"{req.folder}/{req.collection_name}",
+        query=req.query,
+        domain=req.domain,
+        max_items=req.max_items,
+    )
+    
+    # Get memories for grouping info
+    search_results = await search_memories(
+        session,
+        SearchRequest(query=req.query, top_k=req.max_items, filters={}),
+    )
+    memories = [mem for mem, _ in search_results]
+    if req.domain:
+        memories = [m for m in memories if m.domain == req.domain]
+    
+    # Export memories
+    export_result = await v1_obsidian_export(export_req, session, _user)
+
+    # Create index note
+    adapter = ObsidianCliAdapter()
+    try:
+        index_content = _build_collection_index(
+            collection_name=req.collection_name,
+            query=req.query,
+            exported=export_result.exported,
+            memories=memories,
+            group_by=req.group_by,
+        )
+        
+        index_path = f"{req.folder}/{req.collection_name}/Index.md"
+        
+        await adapter.write_note(
+            vault=req.vault,
+            path=index_path,
+            content=index_content,
+            frontmatter={
+                "title": req.collection_name,
+                "tags": ["openbrain-collection", "index"],
+                "query": req.query,
+                "item_count": len(export_result.exported),
+                "created_at": datetime.now().isoformat(),
+            },
+            overwrite=True,
+        )
+
+        return ObsidianCollectionResponse(
+            collection_name=req.collection_name,
+            vault=req.vault,
+            folder=req.folder,
+            index_path=index_path,
+            exported_count=export_result.exported_count,
+            exported=export_result.exported,
+            errors=export_result.errors,
+        )
+    except ObsidianCliError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+def _sanitize_filename(name: str) -> str:
+    """Sanitize string for use as filename."""
+    unsafe = '<>:"/\\|?*'
+    for char in unsafe:
+        name = name.replace(char, '_')
+    return name[:100]  # Limit length
+
+
+def _memory_to_note_content(memory: MemoryOut, template: str | None = None) -> str:
+    """Convert memory to markdown note content."""
+    if template:
+        try:
+            return template.format(
+                title=memory.title or "Untitled",
+                content=memory.content,
+                domain=memory.domain,
+                entity_type=memory.entity_type,
+                created_at=memory.created_at,
+                updated_at=memory.updated_at,
+                owner=memory.owner,
+                tags=", ".join(memory.tags),
+                id=memory.id,
+                version=memory.version,
+            )
+        except Exception:
+            # Fall back to default if template fails
+            pass
+
+    # Default format
+    lines = [
+        f"# {memory.title or 'Untitled'}",
+        "",
+        f"**Domain:** {memory.domain}",
+        f"**Type:** {memory.entity_type}",
+        f"**Owner:** {memory.owner}",
+        f"**Created:** {memory.created_at}",
+        "",
+        "## Content",
+        "",
+        memory.content,
+        "",
+        "## Metadata",
+        "",
+        f"- ID: `{memory.id}`",
+        f"- Version: {memory.version}",
+        f"- Status: {memory.status}",
+        f"- Tags: {', '.join(memory.tags)}",
+    ]
+    return "\n".join(lines)
+
+
+def _memory_to_frontmatter(memory: MemoryOut) -> dict[str, Any]:
+    """Generate YAML frontmatter from memory metadata."""
+    return {
+        "title": memory.title,
+        "openbrain_id": memory.id,
+        "domain": memory.domain,
+        "entity_type": memory.entity_type,
+        "owner": memory.owner,
+        "version": memory.version,
+        "status": memory.status,
+        "created_at": memory.created_at.isoformat() if hasattr(memory.created_at, 'isoformat') else str(memory.created_at),
+        "updated_at": memory.updated_at.isoformat() if hasattr(memory.updated_at, 'isoformat') else str(memory.updated_at),
+        "tags": memory.tags,
+        "source": "openbrain-export",
+    }
+
+
+def _build_collection_index(
+    collection_name: str,
+    query: str,
+    exported: list[ObsidianExportItem],
+    memories: list[MemoryOut],
+    group_by: str | None,
+) -> str:
+    """Build markdown index for collection."""
+    lines = [
+        f"# {collection_name}",
+        "",
+        f"*Collection generated from OpenBrain — {len(exported)} items*",
+        "",
+        f"**Query:** `{query}`",
+        "",
+    ]
+
+    if group_by and memories:
+        lines.append(f"## Grouped by: {group_by}")
+        lines.append("")
+        
+        # Group memories
+        groups: dict[str, list[tuple[ObsidianExportItem, MemoryOut]]] = {}
+        for exp in exported:
+            mem = next((m for m in memories if m.id == exp.memory_id), None)
+            if mem:
+                if group_by == "entity_type":
+                    key = mem.entity_type
+                elif group_by == "owner":
+                    key = mem.owner or "No owner"
+                elif group_by == "tags":
+                    key = mem.tags[0] if mem.tags else "Untagged"
+                else:
+                    key = "Other"
+                groups.setdefault(key, []).append((exp, mem))
+        
+        # Output groups
+        for key, items in sorted(groups.items()):
+            lines.append(f"### {key}")
+            lines.append("")
+            for exp, mem in items:
+                link_path = exp.path.replace('.md', '')
+                lines.append(f"- [[{link_path}]] — {exp.title}")
+            lines.append("")
+    else:
+        lines.append("## Items")
+        lines.append("")
+        for exp in exported:
+            link_path = exp.path.replace('.md', '')
+            lines.append(f"- [[{link_path}]] — {exp.title}")
+        lines.append("")
+    
+    return "\n".join(lines)
+
 
 # ---------------------------------------------------------------------------
 # Well-Known Discovery (for ChatGPT MCP)
@@ -876,6 +1198,141 @@ async def export(
         return Response(content=content, media_type="application/x-ndjson")
     return records
 
+
+# ---------------------------------------------------------------------------
+# Bidirectional Sync Handlers (OpenBrain ↔ Obsidian)
+# ---------------------------------------------------------------------------
+
+# Global sync tracker instance
+_sync_tracker: ObsidianChangeTracker | None = None
+_sync_engine: BidirectionalSyncEngine | None = None
+
+
+def _get_sync_tracker() -> ObsidianChangeTracker:
+    """Get or create sync tracker singleton."""
+    global _sync_tracker
+    if _sync_tracker is None:
+        _sync_tracker = ObsidianChangeTracker()
+    return _sync_tracker
+
+
+def _get_sync_engine(strategy: str = "domain_based") -> BidirectionalSyncEngine:
+    """Get or create sync engine singleton."""
+    global _sync_engine
+    if _sync_engine is None:
+        strategy_enum = SyncStrategy(strategy)
+        _sync_engine = BidirectionalSyncEngine(
+            strategy=strategy_enum,
+            tracker=_get_sync_tracker(),
+        )
+    return _sync_engine
+
+
+async def v1_obsidian_bidirectional_sync(
+    req: ObsidianBidirectionalSyncRequest,
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> ObsidianBidirectionalSyncResponse:
+    """
+    Perform bidirectional synchronization between OpenBrain and Obsidian.
+    
+    Detects and resolves changes in both systems.
+    """
+    _require_admin(_user)
+    
+    engine = _get_sync_engine(req.strategy)
+    adapter = ObsidianCliAdapter()
+    
+    result = await engine.sync(
+        session=session,
+        adapter=adapter,
+        vault=req.vault,
+        dry_run=req.dry_run,
+    )
+    
+    # Convert to response format
+    changes_response = [
+        ObsidianSyncChange(
+            memory_id=change.memory_id,
+            obsidian_path=change.obsidian_path,
+            change_type=change.change_type.value,
+            source=change.source,
+            conflict=change.conflict,
+            resolution=change.resolution,
+        )
+        for change in result.details
+    ]
+    
+    return ObsidianBidirectionalSyncResponse(
+        started_at=result.started_at,
+        completed_at=result.completed_at,
+        vault=req.vault,
+        strategy=req.strategy,
+        changes_detected=result.changes_detected,
+        changes_applied=result.changes_applied,
+        conflicts=result.conflicts,
+        dry_run=req.dry_run,
+        errors=result.errors,
+        changes=changes_response,
+    )
+
+
+async def v1_obsidian_sync_status(
+    _user: dict = Depends(require_auth),
+) -> ObsidianSyncStatus:
+    """Get status of sync tracking."""
+    _require_admin(_user)
+    
+    tracker = _get_sync_tracker()
+    stats = tracker.get_stats()
+    
+    return ObsidianSyncStatus(**stats).model_dump()
+
+
+async def v1_obsidian_update_note(
+    vault: str,
+    path: str,
+    content: str | None = None,
+    append: bool = False,
+    tags: list[str] | None = None,
+    _user: dict = Depends(require_auth),
+) -> ObsidianWriteResponse:
+    """Update an existing note in Obsidian."""
+    _require_admin(_user)
+    
+    adapter = ObsidianCliAdapter()
+    
+    # Build frontmatter update if tags provided
+    frontmatter = None
+    if tags:
+        frontmatter = {"tags": tags}
+    
+    try:
+        note = await adapter.update_note(
+            vault=vault,
+            path=path,
+            content=content,
+            frontmatter=frontmatter,
+            append=append,
+        )
+    except ObsidianCliError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    
+    return ObsidianWriteResponse(
+        vault=note.vault,
+        path=note.path,
+        title=note.title,
+        content=note.content,
+        frontmatter=note.frontmatter,
+        tags=note.tags,
+        file_hash=note.file_hash,
+        created=False,  # It was an update
+    )
+
+
+# ---------------------------------------------------------------------------
+# Route Registration
+# ---------------------------------------------------------------------------
 
 register_v1_routes(app, handlers=__import__(__name__, fromlist=["*"]))
 register_ops_routes(app, handlers=__import__(__name__, fromlist=["*"]))

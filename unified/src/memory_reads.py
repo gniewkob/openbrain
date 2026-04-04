@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from importlib import import_module
 from typing import Any
 
 from sqlalchemy import func, select
@@ -16,6 +15,7 @@ from .crud_common import (
 )
 from .embed import get_embedding
 from .models import AuditLog, DomainEnum, Memory
+from .repositories import MemoryRepository, SQLAlchemyMemoryRepository
 from .schemas import (
     MaintenanceAction,
     MaintenanceReportDetail,
@@ -29,13 +29,9 @@ from .schemas import (
 )
 
 
-def _crud_module():
-    return import_module(f"{__package__}.crud")
-
-
 async def _get_embedding_compat(text: str):
-    func = getattr(_crud_module(), "get_embedding", get_embedding)
-    return await func(text)
+    """Get embedding using direct reference."""
+    return await get_embedding(text)
 
 
 async def get_memory_raw(session: AsyncSession, memory_id: str) -> Memory:
@@ -62,50 +58,105 @@ async def get_memory_as_record(
     return _to_record(memory), _to_out(memory)
 
 
-async def list_memories(session: AsyncSession, filters: dict[str, Any], limit: int = 20) -> list[MemoryOut]:
-    stmt = select(Memory)
+# ============================================================================
+# Repository-based API (New - ARCH-002)
+# ============================================================================
+
+def get_repository(session: AsyncSession) -> MemoryRepository:
+    """Factory function to get the appropriate repository instance."""
+    return SQLAlchemyMemoryRepository(session)
+
+
+async def get_memory_with_repo(
+    session: AsyncSession, memory_id: str
+) -> MemoryOut | None:
+    """Get memory using repository pattern."""
+    repo = get_repository(session)
+    memory = await repo.get_by_id(memory_id)
+    return _to_out(memory) if memory else None
+
+
+def _apply_filters_to_stmt(
+    stmt,
+    filters: dict[str, Any],
+    *,
+    default_status_filter: bool = True,
+) -> Any:
+    """
+    Apply common filters to a SQLAlchemy select statement.
+    
+    Args:
+        stmt: The SQLAlchemy select statement to filter
+        filters: Dictionary of filter conditions
+        default_status_filter: If True, exclude superseded/duplicate by default
+    
+    Returns:
+        Modified statement with filters applied
+    """
     if "domain" in filters:
         domains = filters["domain"] if isinstance(filters["domain"], list) else [filters["domain"]]
         stmt = stmt.where(Memory.domain.in_([DomainEnum(domain) for domain in domains]))
     if "entity_type" in filters:
-        stmt = stmt.where(Memory.entity_type == filters["entity_type"])
+        entity_types = filters["entity_type"]
+        if isinstance(entity_types, list):
+            stmt = stmt.where(Memory.entity_type.in_(entity_types))
+        else:
+            stmt = stmt.where(Memory.entity_type == entity_types)
     if "status" in filters:
         stmt = stmt.where(Memory.status == filters["status"])
-    else:
+    elif default_status_filter:
         stmt = stmt.where(Memory.status.notin_([STATUS_SUPERSEDED, STATUS_DUPLICATE]))
     if "sensitivity" in filters:
         stmt = stmt.where(Memory.sensitivity == filters["sensitivity"])
     if "owner" in filters:
-        stmt = stmt.where(Memory.owner == filters["owner"])
+        owners = filters["owner"]
+        if isinstance(owners, list):
+            stmt = stmt.where(Memory.owner.in_(owners))
+        else:
+            stmt = stmt.where(Memory.owner == owners)
     if "tenant_id" in filters:
-        stmt = stmt.where(_tenant_filter_expr([filters["tenant_id"]]))
+        tenant_ids = filters["tenant_id"]
+        if isinstance(tenant_ids, list):
+            stmt = stmt.where(_tenant_filter_expr(tenant_ids))
+        else:
+            stmt = stmt.where(_tenant_filter_expr([tenant_ids]))
+    if "tags_any" in filters:
+        stmt = stmt.where(Memory.tags.overlap(filters["tags_any"]))
+    
+    return stmt
 
+
+async def list_memories(session: AsyncSession, filters: dict[str, Any], limit: int = 20) -> list[MemoryOut]:
+    """List memories with filtering and pagination."""
+    stmt = select(Memory)
+    stmt = _apply_filters_to_stmt(stmt, filters, default_status_filter=True)
     stmt = stmt.order_by(Memory.updated_at.desc()).limit(limit)
     result = await session.execute(stmt)
     return [_to_out(memory) for memory in result.scalars().all()]
 
 
 async def search_memories(session: AsyncSession, req: SearchRequest) -> list[tuple[MemoryOut, float]]:
+    """Semantic search memories with vector similarity."""
     embedding = await _get_embedding_compat(req.query)
     stmt = select(Memory, Memory.embedding.cosine_distance(embedding).label("distance")).where(Memory.status == "active")
-    filters = req.filters
-    if "domain" in filters:
-        domains = filters["domain"] if isinstance(filters["domain"], list) else [filters["domain"]]
-        stmt = stmt.where(Memory.domain.in_([DomainEnum(domain) for domain in domains]))
-    if "entity_type" in filters:
-        stmt = stmt.where(Memory.entity_type == filters["entity_type"])
-    if "sensitivity" in filters:
-        stmt = stmt.where(Memory.sensitivity == filters["sensitivity"])
-    if "tenant_id" in filters:
-        stmt = stmt.where(_tenant_filter_expr([filters["tenant_id"]]))
-    if "owner" in filters:
-        stmt = stmt.where(Memory.owner == filters["owner"])
+    stmt = _apply_filters_to_stmt(stmt, req.filters, default_status_filter=False)
     stmt = stmt.order_by("distance").limit(req.top_k)
     result = await session.execute(stmt)
     return [(_to_out(row.Memory), 1.0 - float(row.distance)) for row in result.all()]
 
 
 async def export_memories(session: AsyncSession, ids: list[str], role: str = "service") -> list[dict]:
+    """
+    Export memories by IDs with sensitivity-based redaction.
+    
+    Args:
+        session: Database session
+        ids: List of memory IDs to export
+        role: Role of the exporter (affects redaction level)
+    
+    Returns:
+        List of exported memory records with redacted sensitive fields
+    """
     stmt = select(Memory).where(Memory.id.in_(ids))
     result = await session.execute(stmt)
     memories = result.scalars().all()
@@ -124,6 +175,22 @@ async def sync_check(
     obsidian_ref: str | None = None,
     file_hash: str | None = None,
 ) -> dict[str, str | None]:
+    """
+    Check if a memory exists and if it's up to date based on content hash.
+    
+    Args:
+        session: Database session
+        memory_id: Memory ID to check
+        match_key: Match key to check (alternative to memory_id)
+        obsidian_ref: Obsidian reference to check (alternative to memory_id)
+        file_hash: Content hash to compare (optional)
+    
+    Returns:
+        Dictionary with status, memory_id, match_key, obsidian_ref, stored_hash, provided_hash
+    
+    Raises:
+        ValueError: If none of memory_id, match_key, obsidian_ref is provided
+    """
     if memory_id is None and match_key is None and obsidian_ref is None:
         raise ValueError("Exactly one of memory_id, match_key, or obsidian_ref must be provided.")
 
@@ -248,27 +315,14 @@ async def get_maintenance_report(session: AsyncSession, report_id: str) -> Maint
 
 
 async def find_memories_v1(session: AsyncSession, req: MemoryFindRequest) -> list[tuple[MemoryRecord, float]]:
+    """Find memories with optional semantic search and filtering."""
     embedding = await _get_embedding_compat(req.query) if req.query else None
     if embedding:
         stmt = select(Memory, Memory.embedding.cosine_distance(embedding).label("distance")).where(Memory.status == "active")
     else:
         stmt = select(Memory).where(Memory.status == "active")
 
-    filters = req.filters
-    if "domain" in filters:
-        domains = filters["domain"] if isinstance(filters["domain"], list) else [filters["domain"]]
-        stmt = stmt.where(Memory.domain.in_([DomainEnum(domain) for domain in domains]))
-    if "entity_type" in filters:
-        types = filters["entity_type"] if isinstance(filters["entity_type"], list) else [filters["entity_type"]]
-        stmt = stmt.where(Memory.entity_type.in_(types))
-    if "owner" in filters:
-        owners = filters["owner"] if isinstance(filters["owner"], list) else [filters["owner"]]
-        stmt = stmt.where(Memory.owner.in_(owners))
-    if "tenant_id" in filters:
-        tenant_ids = filters["tenant_id"] if isinstance(filters["tenant_id"], list) else [filters["tenant_id"]]
-        stmt = stmt.where(_tenant_filter_expr(tenant_ids))
-    if "tags_any" in filters:
-        stmt = stmt.where(Memory.tags.overlap(filters["tags_any"]))
+    stmt = _apply_filters_to_stmt(stmt, req.filters, default_status_filter=False)
 
     if embedding and req.sort == "relevance":
         stmt = stmt.order_by("distance")

@@ -45,6 +45,12 @@ def _make_handlers(**overrides):
         "v1_obsidian_vaults",
         "v1_obsidian_read_note",
         "v1_obsidian_sync",
+        "v1_obsidian_write_note",
+        "v1_obsidian_export",
+        "v1_obsidian_collection",
+        "v1_obsidian_bidirectional_sync",
+        "v1_obsidian_sync_status",
+        "v1_obsidian_update_note",
         "oauth_protected_resource",
         "oauth_authorization_server",
     }

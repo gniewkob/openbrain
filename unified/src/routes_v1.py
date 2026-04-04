@@ -7,8 +7,12 @@ from .schemas import (
     MemoryRecord,
     MemoryWriteManyResponse,
     MemoryWriteResponse,
+    ObsidianBidirectionalSyncResponse,
+    ObsidianCollectionResponse,
+    ObsidianExportResponse,
     ObsidianNoteResponse,
     ObsidianSyncResponse,
+    ObsidianWriteResponse,
 )
 
 
@@ -60,6 +64,44 @@ def register_v1_routes(app: FastAPI, handlers) -> None:
         handlers.v1_obsidian_sync,
         methods=["POST"],
         response_model=ObsidianSyncResponse,
+    )
+    # Export endpoints (OpenBrain → Obsidian)
+    app.add_api_route(
+        "/api/v1/obsidian/write-note",
+        handlers.v1_obsidian_write_note,
+        methods=["POST"],
+        response_model=ObsidianWriteResponse,
+    )
+    app.add_api_route(
+        "/api/v1/obsidian/export",
+        handlers.v1_obsidian_export,
+        methods=["POST"],
+        response_model=ObsidianExportResponse,
+    )
+    app.add_api_route(
+        "/api/v1/obsidian/collection",
+        handlers.v1_obsidian_collection,
+        methods=["POST"],
+        response_model=ObsidianCollectionResponse,
+    )
+    # Bidirectional sync endpoints
+    app.add_api_route(
+        "/api/v1/obsidian/bidirectional-sync",
+        handlers.v1_obsidian_bidirectional_sync,
+        methods=["POST"],
+        response_model=ObsidianBidirectionalSyncResponse,
+    )
+    app.add_api_route(
+        "/api/v1/obsidian/sync-status",
+        handlers.v1_obsidian_sync_status,
+        methods=["GET"],
+        response_model=dict,
+    )
+    app.add_api_route(
+        "/api/v1/obsidian/update-note",
+        handlers.v1_obsidian_update_note,
+        methods=["POST"],
+        response_model=ObsidianWriteResponse,
     )
     app.add_api_route(
         "/.well-known/oauth-protected-resource",

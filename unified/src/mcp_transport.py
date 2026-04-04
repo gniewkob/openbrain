@@ -379,7 +379,7 @@ async def brain_delete(memory_id: str) -> dict[str, Any]:
 @mcp_tool_guard
 async def brain_export(ids: list[str]) -> list[dict[str, Any]]:
     """Export raw memory records for external use."""
-    return await _safe_req("POST", f"/api/memories/export", json={"ids": ids})
+    return await _safe_req("POST", "/api/memories/export", json={"ids": ids})
 
 
 @mcp.tool()
@@ -454,10 +454,23 @@ if ENABLE_HTTP_OBSIDIAN_TOOLS:
 # ===========================================================================
 
 
+# Maximum batch size for bulk operations to prevent OOM
+_MAX_BATCH_SIZE = 100
+
+
 @mcp.tool()
 @mcp_tool_guard
 async def brain_store_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
-    """Bulk store memories. Use for archiving or synchronization."""
+    """
+    Bulk store memories. Use for archiving or synchronization.
+    
+    Args:
+        items: List of memory records (max 100 per batch)
+    """
+    if len(items) > _MAX_BATCH_SIZE:
+        raise ValueError(f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. Split into multiple calls.")
+    if not items:
+        raise ValueError("Batch cannot be empty.")
     payload = {"records": items, "write_mode": "upsert"}
     return await _safe_req("POST", "/write-many", json=payload)
 
@@ -465,7 +478,16 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
 @mcp.tool()
 @mcp_tool_guard
 async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
-    """Idempotent bulk synchronization using match_key."""
+    """
+    Idempotent bulk synchronization using match_key.
+    
+    Args:
+        items: List of memory records (max 100 per batch)
+    """
+    if len(items) > _MAX_BATCH_SIZE:
+        raise ValueError(f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. Split into multiple calls.")
+    if not items:
+        raise ValueError("Batch cannot be empty.")
     return await _safe_req("POST", "/api/memories/bulk-upsert", json=items)
 
 
