@@ -221,6 +221,11 @@ def _current_registry() -> dict[str, Any]:
 
 
 def get_policy_registry() -> dict[str, Any]:
+    """Get current policy registry configuration.
+    
+    Returns:
+        Dictionary with tenants and subjects policy configuration
+    """
     ref = _current_registry()
     return {
         "tenants": dict(ref.get("tenants", {})),
@@ -279,10 +284,29 @@ validate_security_configuration()
 
 
 def get_subject(claims: dict[str, Any]) -> str:
+    """Extract subject identifier from JWT claims.
+    
+    Args:
+        claims: JWT payload containing user claims
+        
+    Returns:
+        Subject identifier (sub claim) or empty string
+    """
     return str(claims.get("sub", "")).strip()
 
 
 def get_tenant_id(claims: dict[str, Any]) -> str:
+    """Extract tenant ID from JWT claims.
+    
+    Checks multiple claim keys in order of preference:
+    tenant_id, tenant, tid, org_id, organization_id
+    
+    Args:
+        claims: JWT payload containing tenant claims
+        
+    Returns:
+        Tenant identifier or empty string if not found
+    """
     for key in (
         "tenant_id",
         "tenant",
@@ -311,6 +335,15 @@ def _claim_values(claims: dict[str, Any], *keys: str) -> list[str]:
 
 
 def get_domain_scope(claims: dict[str, Any], action: str) -> set[str]:
+    """Extract domain scope for given action from JWT claims.
+    
+    Args:
+        claims: JWT payload with domain scope claims
+        action: Action type (read, write, admin)
+        
+    Returns:
+        Set of allowed domains for the action
+    """
     action = action.lower()
     direct_keys = {
         "read": (
@@ -372,6 +405,14 @@ def get_registry_domain_scope(subject: str, tenant_id: str, action: str) -> set[
 
 
 def is_privileged_user(claims: dict[str, Any]) -> bool:
+    """Check if user has privileged/admin access based on claims.
+    
+    Args:
+        claims: JWT payload with role claims
+        
+    Returns:
+        True if user has admin/privileged role
+    """
     subject = get_subject(claims)
     # "local-dev" is returned only when public exposure is disabled — always trusted.
     # "internal" is privileged only when it arrived via X-Internal-Key, not via
