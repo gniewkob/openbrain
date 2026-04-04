@@ -19,23 +19,31 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 log = structlog.get_logger()
 
-# This transport runs inside the unified-server container, so its safe default
-# must target the app's internal listener on port 80 rather than the host-mapped
-# port 7010. External stdio gateways override BRAIN_URL explicitly.
-BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://127.0.0.1:80")
-BACKEND_TIMEOUT: float = float(os.environ.get("BACKEND_TIMEOUT_S", "30"))
-INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
-ENABLE_HTTP_OBSIDIAN_TOOLS: bool = os.environ.get(
-    "ENABLE_HTTP_OBSIDIAN_TOOLS", ""
-).lower() in {"1", "true", "yes"}
-# Source system tag stored with every brain_store call.
-# Override via MCP_SOURCE_SYSTEM env var when running from a non-ChatGPT host.
-MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
+# Config will be imported lazily to avoid circular imports
+# These module-level defaults are kept for backwards compatibility
+BRAIN_URL: str = "http://127.0.0.1:80"  # Will be overridden by config
+BACKEND_TIMEOUT: float = 30.0
+INTERNAL_API_KEY: str = ""
+ENABLE_HTTP_OBSIDIAN_TOOLS: bool = False
+MCP_SOURCE_SYSTEM: str = "other"
+_public_base = ""
+_ngrok_host = ""
 
-_public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-_ngrok_host = (
-    _public_base.replace("https://", "").replace("http://", "") if _public_base else ""
-)
+
+def _init_config():
+    """Initialize module-level config from central config."""
+    global BRAIN_URL, BACKEND_TIMEOUT, INTERNAL_API_KEY, MCP_SOURCE_SYSTEM, _public_base, _ngrok_host
+    from .config import get_config
+    
+    config = get_config()
+    BRAIN_URL = config.mcp.brain_url
+    BACKEND_TIMEOUT = config.mcp.backend_timeout
+    INTERNAL_API_KEY = config.auth.internal_api_key
+    MCP_SOURCE_SYSTEM = config.mcp.source_system
+    _public_base = config.auth.public_base_url
+    _ngrok_host = (
+        _public_base.replace("https://", "").replace("http://", "") if _public_base else ""
+    )
 
 _transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=True,

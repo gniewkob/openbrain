@@ -4,25 +4,24 @@ Supports both old (/api/embeddings) and new (/api/embed) Ollama API.
 Includes LRU caching for embeddings to reduce redundant API calls.
 """
 import asyncio
-import os
 from functools import lru_cache
 from typing import List
 
 import httpx
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
+from .config import get_config
+
+# These will be initialized lazily from config
 _EMBED_TIMEOUT = httpx.Timeout(30.0)
 _EMBED_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 _RETRYABLE_STATUS_CODES = {502, 503, 504}
-# Cache size for embeddings (tune based on memory constraints)
-_EMBED_CACHE_SIZE = int(os.environ.get("EMBED_CACHE_SIZE", "1000"))
 
 _client: httpx.AsyncClient | None = None
 
 
 # Thread-safe cache for embeddings using LRU strategy
-@lru_cache(maxsize=_EMBED_CACHE_SIZE)
+# Note: Using a fixed maxsize here; actual cache size controlled in _update_embedding_cache
+@lru_cache(maxsize=1000)
 def _get_cached_embedding(text_hash: str) -> tuple[List[float], str] | None:
     """
     Cache storage for embeddings. Returns (embedding, model) or None.
@@ -40,8 +39,9 @@ def _compute_text_hash(text: str) -> str:
 def _get_client() -> httpx.AsyncClient:
     global _client
     if _client is None:
+        config = get_config()
         _client = httpx.AsyncClient(
-            base_url=OLLAMA_URL,
+            base_url=config.embedding.url,
             timeout=_EMBED_TIMEOUT,
             limits=_EMBED_LIMITS,
         )
@@ -85,23 +85,25 @@ async def get_embedding(text: str) -> list[float]:
     Fetch an embedding vector for the given text using Ollama.
     Uses LRU cache to avoid redundant API calls for identical text.
     """
+    config = get_config()
+    
     # Check cache first
     text_hash = _compute_text_hash(text)
     cached = _get_cached_embedding(text_hash)
     if cached is not None:
         embedding, cached_model = cached
-        if cached_model == EMBED_MODEL:
+        if cached_model == config.embedding.model:
             return list(embedding)  # Return copy to prevent mutation
     
     # Try new API first (/api/embed), fall back to old (/api/embeddings).
     response = await _post_with_retry(
         "/api/embed",
-        {"model": EMBED_MODEL, "input": text},
+        {"model": config.embedding.model, "input": text},
     )
     if response.status_code == 404:
         response = await _post_with_retry(
             "/api/embeddings",
-            {"model": EMBED_MODEL, "prompt": text},
+            {"model": config.embedding.model, "prompt": text},
         )
         result = response.json()["embedding"]
     else:
@@ -112,7 +114,7 @@ async def get_embedding(text: str) -> list[float]:
     # Store in cache (convert to tuple for hashability)
     # Note: lru_cache requires hashable types, so we use a simple wrapper
     # The cache is managed at module level for persistence
-    await _update_embedding_cache(text_hash, tuple(result), EMBED_MODEL)
+    await _update_embedding_cache(text_hash, tuple(result), config.embedding.model)
     
     return result
 
@@ -124,9 +126,10 @@ _embedding_cache_lock = asyncio.Lock()
 
 async def _update_embedding_cache(text_hash: str, embedding: tuple[float, ...], model: str) -> None:
     """Update the embedding cache with a new entry."""
+    config = get_config()
     async with _embedding_cache_lock:
         # Simple LRU eviction when cache is full
-        if len(_embedding_cache) >= _EMBED_CACHE_SIZE:
+        if len(_embedding_cache) >= config.embedding.cache_size:
             # Remove oldest entry (simple FIFO for now)
             oldest_key = next(iter(_embedding_cache))
             del _embedding_cache[oldest_key]
@@ -135,10 +138,11 @@ async def _update_embedding_cache(text_hash: str, embedding: tuple[float, ...], 
 
 async def get_cache_stats() -> dict[str, int]:
     """Return cache statistics for monitoring."""
+    config = get_config()
     async with _embedding_cache_lock:
         return {
             "cache_size": len(_embedding_cache),
-            "cache_limit": _EMBED_CACHE_SIZE,
+            "cache_limit": config.embedding.cache_size,
         }
 
 

@@ -223,7 +223,12 @@ def note_to_memory_write_record(
 
 class ObsidianCliAdapter:
     def __init__(self, command: str | None = None, timeout_s: float = 30.0) -> None:
-        self.command = command or os.environ.get("OBSIDIAN_CLI_COMMAND", "obsidian")
+        if command:
+            self.command = command
+        else:
+            from ..config import get_config
+            config = get_config()
+            self.command = config.obsidian.cli_command
         self.timeout_s = timeout_s
 
     async def _run(self, *args: str) -> str:

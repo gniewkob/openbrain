@@ -140,7 +140,10 @@ class ObsidianChangeTracker:
     def _default_storage_path(self) -> str:
         """Default path for sync state storage."""
         import os
-        data_dir = os.environ.get("OPENBRAIN_DATA_DIR", ".openbrain")
+        from .config import get_config
+        
+        config = get_config()
+        data_dir = config.obsidian.data_dir
         return os.path.join(data_dir, "obsidian_sync_state.json")
     
     def _load_state(self) -> None:
