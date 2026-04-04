@@ -89,7 +89,8 @@ def _validate_corporate_domain(
 
     if not rec.match_key:
         errors.append(
-            "match_key is required for corporate domain — ensures idempotency on append-only records."
+            "match_key is required for corporate domain — ensures "
+            "idempotency on append-only records."
         )
 
     return mode, errors
@@ -763,7 +764,11 @@ async def run_maintenance(
                             MaintenanceAction(
                                 action="dedup_remediate",
                                 memory_id=duplicate.id,
-                                detail=f"Exact duplicate of {canonical.id} marked as duplicate via governance-safe remediation (append-only)",
+                                detail=(
+                                    f"Exact duplicate of {canonical.id} "
+                                    f"marked as duplicate via "
+                                    f"governance-safe remediation (append-only)"
+                                ),
                             )
                         )
                     else:
@@ -814,7 +819,10 @@ async def run_maintenance(
                     MaintenanceAction(
                         action="fix_link",
                         memory_id=memory.id,
-                        detail=f"superseded_by {memory.superseded_by} not found in active",
+                        detail=(
+                            f"superseded_by {memory.superseded_by} "
+                            f"not found in active"
+                        ),
                     )
                 )
                 if not req.dry_run:
@@ -823,7 +831,10 @@ async def run_maintenance(
                             MaintenanceAction(
                                 action="policy_skip",
                                 memory_id=memory.id,
-                                detail="Skipped supersession link repair for append-only memory",
+                                detail=(
+                                    "Skipped supersession link repair "
+                                    "for append-only memory"
+                                ),
                             )
                         )
                         continue
