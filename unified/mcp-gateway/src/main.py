@@ -162,14 +162,56 @@ def _require_obsidian_local_tools_enabled() -> None:
 # ---------------------------------------------------------------------------
 
 
+async def _get_backend_status() -> dict:
+    """Query /readyz on the backend with a 5s timeout.
+
+    Returns a backend status dict regardless of reachability.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(f"{BRAIN_URL}/readyz")
+        if r.status_code == 200:
+            data = r.json()
+            return {
+                "status": "ok",
+                "url": BRAIN_URL,
+                "db": data.get("db", "unknown"),
+                "vector_store": data.get("vector_store", "unknown"),
+            }
+        return {
+            "status": "unavailable",
+            "url": BRAIN_URL,
+            "db": "unknown",
+            "vector_store": "unknown",
+        }
+    except Exception:
+        return {
+            "status": "unavailable",
+            "url": BRAIN_URL,
+            "db": "unknown",
+            "vector_store": "unknown",
+        }
+
+
 @mcp.tool()
 async def brain_capabilities() -> dict:
     """Check the operational status of the Memory Platform V1."""
     tier_2_tools = ["list", "get_context", "delete", "export", "sync_check"]
     if _obsidian_local_tools_enabled():
         tier_2_tools.extend(["obsidian_vaults", "obsidian_read_note", "obsidian_sync"])
+
+    obsidian_enabled = _obsidian_local_tools_enabled()
+    backend = await _get_backend_status()
+
     return {
         "platform": "OpenBrain V1 (Gateway)",
+        "backend": backend,
+        "obsidian_local": {
+            "status": "enabled" if obsidian_enabled else "disabled",
+            "reason": None
+            if obsidian_enabled
+            else f"Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1 to enable",
+        },
         "tier_1_core": {
             "status": "stable",
             "tools": ["search", "get", "store", "update"],
@@ -285,7 +327,14 @@ async def brain_list(
         params["tenant_id"] = tenant_id
 
     async with _client() as c:
-        r = await c.get("/api/memories", params=params)
+        r = await c.post(
+            "/api/v1/memory/find",
+            json={
+                "query": None,
+                "limit": params.get("limit", 20),
+                "filters": {k: v for k, v in params.items() if k != "limit"},
+            },
+        )
         _raise(r)
         return r.json()
 
@@ -357,14 +406,18 @@ async def brain_update(
     obsidian_ref: str | None = None,
 ) -> BrainMemory:
     """
-    Update a memory.
+    Update a memory by ID.
     - Corporate: creates new version (append-only). Old version marked as superseded.
     - Build/Personal: updates in place.
     """
-    payload: dict[str, Any] = {"content": content, "updated_by": updated_by}
+    # Build patch payload — only include fields explicitly provided
+    payload: dict[str, Any] = {
+        "content": content,
+        "updated_by": updated_by,
+    }
     if title is not None:
         payload["title"] = title
-    if sensitivity:
+    if sensitivity is not None:
         payload["sensitivity"] = sensitivity
     if owner is not None:
         payload["owner"] = owner
@@ -378,7 +431,10 @@ async def brain_update(
         payload["obsidian_ref"] = obsidian_ref
 
     async with _client() as c:
-        r = await c.put(f"/api/memories/{memory_id}", json=payload)
+        r = await c.patch(
+            f"/api/v1/memory/{memory_id}",
+            json=payload,
+        )
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         _raise(r)
@@ -392,7 +448,7 @@ async def brain_delete(memory_id: str) -> dict:
     Corporate memories cannot be deleted (returns 403).
     """
     async with _client() as c:
-        r = await c.delete(f"/api/memories/{memory_id}")
+        r = await c.delete(f"/api/v1/memory/{memory_id}")
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         if r.status_code == 403:
@@ -416,7 +472,7 @@ async def brain_maintain(
     """
     async with _client() as c:
         r = await c.post(
-            "/api/admin/maintain",
+            "/api/v1/memory/maintain",
             json={
                 "dry_run": dry_run,
                 "dedup_threshold": dedup_threshold,
@@ -436,7 +492,7 @@ async def brain_export(ids: list[str]) -> list[dict]:
     Restricted-sensitivity content is redacted automatically.
     """
     async with _client() as c:
-        r = await c.post("/api/memories/export", json={"ids": ids})
+        r = await c.post("/api/v1/memory/export", json={"ids": ids})
         _raise(r)
         return r.json()
 
@@ -460,7 +516,7 @@ async def brain_sync_check(
         "file_hash": file_hash,
     }
     async with _client() as c:
-        r = await c.post("/api/memories/sync-check", json=payload)
+        r = await c.post("/api/v1/memory/sync-check", json=payload)
         _raise(r)
         return r.json()
 
@@ -696,7 +752,7 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict:
 async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict:
     """Idempotent bulk synchronization using match_key."""
     async with _client() as c:
-        r = await c.post("/api/memories/bulk-upsert", json=items)
+        r = await c.post("/api/v1/memory/bulk-upsert", json=items)
         _raise(r)
         return r.json()
 
