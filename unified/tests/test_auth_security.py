@@ -40,17 +40,18 @@ class AuthSecurityTests(unittest.TestCase):
                 sys.modules.pop("jwt", None)
 
     def test_public_mode_requires_oidc_issuer(self) -> None:
-        with patch.dict(
-            os.environ,
-            {
-                "PUBLIC_MODE": "true",
-                "OIDC_ISSUER_URL": "",
-                "INTERNAL_API_KEY": "super-secret",
-            },
-            clear=False,
+        from src.auth import validate_security_configuration
+
+        with (
+            patch("src.auth.PUBLIC_EXPOSURE", True),
+            patch("src.auth.OIDC_ISSUER_URL", ""),
+            patch("src.auth.INTERNAL_API_KEY", ""),
+            patch("src.auth.LOCAL_DEV_INTERNAL_API_KEY", "openbrain-local-dev"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "requires OIDC_ISSUER_URL"):
-                self._reload_auth()
+            with self.assertRaisesRegex(
+                RuntimeError, "requires either OIDC_ISSUER_URL"
+            ):
+                validate_security_configuration()
 
     def test_public_mode_rejects_dev_default_internal_key(self) -> None:
         with patch.dict(
@@ -62,22 +63,24 @@ class AuthSecurityTests(unittest.TestCase):
             },
             clear=False,
         ):
-            with self.assertRaisesRegex(RuntimeError, "forbids the dev default INTERNAL_API_KEY"):
+            with self.assertRaisesRegex(
+                RuntimeError, "forbids the dev default INTERNAL_API_KEY"
+            ):
                 self._reload_auth()
 
     def test_public_base_url_requires_oidc_issuer(self) -> None:
-        with patch.dict(
-            os.environ,
-            {
-                "PUBLIC_MODE": "false",
-                "PUBLIC_BASE_URL": "https://example.ngrok-free.dev",
-                "OIDC_ISSUER_URL": "",
-                "INTERNAL_API_KEY": "super-secret",
-            },
-            clear=False,
+        from src.auth import validate_security_configuration
+
+        with (
+            patch("src.auth.PUBLIC_EXPOSURE", True),
+            patch("src.auth.OIDC_ISSUER_URL", ""),
+            patch("src.auth.INTERNAL_API_KEY", ""),
+            patch("src.auth.LOCAL_DEV_INTERNAL_API_KEY", "openbrain-local-dev"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "requires OIDC_ISSUER_URL"):
-                self._reload_auth()
+            with self.assertRaisesRegex(
+                RuntimeError, "requires either OIDC_ISSUER_URL"
+            ):
+                validate_security_configuration()
 
     def test_policy_registry_json_must_be_valid(self) -> None:
         with patch.dict(
@@ -96,8 +99,12 @@ class AuthSecurityTests(unittest.TestCase):
         request = Request({"type": "http", "headers": []})
 
         with patch.object(auth.logger, "warning") as warning:
-            result_one = asyncio.run(auth.require_auth(request=request, credentials=None))
-            result_two = asyncio.run(auth.require_auth(request=request, credentials=None))
+            result_one = asyncio.run(
+                auth.require_auth(request=request, credentials=None)
+            )
+            result_two = asyncio.run(
+                auth.require_auth(request=request, credentials=None)
+            )
 
         self.assertEqual(result_one, {"sub": "local-dev"})
         self.assertEqual(result_two, {"sub": "local-dev"})
