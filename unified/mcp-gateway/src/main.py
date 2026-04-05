@@ -40,6 +40,11 @@ INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
 OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"
 MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
 
+# Parameter validation bounds (PERF-007)
+MAX_SEARCH_TOP_K: int = 100
+MAX_LIST_LIMIT: int = 200
+MAX_SYNC_LIMIT: int = 200
+
 mcp = FastMCP(
     name="OpenBrain",
     instructions=(
@@ -312,6 +317,8 @@ async def brain_list(
     status options: active | superseded (default: active only)
     domain options: corporate | build | personal
     """
+    if not 1 <= limit <= MAX_LIST_LIMIT:
+        raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
     params: dict[str, Any] = {"limit": limit}
     if domain:
         params["domain"] = domain
@@ -364,6 +371,8 @@ async def brain_search(
     Returns top-k memories most relevant to the query.
     Optionally filter by domain (corporate|build|personal), entity_type, sensitivity.
     """
+    if not 1 <= top_k <= MAX_SEARCH_TOP_K:
+        raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
     filters: dict[str, Any] = {}
     if domain:
         filters["domain"] = domain
@@ -567,6 +576,8 @@ async def brain_obsidian_sync(
     One-way sync from an Obsidian vault into OpenBrain using deterministic match keys.
     Use paths for explicit notes or folder for a bounded folder sync.
     """
+    if not 1 <= limit <= MAX_SYNC_LIMIT:
+        raise ValueError(f"limit must be 1–{MAX_SYNC_LIMIT}, got {limit}")
     _require_obsidian_local_tools_enabled()
     adapter = ObsidianCliAdapter()
     try:
@@ -718,6 +729,8 @@ async def brain_obsidian_collection(
         max_items: Maximum memories
         group_by: How to group (entity_type, owner, tags)
     """
+    if not 1 <= max_items <= MAX_SYNC_LIMIT:
+        raise ValueError(f"max_items must be 1–{MAX_SYNC_LIMIT}, got {max_items}")
     _require_obsidian_local_tools_enabled()
 
     async with _client() as c:
