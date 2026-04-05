@@ -9,6 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .config import get_config
 from .exceptions import register_exception_handlers
+from .middleware import SecretScanMiddleware
 
 _ALLOWED_HEADERS = [
     "Authorization",
@@ -108,6 +109,9 @@ def create_app(*, public_base_url: str = "", lifespan) -> FastAPI:
 
     # Security headers on every response (added after CORS — runs first in ASGI stack)
     app.add_middleware(SecurityHeadersMiddleware)
+
+    # Secret scanning on write paths (added after SecurityHeaders — runs second)
+    app.add_middleware(SecretScanMiddleware)
 
     # Register centralized exception handlers
     register_exception_handlers(app)
