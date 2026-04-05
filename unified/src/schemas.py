@@ -596,6 +596,7 @@ class ErrorDetail(BaseModel):
     code: str
     message: str
     details: Optional[dict[str, Any]] = None
+    retryable: bool = False
 
 
 class ErrorEnvelope(BaseModel):

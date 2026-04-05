@@ -183,6 +183,20 @@ def is_production() -> bool:
     return os.environ.get("PUBLIC_MODE", "").lower() == "true"
 
 
+_HTTP_STATUS_TO_CODE: dict[int, str] = {
+    400: "validation_error",
+    401: "auth_required",
+    403: "access_denied",
+    404: "memory_not_found",
+    409: "match_key_conflict",
+    422: "semantic_error",
+    429: "rate_limit_exceeded",
+    503: "backend_unavailable",
+}
+
+_RETRYABLE_STATUS_CODES: frozenset[int] = frozenset([429, 503])
+
+
 def create_error_response(
     exc: Exception,
     request: Request | None = None,
@@ -190,10 +204,12 @@ def create_error_response(
     """Create standardized error response."""
 
     if isinstance(exc, OpenBrainError):
-        response = {
+        retryable = exc.status_code in _RETRYABLE_STATUS_CODES
+        response: dict[str, Any] = {
             "error": {
                 "code": exc.error_code,
                 "message": exc.safe_message if is_production() else exc.message,
+                "retryable": retryable,
             }
         }
 
@@ -216,6 +232,7 @@ def create_error_response(
             "error": {
                 "code": "internal_error",
                 "message": "An internal error occurred",
+                "retryable": False,
             }
         }
 
@@ -225,6 +242,7 @@ def create_error_response(
             "code": "internal_error",
             "message": str(exc),
             "type": type(exc).__name__,
+            "retryable": False,
         }
     }
 
@@ -245,6 +263,60 @@ async def openbrain_exception_handler(
     )
 
 
+async def http_exception_handler(
+    request: Request,
+    exc: HTTPException,
+) -> JSONResponse:
+    """Wrap all HTTPException into ErrorDetail envelope with semantic code.
+
+    Maps HTTP status code to a domain-specific error code. Adds retryable:true
+    for 429 and 503 responses.
+    """
+    code = _HTTP_STATUS_TO_CODE.get(exc.status_code, "internal_error")
+    retryable = exc.status_code in _RETRYABLE_STATUS_CODES
+
+    # If detail is already an ErrorDetail envelope (e.g. raised internally),
+    # extract the code and message rather than clobbering them.
+    detail = exc.detail
+    if isinstance(detail, dict) and "code" in detail:
+        code = detail["code"]
+        message = detail.get("message", str(exc.status_code))
+    elif isinstance(detail, str):
+        message = detail
+    else:
+        message = str(exc.status_code)
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": code,
+                "message": message,
+                "details": None,
+                "retryable": retryable,
+            }
+        },
+    )
+
+
+async def value_error_handler(
+    request: Request,
+    exc: ValueError,
+) -> JSONResponse:
+    """Map ValueError from business logic to 422 semantic_error."""
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "error": {
+                "code": "semantic_error",
+                "message": str(exc),
+                "details": None,
+                "retryable": False,
+            }
+        },
+    )
+
+
 async def generic_exception_handler(
     request: Request,
     exc: Exception,
@@ -252,9 +324,7 @@ async def generic_exception_handler(
     """Handler for unhandled exceptions."""
     response = create_error_response(exc, request)
 
-    if isinstance(exc, HTTPException):
-        status_code = exc.status_code
-    elif isinstance(exc, OpenBrainError):
+    if isinstance(exc, OpenBrainError):
         status_code = exc.status_code
     else:
         status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -269,8 +339,10 @@ def register_exception_handlers(app: Any) -> None:
     if not isinstance(app, FastAPI):
         raise TypeError("app must be a FastAPI instance")
 
-    # Register OpenBrain exception handlers
+    # Most-specific handlers first
     app.add_exception_handler(OpenBrainError, openbrain_exception_handler)
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(ValueError, value_error_handler)
 
     # Generic handler for unexpected exceptions
     app.add_exception_handler(Exception, generic_exception_handler)
