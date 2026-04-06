@@ -10,6 +10,7 @@ import time as _time
 from collections import OrderedDict
 
 import httpx
+import structlog
 
 from .config import get_config
 
@@ -17,6 +18,12 @@ from .config import get_config
 _EMBED_TIMEOUT = httpx.Timeout(30.0)
 _EMBED_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 _RETRYABLE_STATUS_CODES = {502, 503, 504}
+
+# Ollama nomic-embed-text supports up to 8192 tokens; ~4 chars/token → 6000 char
+# safe limit. We truncate instead of failing so writes always succeed.
+EMBED_MAX_CHARS = 6_000
+
+log = structlog.get_logger()
 
 _client: httpx.AsyncClient | None = None
 
@@ -140,9 +147,18 @@ async def _post_with_retry(path: str, payload: dict[str, str]) -> httpx.Response
 async def get_embedding(text: str) -> list[float]:
     """
     Fetch an embedding vector for the given text using Ollama.
+    Truncates text to EMBED_MAX_CHARS before embedding.
     Uses LRU cache to avoid redundant API calls for identical text.
     Raises CircuitOpenError if Ollama is repeatedly unavailable.
     """
+    if len(text) > EMBED_MAX_CHARS:
+        log.warning(
+            "embed_text_truncated",
+            original_len=len(text),
+            truncated_to=EMBED_MAX_CHARS,
+        )
+        text = text[:EMBED_MAX_CHARS]
+
     config = get_config()
     text_hash = _compute_text_hash(text)
 
@@ -153,6 +169,8 @@ async def get_embedding(text: str) -> list[float]:
             if cached_model == config.embedding.model:
                 _embedding_cache.move_to_end(text_hash)
                 return list(embedding)
+            # Model changed — evict stale entry so fresh embedding is computed
+            del _embedding_cache[text_hash]
 
     # Check circuit breaker before making an HTTP call to Ollama
     await _circuit_breaker.guard()
