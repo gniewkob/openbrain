@@ -140,6 +140,11 @@ def test_app():
 
 
 class TestSecretScanMiddlewareIntegration:
+    @pytest.fixture(autouse=True)
+    def enable_secret_scanning(self, monkeypatch):
+        """Ensure secret scanning is active during integration tests."""
+        monkeypatch.delenv("DISABLE_SECRET_SCANNING", raising=False)
+
     def _post(self, app, path: str, body: dict):
         """Synchronous helper using AsyncClient."""
         import asyncio
