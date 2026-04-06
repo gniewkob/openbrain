@@ -9,10 +9,12 @@ through for local use.
 from __future__ import annotations
 
 import asyncio
+import collections
 import hmac
 import json
 import logging
 import os
+import threading
 import time
 from pathlib import Path
 from dataclasses import dataclass
@@ -493,6 +495,45 @@ def is_privileged_user(claims: dict[str, Any]) -> bool:
     )
 
 
+# ---------------------------------------------------------------------------
+# Rate limiting for X-Internal-Key requests (audit 1.2)
+# Sliding-window counter per client IP; no Redis required.
+# ---------------------------------------------------------------------------
+_rate_limit_store: dict[str, collections.deque] = {}
+_rate_limit_lock = threading.Lock()
+
+
+def _get_rate_limit_rpm() -> int:
+    try:
+        return int(os.environ.get("AUTH_RATE_LIMIT_RPM", "100"))
+    except ValueError:
+        return 100
+
+
+def check_internal_key_rate_limit(client_ip: str) -> None:
+    """Sliding-window rate limiter for internal key requests.
+
+    Raises HTTP 429 if client exceeds AUTH_RATE_LIMIT_RPM per minute.
+    """
+    limit = _get_rate_limit_rpm()
+    now = time.time()
+    window_start = now - 60.0
+
+    with _rate_limit_lock:
+        if client_ip not in _rate_limit_store:
+            _rate_limit_store[client_ip] = collections.deque()
+        q = _rate_limit_store[client_ip]
+        while q and q[0] < window_start:
+            q.popleft()
+        if len(q) >= limit:
+            raise HTTPException(
+                status_code=429,
+                detail="Rate limit exceeded",
+                headers={"Retry-After": "60"},
+            )
+        q.append(now)
+
+
 async def require_auth(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
@@ -526,6 +567,8 @@ async def require_auth(
         and INTERNAL_API_KEY
         and hmac.compare_digest(internal_key, INTERNAL_API_KEY)
     ):
+        client_ip = (request.client.host if request.client else None) or "unknown"
+        check_internal_key_rate_limit(client_ip)
         return {"sub": "internal", "_auth_via_internal_key": True}
 
     if not _oidc:

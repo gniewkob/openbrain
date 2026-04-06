@@ -142,5 +142,49 @@ class AuthSecurityTests(unittest.TestCase):
             self.assertNotEqual(ctx.exception.status_code, 503)
 
 
+class RateLimitTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from src import auth
+
+        # Reset rate limit store between tests
+        auth._rate_limit_store.clear()
+
+    def test_rate_limit_function_exists(self) -> None:
+        from src.auth import check_internal_key_rate_limit
+
+        self.assertTrue(callable(check_internal_key_rate_limit))
+
+    def test_requests_within_limit_pass(self) -> None:
+        with patch.dict(os.environ, {"AUTH_RATE_LIMIT_RPM": "5"}):
+            from src.auth import check_internal_key_rate_limit, _rate_limit_store
+
+            _rate_limit_store.clear()
+            for _ in range(5):
+                check_internal_key_rate_limit("192.0.2.1")  # must not raise
+
+    def test_exceeding_limit_raises_429(self) -> None:
+        from fastapi import HTTPException
+
+        with patch.dict(os.environ, {"AUTH_RATE_LIMIT_RPM": "3"}):
+            from src.auth import check_internal_key_rate_limit, _rate_limit_store
+
+            _rate_limit_store.clear()
+            for _ in range(3):
+                check_internal_key_rate_limit("192.0.2.2")
+            with self.assertRaises(HTTPException) as ctx:
+                check_internal_key_rate_limit("192.0.2.2")
+            self.assertEqual(ctx.exception.status_code, 429)
+
+    def test_different_ips_have_independent_limits(self) -> None:
+        with patch.dict(os.environ, {"AUTH_RATE_LIMIT_RPM": "2"}):
+            from src.auth import check_internal_key_rate_limit, _rate_limit_store
+
+            _rate_limit_store.clear()
+            check_internal_key_rate_limit("10.0.0.1")
+            check_internal_key_rate_limit("10.0.0.1")
+            # 10.0.0.1 is now at limit, 10.0.0.2 should still work
+            check_internal_key_rate_limit("10.0.0.2")  # must not raise
+
+
 if __name__ == "__main__":
     unittest.main()
