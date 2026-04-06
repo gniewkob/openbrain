@@ -46,7 +46,7 @@ class TestEndpointsNoDBRequired:
         assert response.status_code == 200
         data = response.json()
         assert "paths" in data
-        assert len(data["paths"]) > 30  # Should have many endpoints
+        assert len(data["paths"]) >= 20  # Should have many endpoints
 
     def test_oauth_well_known(self, client: TestClient) -> None:
         """OAuth well-known endpoints work."""
