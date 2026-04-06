@@ -5,6 +5,8 @@ Refactored to reduce cyclomatic complexity.
 
 from __future__ import annotations
 
+import asyncio
+import os
 from datetime import datetime
 from inspect import isawaitable
 
@@ -730,6 +732,15 @@ async def upsert_memories_bulk(
 
 
 async def run_maintenance(
+    session: AsyncSession, req: MaintenanceRequest, actor: str = "agent"
+) -> MaintenanceReport:
+    """Run maintenance with a configurable timeout (MAINTENANCE_TIMEOUT_S, default 300s)."""
+    timeout_s = float(os.environ.get("MAINTENANCE_TIMEOUT_S", "300"))
+    async with asyncio.timeout(timeout_s):
+        return await _run_maintenance_inner(session, req, actor)
+
+
+async def _run_maintenance_inner(
     session: AsyncSession, req: MaintenanceRequest, actor: str = "agent"
 ) -> MaintenanceReport:
     actions: list[MaintenanceAction] = []
