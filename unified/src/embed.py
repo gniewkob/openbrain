@@ -6,7 +6,6 @@ Includes LRU caching for embeddings to reduce redundant API calls.
 
 import asyncio
 from collections import OrderedDict
-from typing import List
 
 import httpx
 
