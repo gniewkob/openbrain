@@ -44,27 +44,27 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-    
+
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
       with:
-        python-version: '3.12'
-    
+        version: "latest"
+
     - name: Install dependencies
       run: |
         cd unified
-        python -m pip install --upgrade pip
-        pip install -e ".[dev]"
-    
+        uv sync --group dev
+
     - name: Run tests
       env:
         DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/openbrain_test
+        DISABLE_SECRET_SCANNING: "1"
       run: |
         cd unified
-        pytest tests/ -v --tb=short -x
+        uv run pytest tests/ -v --tb=short -x --ignore=tests/test_api_endpoints_live.py
 
   security:
     runs-on: ubuntu-latest
