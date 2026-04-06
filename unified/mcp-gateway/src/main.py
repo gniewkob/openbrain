@@ -343,7 +343,8 @@ async def brain_list(
             },
         )
         _raise(r)
-        return r.json()
+        # /find returns [{"record": {...}, "score": ...}]; extract records only
+        return [hit.get("record", hit) for hit in r.json()]
 
 
 @mcp.tool()
