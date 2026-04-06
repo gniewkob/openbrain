@@ -3,9 +3,9 @@ services:
     image: pgvector/pgvector:pg16
     container_name: openbrain-unified-db
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=openbrain_unified
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - openbrain_postgres_data:/var/lib/postgresql/data
     ports:
@@ -13,7 +13,7 @@ services:
     networks:
       - net_unified
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d openbrain_unified"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -40,7 +40,7 @@ services:
     volumes:
       - ./unified:/app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/openbrain_unified
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     command: alembic upgrade head
     networks:
       - net_unified
@@ -55,7 +55,7 @@ services:
     volumes:
       - ./unified:/app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/openbrain_unified
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - OLLAMA_URL=http://host.docker.internal:11434
       - REDIS_URL=redis://redis:6379/0
       - PUBLIC_MODE=true
