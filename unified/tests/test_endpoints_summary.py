@@ -29,7 +29,7 @@ class TestEndpointsNoDBRequired:
 
     def test_readyz_returns_503_without_db(self, client: TestClient) -> None:
         """Readyz returns 503 when DB unavailable (expected)."""
-        response = client.get("/readyz")
+        response = client.get("/api/v1/readyz")
         # 503 is expected when DB is down
         assert response.status_code == 503
         data = response.json()
