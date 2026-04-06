@@ -136,7 +136,9 @@ class _TransportClient:
         if method == "GET" and path == "/api/v1/memory/mem-1":
             return _FakeResponse(200, V1_RECORD)
         if method == "PUT" and path == "/api/memories/mem-1":
-            return _FakeResponse(200, LEGACY_MEMORY)
+            return _FakeResponse(200, V1_RECORD)
+        if method == "PATCH" and path.startswith("/api/v1/memory/"):
+            return _FakeResponse(200, V1_RECORD)
         if method == "GET" and path == "/api/memories":
             return _FakeResponse(200, [LEGACY_MEMORY])
         if method == "DELETE" and path == "/api/memories/mem-1":
