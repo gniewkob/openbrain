@@ -8,8 +8,6 @@ Runs in Docker on port 80 (mapped to 7010 externally).
 from __future__ import annotations
 
 import structlog
-from fastapi import FastAPI
-
 from fastapi.responses import PlainTextResponse
 
 from .app_factory import create_app
