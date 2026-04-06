@@ -747,5 +747,32 @@ class DbPoolConfigTest(unittest.TestCase):
         self.assertIn("server_settings", source)
 
 
+class PerfIndexesMigrationTests(unittest.TestCase):
+    def test_migration_011_exists_with_correct_indexes(self) -> None:
+        """Migration 011 must define indexes on created_at, updated_at, content_hash."""
+        import importlib.util
+        from pathlib import Path
+
+        migration_path = (
+            Path(__file__).parent.parent / "migrations" / "versions" / "011_add_perf_indexes.py"
+        )
+        self.assertTrue(migration_path.exists(), "Migration 011_add_perf_indexes.py not found")
+
+        spec = importlib.util.spec_from_file_location("m011", migration_path)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+
+        self.assertEqual(m.revision, "011")
+        self.assertEqual(m.down_revision, "010")
+        self.assertTrue(callable(m.upgrade))
+        self.assertTrue(callable(m.downgrade))
+
+        import inspect
+        source = inspect.getsource(m.upgrade)
+        self.assertIn("created_at", source)
+        self.assertIn("updated_at", source)
+        self.assertIn("content_hash", source)
+
+
 if __name__ == "__main__":
     unittest.main()
