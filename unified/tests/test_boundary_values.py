@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import unittest
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -26,7 +27,7 @@ from src.schemas import (
 # Load mcp-gateway src/main.py under a unique package name to avoid shadowing
 # unified/src/main.py (both packages use the name "src").
 # ---------------------------------------------------------------------------
-_GW_DIR = "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway"
+_GW_DIR = str(Path(__file__).resolve().parents[1] / "mcp-gateway")
 
 _pkg_spec = importlib.util.spec_from_file_location(
     "mcp_gw_src",
