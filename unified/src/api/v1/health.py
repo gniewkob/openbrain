@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
