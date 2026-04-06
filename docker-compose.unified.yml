@@ -40,7 +40,7 @@ services:
     volumes:
       - ./unified:/app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:REDACTED_POSTGRES_PASSWORD@db:5432/openbrain_unified
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/openbrain_unified
     command: alembic upgrade head
     networks:
       - net_unified
@@ -55,7 +55,7 @@ services:
     volumes:
       - ./unified:/app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:REDACTED_POSTGRES_PASSWORD@db:5432/openbrain_unified
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/openbrain_unified
       - OLLAMA_URL=http://host.docker.internal:11434
       - REDIS_URL=redis://redis:6379/0
       - PUBLIC_MODE=true
