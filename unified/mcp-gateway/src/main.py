@@ -139,19 +139,21 @@ def _client() -> _SharedClient:
 
 def _raise(r: httpx.Response) -> None:
     if r.is_error:
-        # In production, hide internal details to prevent information leakage
+        # Always include the HTTP status code so callers can correlate with server logs.
+        # In production, omit the response body to prevent internal detail leakage.
         is_production = os.environ.get("ENV", "development").lower() == "production"
         if is_production:
-            if r.status_code >= 500:
-                raise ValueError(f"Backend error: Internal server error")
-            elif r.status_code == 404:
-                raise ValueError(f"Backend error: Resource not found")
-            elif r.status_code == 401:
-                raise ValueError(f"Backend error: Authentication required")
-            elif r.status_code == 403:
-                raise ValueError(f"Backend error: Access denied")
-            else:
-                raise ValueError(f"Backend error: Request failed")
+            _STATUS_LABELS = {
+                401: "Authentication required",
+                403: "Access denied",
+                404: "Resource not found",
+                422: "Validation error",
+            }
+            label = _STATUS_LABELS.get(
+                r.status_code,
+                "Internal server error" if r.status_code >= 500 else "Request failed",
+            )
+            raise ValueError(f"Backend {r.status_code}: {label}")
         else:
             try:
                 detail = r.json()
