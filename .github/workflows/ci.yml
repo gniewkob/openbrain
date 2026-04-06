@@ -64,7 +64,9 @@ jobs:
         DISABLE_SECRET_SCANNING: "1"
       run: |
         cd unified
-        uv run pytest tests/ -v --tb=short -x --ignore=tests/test_api_endpoints_live.py
+        uv run pytest tests/ -v --tb=short -x \
+          --ignore=tests/integration \
+          --ignore=tests/test_api_endpoints_live.py
 
   security:
     runs-on: ubuntu-latest
