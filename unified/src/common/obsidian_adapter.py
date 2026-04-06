@@ -441,7 +441,7 @@ class ObsidianCliAdapter:
                 return _VAULT_PATHS_CACHE[vault]
 
             # Try individual env var: OBSIDIAN_VAULT_{VAULT_NAME}_PATH
-            normalized = vault.upper().replace(' ', '_').replace('-', '_')
+            normalized = vault.upper().replace(" ", "_").replace("-", "_")
             env_var = f"OBSIDIAN_VAULT_{normalized}_PATH"
             path = os.environ.get(env_var)
             if path:
@@ -574,7 +574,7 @@ class ObsidianCliAdapter:
         if not vault_root:
             raise ObsidianCliError(
                 f"Cannot determine filesystem path for vault: {vault}. "
-                f"Set OBSIDIAN_VAULT_{normalized}_PATH or "
+                f"Set OBSIDIAN_VAULT_{vault.upper().replace(' ', '_').replace('-', '_')}_PATH or "
                 f"OBSIDIAN_VAULT_PATHS environment variable."
             )
 

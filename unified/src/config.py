@@ -8,7 +8,6 @@ scattered os.environ.get() calls in other modules.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -73,10 +72,16 @@ class AuthConfig(BaseSettings):
                 raise ValueError(
                     "INTERNAL_API_KEY must be at least 32 characters in public mode"
                 )
-            if not self.oidc_issuer_url:
+            # OIDC is optional when callers use X-Internal-Key exclusively
+            # (e.g. ChatGPT MCP, local MCP gateway). Require OIDC only when
+            # no valid internal key is configured.
+            has_valid_key = (
+                bool(self.internal_api_key) and len(self.internal_api_key) >= 32
+            )
+            if not self.oidc_issuer_url and not has_valid_key:
                 raise ValueError(
                     "OIDC_ISSUER_URL is required when PUBLIC_MODE=true "
-                    "or PUBLIC_BASE_URL is set"
+                    "or PUBLIC_BASE_URL is set and no INTERNAL_API_KEY is configured"
                 )
         return self
 
