@@ -529,9 +529,7 @@ async def require_auth(
         return {"sub": "internal", "_auth_via_internal_key": True}
 
     if not _oidc:
-        raise HTTPException(
-            status_code=503, detail="OIDC verifier is unavailable in public mode"
-        )
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
     if credentials is None:
         raise HTTPException(status_code=401, detail="Missing Authorization header")

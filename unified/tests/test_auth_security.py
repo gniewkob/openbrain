@@ -115,6 +115,32 @@ class AuthSecurityTests(unittest.TestCase):
         verifier = auth.OIDCVerifier("https://issuer.example.com")
         self.assertIsNone(verifier._refresh_lock)
 
+    def test_no_oidc_in_public_mode_returns_401_not_503(self) -> None:
+        """When OIDC is unavailable in public mode, require_auth must return 401."""
+        from fastapi import HTTPException
+
+        auth = self._reload_auth()
+        request = Request({"type": "http", "headers": []})
+
+        with (
+            patch.object(auth, "PUBLIC_EXPOSURE", True),
+            patch.object(auth, "INTERNAL_API_KEY", ""),
+            patch.object(auth, "_oidc", None),
+        ):
+            request = Request(
+                {
+                    "type": "http",
+                    "headers": [(b"x-internal-key", b"")],
+                    "query_string": b"",
+                    "method": "GET",
+                    "path": "/",
+                }
+            )
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(auth.require_auth(request=request, credentials=None))
+            self.assertEqual(ctx.exception.status_code, 401)
+            self.assertNotEqual(ctx.exception.status_code, 503)
+
 
 if __name__ == "__main__":
     unittest.main()
