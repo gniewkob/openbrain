@@ -226,6 +226,12 @@ async def brain_capabilities() -> dict:
 
     return {
         "platform": "OpenBrain V1 (Gateway)",
+        "api_version": "2.2.0",
+        "schema_changelog": {
+            "2.2.0": "Added PATCH support for partial updates (brain_update); circuit breaker for Ollama",
+            "2.1.0": "Unified V1 API endpoints; corporate append-only enforcement; rate limiting",
+            "2.0.0": "Initial unified server release",
+        },
         "backend": backend,
         "obsidian_local": {
             "status": "enabled" if obsidian_enabled else "disabled",

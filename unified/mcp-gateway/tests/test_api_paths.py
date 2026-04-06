@@ -79,12 +79,15 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             client = AsyncMock()
             client.__aenter__.return_value = client
             client.__aexit__.return_value = False
-            client.get.return_value = response
+            client.post.return_value = response
             mock_client.return_value = client
 
             await gateway.brain_list(limit=1)
 
-        client.get.assert_awaited_once_with("/api/memories", params={"limit": 1})
+        client.post.assert_awaited_once_with(
+            "/api/v1/memory/find",
+            json={"query": None, "limit": 1, "filters": {}},
+        )
 
     async def test_brain_search_calls_api_search_path(self) -> None:
         gateway = load_gateway_main()
@@ -122,7 +125,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             await gateway.brain_sync_check(match_key="mk-1")
 
         client.post.assert_awaited_once_with(
-            "/api/memories/sync-check",
+            "/api/v1/memory/sync-check",
             json={
                 "memory_id": None,
                 "match_key": "mk-1",
@@ -147,7 +150,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             await gateway.brain_upsert_bulk([{"match_key": "mk-1", "content": "x"}])
 
         client.post.assert_awaited_once_with(
-            "/api/memories/bulk-upsert",
+            "/api/v1/memory/bulk-upsert",
             json=[{"match_key": "mk-1", "content": "x"}],
         )
 
