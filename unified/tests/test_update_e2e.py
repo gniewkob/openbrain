@@ -15,6 +15,8 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from src.schemas import MemoryOut  # noqa: E402 (needed for type annotations below)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -129,18 +131,21 @@ class TestBuildUpdateInvariants(unittest.IsolatedAsyncioTestCase):
         mock_result.scalar_one_or_none.return_value = original
         mock_session.execute.return_value = mock_result
 
-        with patch(
-            "src.memory_writes.handle_memory_write",
-            new=AsyncMock(
-                return_value=MagicMock(
-                    status="updated",
-                    record=MagicMock(id=updated.id),
-                    errors=[],
-                )
+        with (
+            patch(
+                "src.memory_writes.handle_memory_write",
+                new=AsyncMock(
+                    return_value=MagicMock(
+                        status="updated",
+                        record=MagicMock(id=updated.id),
+                        errors=[],
+                    )
+                ),
             ),
-        ), patch(
-            "src.memory_writes.get_memory",
-            new=AsyncMock(return_value=updated_out),
+            patch(
+                "src.memory_writes.get_memory",
+                new=AsyncMock(return_value=updated_out),
+            ),
         ):
             return await update_memory(
                 mock_session,
@@ -207,18 +212,21 @@ class TestCorporateUpdateInvariants(unittest.IsolatedAsyncioTestCase):
         mock_result.scalar_one_or_none.return_value = original
         mock_session.execute.return_value = mock_result
 
-        with patch(
-            "src.memory_writes.handle_memory_write",
-            new=AsyncMock(
-                return_value=MagicMock(
-                    status="versioned",
-                    record=MagicMock(id=new_id),
-                    errors=[],
-                )
+        with (
+            patch(
+                "src.memory_writes.handle_memory_write",
+                new=AsyncMock(
+                    return_value=MagicMock(
+                        status="versioned",
+                        record=MagicMock(id=new_id),
+                        errors=[],
+                    )
+                ),
             ),
-        ), patch(
-            "src.memory_writes.get_memory",
-            new=AsyncMock(return_value=versioned_out),
+            patch(
+                "src.memory_writes.get_memory",
+                new=AsyncMock(return_value=versioned_out),
+            ),
         ):
             return await update_memory(
                 mock_session,
@@ -243,9 +251,7 @@ class TestCorporateUpdateInvariants(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.previous_id, "corp-1")
 
     async def test_corporate_update_preserves_root_id(self):
-        original = _make_memory(
-            mem_id="corp-1", domain="corporate", root_id="corp-1"
-        )
+        original = _make_memory(mem_id="corp-1", domain="corporate", root_id="corp-1")
         result = await self._run_corporate_update(original, "v2 content")
         self.assertEqual(result.root_id, "corp-1")
 
@@ -279,18 +285,21 @@ class TestUpdateSharedInvariants(unittest.IsolatedAsyncioTestCase):
         mock_result.scalar_one_or_none.return_value = original
         mock_session.execute.return_value = mock_result
 
-        with patch(
-            "src.memory_writes.handle_memory_write",
-            new=AsyncMock(
-                return_value=MagicMock(
-                    status="updated",
-                    record=MagicMock(id="m-1"),
-                    errors=[],
-                )
+        with (
+            patch(
+                "src.memory_writes.handle_memory_write",
+                new=AsyncMock(
+                    return_value=MagicMock(
+                        status="updated",
+                        record=MagicMock(id="m-1"),
+                        errors=[],
+                    )
+                ),
             ),
-        ), patch(
-            "src.memory_writes.get_memory",
-            new=AsyncMock(return_value=preserved_out),
+            patch(
+                "src.memory_writes.get_memory",
+                new=AsyncMock(return_value=preserved_out),
+            ),
         ):
             result = await update_memory(
                 mock_session,
@@ -306,9 +315,7 @@ class TestUpdateSharedInvariants(unittest.IsolatedAsyncioTestCase):
         from src.memory_writes import update_memory
         from src.schemas import MemoryUpdate
 
-        original = _make_memory(
-            mem_id="m-2", domain="personal", owner="user:alice"
-        )
+        original = _make_memory(mem_id="m-2", domain="personal", owner="user:alice")
         out = _make_memory_out(original)
         out = out.model_copy(update={"content": "new content"})
 
@@ -324,8 +331,9 @@ class TestUpdateSharedInvariants(unittest.IsolatedAsyncioTestCase):
                 errors=[],
             )
         )
-        with patch("src.memory_writes.handle_memory_write", new=write_mock), patch(
-            "src.memory_writes.get_memory", new=AsyncMock(return_value=out)
+        with (
+            patch("src.memory_writes.handle_memory_write", new=write_mock),
+            patch("src.memory_writes.get_memory", new=AsyncMock(return_value=out)),
         ):
             await update_memory(
                 mock_session,
@@ -393,9 +401,7 @@ class TestUpdateSharedInvariants(unittest.IsolatedAsyncioTestCase):
         from src.memory_writes import update_memory
         from src.schemas import MemoryUpdate
 
-        original = _make_memory(
-            mem_id="m-4", domain="build", content_hash="hash-old"
-        )
+        original = _make_memory(mem_id="m-4", domain="build", content_hash="hash-old")
         updated_out = _make_memory_out(original)
         updated_out = updated_out.model_copy(
             update={"content": "new text", "content_hash": "hash-new"}
@@ -406,18 +412,21 @@ class TestUpdateSharedInvariants(unittest.IsolatedAsyncioTestCase):
         mock_result.scalar_one_or_none.return_value = original
         mock_session.execute.return_value = mock_result
 
-        with patch(
-            "src.memory_writes.handle_memory_write",
-            new=AsyncMock(
-                return_value=MagicMock(
-                    status="updated",
-                    record=MagicMock(id="m-4"),
-                    errors=[],
-                )
+        with (
+            patch(
+                "src.memory_writes.handle_memory_write",
+                new=AsyncMock(
+                    return_value=MagicMock(
+                        status="updated",
+                        record=MagicMock(id="m-4"),
+                        errors=[],
+                    )
+                ),
             ),
-        ), patch(
-            "src.memory_writes.get_memory",
-            new=AsyncMock(return_value=updated_out),
+            patch(
+                "src.memory_writes.get_memory",
+                new=AsyncMock(return_value=updated_out),
+            ),
         ):
             result = await update_memory(
                 mock_session,
