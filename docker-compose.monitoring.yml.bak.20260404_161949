@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  metrics-bridge:
+    build:
+      context: .
+      dockerfile: monitoring/Dockerfile.bridge
+    container_name: shared-metrics-bridge
+    environment:
+      - INTERNAL_API_KEY=0FABJMzqD2cvBOC_dYbjKCnb51nDVlqo--f44nVwWrI
+      - METRICS_UPSTREAM_URL=http://openbrain-unified-server:80/metrics
+      - METRICS_LISTEN_HOST=0.0.0.0
+      - METRICS_LISTEN_PORT=9180
+    networks:
+      - net_shared_monitoring
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: shared-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - openbrain_prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks:
+      - net_shared_monitoring
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.5
+    container_name: shared-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=adminadmin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - openbrain_grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3005:3000"
+    networks:
+      - net_shared_monitoring
+    restart: unless-stopped
+
+networks:
+  net_shared_monitoring:
+    external: true
+volumes:
+  openbrain_prometheus_data:
+  openbrain_grafana_data:

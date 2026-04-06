@@ -24,7 +24,7 @@ from .crud_common import (
     _to_out,
     _to_record,
 )
-from .embed import get_embedding
+from .embed import get_embedding, EMBED_MAX_CHARS
 from .memory_reads import get_memory, get_memory_raw
 from .models import AuditLog, Memory
 from .schemas import (
@@ -147,6 +147,28 @@ def _log_duplicate_risk(rec: MemoryWriteRecord) -> None:
             owner=rec.owner,
             hint="Provide match_key for idempotent writes",
         )
+
+
+def _warn_if_truncated(content: str, *, domain: str, entity_type: str) -> str | None:
+    """
+    Log a warning and return a warning message if content exceeds EMBED_MAX_CHARS.
+
+    Returns the warning string (to append to response.warnings), or None if no warning.
+    """
+    if len(content) <= EMBED_MAX_CHARS:
+        return None
+    log.warning(
+        "write_content_will_be_truncated",
+        content_len=len(content),
+        embed_max_chars=EMBED_MAX_CHARS,
+        domain=domain,
+        entity_type=entity_type,
+    )
+    return (
+        f"Content ({len(content)} chars) exceeds embedding limit "
+        f"({EMBED_MAX_CHARS} chars); only the first {EMBED_MAX_CHARS} chars "
+        "will be indexed for vector search."
+    )
 
 
 def _build_memory_metadata(
@@ -389,11 +411,19 @@ async def handle_memory_write(
     # Log duplicate risk
     _log_duplicate_risk(rec)
 
+    # Warn if content will be truncated during embedding
+    _truncation_warning = _warn_if_truncated(
+        rec.content, domain=domain, entity_type=rec.entity_type
+    )
+
     # Create new memory if none exists
     if not existing:
-        return await _create_new_memory(
+        result = await _create_new_memory(
             session, rec, actor, content_hash, append_only_policy, _commit
         )
+        if _truncation_warning and result.status != "failed":
+            result.warnings.append(_truncation_warning)
+        return result
 
     # Skip if content hasn't changed
     if _record_matches_existing(existing, rec, content_hash):
@@ -401,11 +431,17 @@ async def handle_memory_write(
 
     # Version or update based on mode and policy
     if mode == WriteMode.append_version or append_only_policy:
-        return await _version_memory(
+        result = await _version_memory(
             session, existing, rec, actor, content_hash, _commit
         )
+        if _truncation_warning and result.status != "failed":
+            result.warnings.append(_truncation_warning)
+        return result
 
-    return await _update_memory(session, existing, rec, actor, content_hash, _commit)
+    result = await _update_memory(session, existing, rec, actor, content_hash, _commit)
+    if _truncation_warning and result.status != "failed":
+        result.warnings.append(_truncation_warning)
+    return result
 
 
 # Keep the rest of the file (handle_memory_write_many, etc.)
