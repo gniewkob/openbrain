@@ -2,9 +2,11 @@
 Ollama Embedding Client.
 Supports both old (/api/embeddings) and new (/api/embed) Ollama API.
 Includes LRU caching for embeddings to reduce redundant API calls.
+Includes a circuit breaker to fail fast when Ollama is repeatedly unavailable.
 """
 
 import asyncio
+import time as _time
 from collections import OrderedDict
 
 import httpx
@@ -21,6 +23,66 @@ _client: httpx.AsyncClient | None = None
 # LRU cache: OrderedDict preserves insertion order; move_to_end on hit = true LRU
 _embedding_cache: OrderedDict[str, tuple[tuple[float, ...], str]] = OrderedDict()
 _embedding_cache_lock = asyncio.Lock()
+
+
+# ---------------------------------------------------------------------------
+# Circuit breaker for Ollama (audit 4.1)
+# ---------------------------------------------------------------------------
+
+
+class CircuitOpenError(RuntimeError):
+    """Raised when the Ollama circuit breaker is open (service unavailable)."""
+
+
+class _CircuitBreaker:
+    """Three-state circuit breaker: closed → open → half_open → closed.
+
+    Trips after `failure_threshold` consecutive network failures.
+    Allows a probe after `reset_timeout` seconds (half_open state).
+    """
+
+    def __init__(self, failure_threshold: int = 3, reset_timeout: float = 30.0) -> None:
+        self.failure_threshold = failure_threshold
+        self.reset_timeout = reset_timeout
+        self._state = "closed"
+        self._failures = 0
+        self._opened_at: float = 0.0
+
+    @property
+    def state(self) -> str:
+        return self._state
+
+    def reset(self) -> None:
+        self._state = "closed"
+        self._failures = 0
+        self._opened_at = 0.0
+
+    async def guard(self) -> None:
+        """Raise CircuitOpenError if circuit is open and reset_timeout not elapsed."""
+        if self._state == "closed":
+            return
+        if self._state == "open":
+            if _time.monotonic() - self._opened_at >= self.reset_timeout:
+                self._state = "half_open"
+                return
+            raise CircuitOpenError(
+                "Ollama embedding service is unavailable (circuit open). "
+                "Retry after a moment."
+            )
+        # half_open: allow one probe through
+
+    def on_success(self) -> None:
+        self._failures = 0
+        self._state = "closed"
+
+    def on_failure(self) -> None:
+        self._failures += 1
+        if self._failures >= self.failure_threshold:
+            self._state = "open"
+            self._opened_at = _time.monotonic()
+
+
+_circuit_breaker = _CircuitBreaker()
 
 
 def _compute_text_hash(text: str) -> str:
@@ -79,6 +141,7 @@ async def get_embedding(text: str) -> list[float]:
     """
     Fetch an embedding vector for the given text using Ollama.
     Uses LRU cache to avoid redundant API calls for identical text.
+    Raises CircuitOpenError if Ollama is repeatedly unavailable.
     """
     config = get_config()
     text_hash = _compute_text_hash(text)
@@ -91,21 +154,30 @@ async def get_embedding(text: str) -> list[float]:
                 _embedding_cache.move_to_end(text_hash)
                 return list(embedding)
 
+    # Check circuit breaker before making an HTTP call to Ollama
+    await _circuit_breaker.guard()
+
     # Cache miss — call Ollama
-    response = await _post_with_retry(
-        "/api/embed",
-        {"model": config.embedding.model, "input": text},
-    )
-    if response.status_code == 404:
+    try:
         response = await _post_with_retry(
-            "/api/embeddings",
-            {"model": config.embedding.model, "prompt": text},
+            "/api/embed",
+            {"model": config.embedding.model, "input": text},
         )
-        result = response.json()["embedding"]
+        if response.status_code == 404:
+            response = await _post_with_retry(
+                "/api/embeddings",
+                {"model": config.embedding.model, "prompt": text},
+            )
+            result = response.json()["embedding"]
+        else:
+            data = response.json()
+            # /api/embed returns {"embeddings": [[...]]}
+            result = data["embeddings"][0]
+    except (httpx.ConnectError, httpx.TimeoutException):
+        _circuit_breaker.on_failure()
+        raise
     else:
-        data = response.json()
-        # /api/embed returns {"embeddings": [[...]]}
-        result = data["embeddings"][0]
+        _circuit_breaker.on_success()
 
     await _update_embedding_cache(text_hash, tuple(result), config.embedding.model)
 
