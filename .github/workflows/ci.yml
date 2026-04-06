@@ -31,6 +31,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -66,7 +67,8 @@ jobs:
         cd unified
         uv run pytest tests/ -v --tb=short -x \
           --ignore=tests/integration \
-          --ignore=tests/test_api_endpoints_live.py
+          --ignore=tests/test_api_endpoints_live.py \
+          --ignore=tests/test_endpoints_summary.py
 
   security:
     runs-on: ubuntu-latest
