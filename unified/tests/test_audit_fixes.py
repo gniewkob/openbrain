@@ -318,9 +318,6 @@ class ReadyzLoggingTest(unittest.IsolatedAsyncioTestCase):
     """T6 — readyz must log DB errors instead of swallowing them silently."""
 
     async def test_readyz_logs_db_error(self) -> None:
-        from tests.test_metrics import _import_main_with_fake_auth_deps
-        main = _import_main_with_fake_auth_deps()
-
         log_calls: list = []
 
         def _capture(*args, **kwargs):
@@ -555,9 +552,6 @@ class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
     """Fix4 — RequestIDMiddleware must reject malformed X-Request-ID headers."""
 
     async def test_valid_uuid_header_is_preserved(self) -> None:
-        from tests.test_metrics import _import_main_with_fake_auth_deps
-        main = _import_main_with_fake_auth_deps()
-
         captured: list[str] = []
 
         async def fake_next(request):
@@ -590,8 +584,6 @@ class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req_ids[0], valid_id)
 
     def test_malformed_header_is_rejected(self) -> None:
-        from tests.test_metrics import _import_main_with_fake_auth_deps
-        main = _import_main_with_fake_auth_deps()
         import re
         self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("inject\nnewline")))
         self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("x" * 65)))

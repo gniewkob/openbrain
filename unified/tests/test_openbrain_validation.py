@@ -25,10 +25,10 @@ class TestRouteRegistration:
         """Test health check routes."""
         from src.main import app
         paths = [r.path for r in app.routes if hasattr(r, 'path')]
-        
-        assert '/healthz' in paths
-        assert '/readyz' in paths
-        assert '/health' in paths
+
+        assert '/api/v1/healthz' in paths
+        assert '/api/v1/readyz' in paths
+        assert '/api/v1/health' in paths
     
     def test_v1_api_routes(self) -> None:
         """Test V1 API routes."""
@@ -163,9 +163,9 @@ class TestEmbedCache:
     
     def test_cache_function_exists(self) -> None:
         """Test cache function exists."""
-        from src.embed import _get_cached_embedding
-        from functools import _lru_cache_wrapper
-        assert callable(_get_cached_embedding)
+        from src.embed import _embedding_cache
+        from collections import OrderedDict
+        assert isinstance(_embedding_cache, OrderedDict)
 
 
 class TestRateLimiting:
