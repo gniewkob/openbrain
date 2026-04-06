@@ -1,4 +1,5 @@
 """Alembic environment for OpenBrain Unified (async SQLAlchemy + asyncpg)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -26,6 +27,7 @@ _D_P = "postgres"
 DEFAULT_DB_URL = f"postgresql+asyncpg://{_D_U}:{_D_P}@localhost:5432/openbrain_unified"
 DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DB_URL)
 
+
 def run_migrations_offline() -> None:
     """Run migrations without a live DB connection (generates SQL script)."""
     context.configure(
@@ -39,7 +41,14 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        # Each revision runs in its own transaction; a failure rolls back only
+        # that revision, not all previously applied revisions in the same run.
+        transaction_per_migration=True,
+    )
     with context.begin_transaction():
         context.run_migrations()
 
