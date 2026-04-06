@@ -12,6 +12,7 @@ Regression tests for audit fixes:
   - A4: dry_run=True maintenance does not persist AuditLog entries
   - A5: embedding fetched before content mutation (safe write order)
 """
+
 from __future__ import annotations
 
 import os
@@ -96,6 +97,7 @@ class BrainUrlEnvTest(unittest.TestCase):
         with patch.dict(os.environ, {"BRAIN_URL": "http://testhost:9999"}):
             import importlib
             import src.mcp_transport as transport_mod
+
             # Re-evaluate the default at import time by reading the module attribute
             # after env is set, then restore. For a module-level constant we check
             # the default in the source by reading a fresh import.
@@ -106,10 +108,12 @@ class BrainUrlEnvTest(unittest.TestCase):
 
     def test_brain_url_default_is_internal_80(self) -> None:
         import src.mcp_transport as transport_mod
+
         # Remove env var to test default
         saved = os.environ.pop("BRAIN_URL", None)
         try:
             import importlib
+
             importlib.reload(transport_mod)
             self.assertIn(":80", transport_mod.BRAIN_URL)
             self.assertNotIn("7010", transport_mod.BRAIN_URL)
@@ -117,6 +121,7 @@ class BrainUrlEnvTest(unittest.TestCase):
             if saved:
                 os.environ["BRAIN_URL"] = saved
             import importlib
+
             importlib.reload(transport_mod)
 
 
@@ -125,15 +130,23 @@ class UpdateMemoryErrorPropagationTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_update_memory_raises_on_failed_write(self) -> None:
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: _mem())
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: _mem()
+        )
 
         failed_response = MemoryWriteResponse(
             status="failed",
             errors=["Owner is required for corporate domain."],
         )
-        with patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=failed_response)):
+        with patch.object(
+            memory_writes,
+            "handle_memory_write",
+            new=AsyncMock(return_value=failed_response),
+        ):
             with self.assertRaises(ValueError) as ctx:
-                await memory_writes.update_memory(session, "mem-1", MemoryUpdate(content="new"))
+                await memory_writes.update_memory(
+                    session, "mem-1", MemoryUpdate(content="new")
+                )
 
         self.assertIn("Owner is required", str(ctx.exception))
 
@@ -141,20 +154,30 @@ class UpdateMemoryErrorPropagationTest(unittest.IsolatedAsyncioTestCase):
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
 
-        result = await memory_writes.update_memory(session, "missing-id", MemoryUpdate(content="x"))
+        result = await memory_writes.update_memory(
+            session, "missing-id", MemoryUpdate(content="x")
+        )
         self.assertIsNone(result)
 
     async def test_update_memory_skipped_returns_existing_record(self) -> None:
         """status=skipped must return the loaded record without an extra get_memory SELECT."""
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: _mem())
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: _mem()
+        )
 
         skipped_response = MemoryWriteResponse(status="skipped", record=_record())
         with (
-            patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=skipped_response)),
+            patch.object(
+                memory_writes,
+                "handle_memory_write",
+                new=AsyncMock(return_value=skipped_response),
+            ),
             patch.object(memory_writes, "get_memory", new=AsyncMock()) as mock_get,
         ):
-            result = await memory_writes.update_memory(session, "mem-1", MemoryUpdate(content="unchanged"))
+            result = await memory_writes.update_memory(
+                session, "mem-1", MemoryUpdate(content="unchanged")
+            )
 
         self.assertIsNotNone(result)
         self.assertEqual(result.id, "mem-1")
@@ -183,9 +206,13 @@ class AtomicWriteManyTest(unittest.IsolatedAsyncioTestCase):
             MemoryWriteRecord(content=f"rec-{i}", domain="build", entity_type="Note")
             for i in range(3)
         ]
-        request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=True)
+        request = MemoryWriteManyRequest(
+            records=records, write_mode=WriteMode.upsert, atomic=True
+        )
 
-        with patch.object(memory_writes, "handle_memory_write", side_effect=_write_side_effect):
+        with patch.object(
+            memory_writes, "handle_memory_write", side_effect=_write_side_effect
+        ):
             result = await memory_writes.handle_memory_write_many(session, request)
 
         # Batch must be rolled back
@@ -210,9 +237,13 @@ class AtomicWriteManyTest(unittest.IsolatedAsyncioTestCase):
             MemoryWriteRecord(content=f"rec-{i}", domain="build", entity_type="Note")
             for i in range(3)
         ]
-        request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=False)
+        request = MemoryWriteManyRequest(
+            records=records, write_mode=WriteMode.upsert, atomic=False
+        )
 
-        with patch.object(memory_writes, "handle_memory_write", side_effect=_write_side_effect):
+        with patch.object(
+            memory_writes, "handle_memory_write", side_effect=_write_side_effect
+        ):
             result = await memory_writes.handle_memory_write_many(session, request)
 
         self.assertEqual(result.status, "partial_success")
@@ -249,7 +280,11 @@ class MatchKeySelectForUpdateTest(unittest.IsolatedAsyncioTestCase):
         )
         req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
 
-        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(
+            memory_writes,
+            "_get_embedding_compat",
+            new=AsyncMock(return_value=[0.1, 0.2]),
+        ):
             # The SELECT FOR UPDATE statement should be the first executed
             try:
                 await memory_writes.handle_memory_write(session, req)
@@ -300,12 +335,24 @@ class StoreBulkFieldMappingTest(unittest.IsolatedAsyncioTestCase):
         ]
 
         with (
-            patch.object(memory_writes, "handle_memory_write", side_effect=_capture_write),
-            patch.object(memory_writes, "handle_memory_write_many", wraps=memory_writes.handle_memory_write_many),
-            patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1])),
+            patch.object(
+                memory_writes, "handle_memory_write", side_effect=_capture_write
+            ),
+            patch.object(
+                memory_writes,
+                "handle_memory_write_many",
+                wraps=memory_writes.handle_memory_write_many,
+            ),
+            patch.object(
+                memory_writes,
+                "_get_embedding_compat",
+                new=AsyncMock(return_value=[0.1]),
+            ),
         ):
             # Call store_memories_bulk directly
-            session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
+            session.execute.return_value = SimpleNamespace(
+                scalars=lambda: SimpleNamespace(all=lambda: [])
+            )
             await memory_writes.store_memories_bulk(session, items)
 
         self.assertGreater(len(captured_reqs), 0)
@@ -332,12 +379,15 @@ class ReadyzLoggingTest(unittest.IsolatedAsyncioTestCase):
         fake_ctx.__aexit__ = AsyncMock(return_value=False)
 
         from src.api.v1 import health as health_mod
+
         with patch.object(health_mod, "AsyncSessionLocal", return_value=fake_ctx):
             with patch.object(health_mod.log, "error", side_effect=_capture):
                 response = await health_mod.readyz()
 
         # readyz returns a JSONResponse (with status_code) on error
-        self.assertTrue(hasattr(response, "status_code"), "Expected JSONResponse on DB error")
+        self.assertTrue(
+            hasattr(response, "status_code"), "Expected JSONResponse on DB error"
+        )
         self.assertEqual(response.status_code, 503)
         self.assertGreater(len(log_calls), 0, "log.error must be called on DB failure")
 
@@ -348,6 +398,7 @@ class CrossDomainDedupTest(unittest.IsolatedAsyncioTestCase):
     async def test_dedup_query_includes_domain_in_group_by(self) -> None:
         """Verify the dup_groups query includes Memory.domain in SELECT/GROUP BY."""
         from src.schemas import MaintenanceRequest
+
         captured_stmts: list = []
 
         async def _execute(stmt):
@@ -356,14 +407,18 @@ class CrossDomainDedupTest(unittest.IsolatedAsyncioTestCase):
             if len(captured_stmts) == 1:
                 return SimpleNamespace(scalar_one=lambda: 2)
             # Second call: dup_groups (empty — no actual duplicates)
-            return SimpleNamespace(all=lambda: [], scalars=lambda: SimpleNamespace(all=lambda: []))
+            return SimpleNamespace(
+                all=lambda: [], scalars=lambda: SimpleNamespace(all=lambda: [])
+            )
 
         session = SimpleNamespace(execute=_execute)
         session.add = lambda obj: None
         session.flush = AsyncMock()
         session.commit = AsyncMock()
 
-        req = MaintenanceRequest(dry_run=True, dedup_threshold=0.05, fix_superseded_links=False)
+        req = MaintenanceRequest(
+            dry_run=True, dedup_threshold=0.05, fix_superseded_links=False
+        )
         await memory_writes.run_maintenance(session, req)
 
         # The dedup GROUP BY statement should reference domain
@@ -381,7 +436,9 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
         from sqlalchemy import select as sa_select
 
         now = datetime.now(timezone.utc)
-        existing = _mem(sensitivity="internal", content="same", content_hash="hash-same")
+        existing = _mem(
+            sensitivity="internal", content="same", content_hash="hash-same"
+        )
 
         captured_stmts: list = []
 
@@ -404,10 +461,16 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
         )
         req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
 
-        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(
+            memory_writes,
+            "_get_embedding_compat",
+            new=AsyncMock(return_value=[0.1, 0.2]),
+        ):
             result = await memory_writes.handle_memory_write(session, req)
 
-        self.assertNotEqual(result.status, "skipped", "sensitivity-only change must not be skipped")
+        self.assertNotEqual(
+            result.status, "skipped", "sensitivity-only change must not be skipped"
+        )
 
     async def test_metadata_only_change_is_not_skipped(self) -> None:
         existing = _mem(
@@ -446,10 +509,16 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
         )
         req = MemoryWriteRequest(record=record, write_mode=WriteMode.upsert)
 
-        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(
+            memory_writes,
+            "_get_embedding_compat",
+            new=AsyncMock(return_value=[0.1, 0.2]),
+        ):
             result = await memory_writes.handle_memory_write(session, req)
 
-        self.assertNotEqual(result.status, "skipped", "metadata-only change must not be skipped")
+        self.assertNotEqual(
+            result.status, "skipped", "metadata-only change must not be skipped"
+        )
 
 
 class NonAtomicSessionRollbackTest(unittest.IsolatedAsyncioTestCase):
@@ -473,9 +542,13 @@ class NonAtomicSessionRollbackTest(unittest.IsolatedAsyncioTestCase):
             MemoryWriteRecord(content=f"rec-{i}", domain="build", entity_type="Note")
             for i in range(3)
         ]
-        request = MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert, atomic=False)
+        request = MemoryWriteManyRequest(
+            records=records, write_mode=WriteMode.upsert, atomic=False
+        )
 
-        with patch.object(memory_writes, "handle_memory_write", side_effect=_write_side_effect):
+        with patch.object(
+            memory_writes, "handle_memory_write", side_effect=_write_side_effect
+        ):
             result = await memory_writes.handle_memory_write_many(session, request)
 
         session.rollback.assert_awaited_once()
@@ -487,41 +560,60 @@ class DryRunAuditLogTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_dry_run_does_not_add_audit_log(self) -> None:
         from src.schemas import MaintenanceRequest
+
         added_objects: list = []
 
         async def _execute(stmt):
-            return SimpleNamespace(scalar_one=lambda: 0, all=lambda: [], scalars=lambda: SimpleNamespace(all=lambda: []))
+            return SimpleNamespace(
+                scalar_one=lambda: 0,
+                all=lambda: [],
+                scalars=lambda: SimpleNamespace(all=lambda: []),
+            )
 
         session = SimpleNamespace(execute=_execute)
         session.add = lambda obj: added_objects.append(obj)
         session.flush = AsyncMock()
         session.commit = AsyncMock()
 
-        req = MaintenanceRequest(dry_run=True, dedup_threshold=0.0, fix_superseded_links=False)
+        req = MaintenanceRequest(
+            dry_run=True, dedup_threshold=0.0, fix_superseded_links=False
+        )
         report = await memory_writes.run_maintenance(session, req)
 
         from src.models import AuditLog
+
         audit_entries = [o for o in added_objects if isinstance(o, AuditLog)]
-        self.assertEqual(len(audit_entries), 0, "dry_run=True must not persist AuditLog")
+        self.assertEqual(
+            len(audit_entries), 0, "dry_run=True must not persist AuditLog"
+        )
 
     async def test_non_dry_run_does_add_audit_log(self) -> None:
         from src.models import AuditLog
         from src.schemas import MaintenanceRequest
+
         added_objects: list = []
 
         async def _execute(stmt):
-            return SimpleNamespace(scalar_one=lambda: 0, all=lambda: [], scalars=lambda: SimpleNamespace(all=lambda: []))
+            return SimpleNamespace(
+                scalar_one=lambda: 0,
+                all=lambda: [],
+                scalars=lambda: SimpleNamespace(all=lambda: []),
+            )
 
         session = SimpleNamespace(execute=_execute)
         session.add = lambda obj: added_objects.append(obj)
         session.flush = AsyncMock()
         session.commit = AsyncMock()
 
-        req = MaintenanceRequest(dry_run=False, dedup_threshold=0.0, fix_superseded_links=False)
+        req = MaintenanceRequest(
+            dry_run=False, dedup_threshold=0.0, fix_superseded_links=False
+        )
         await memory_writes.run_maintenance(session, req)
 
         audit_entries = [o for o in added_objects if isinstance(o, AuditLog)]
-        self.assertEqual(len(audit_entries), 1, "dry_run=False must persist exactly one AuditLog")
+        self.assertEqual(
+            len(audit_entries), 1, "dry_run=False must persist exactly one AuditLog"
+        )
 
 
 class SearchScoreSemanticsTest(unittest.IsolatedAsyncioTestCase):
@@ -539,12 +631,20 @@ class SearchScoreSemanticsTest(unittest.IsolatedAsyncioTestCase):
 
         session = SimpleNamespace(execute=_execute)
 
-        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
-            results = await memory_reads.search_memories(session, SearchRequest(query="test", top_k=1))
+        with patch.object(
+            memory_reads,
+            "_get_embedding_compat",
+            new=AsyncMock(return_value=[0.1, 0.2]),
+        ):
+            results = await memory_reads.search_memories(
+                session, SearchRequest(query="test", top_k=1)
+            )
 
         self.assertEqual(len(results), 1)
         _mem_out, score = results[0]
-        self.assertAlmostEqual(score, 0.9, places=5, msg="score must be 1.0 - distance (similarity)")
+        self.assertAlmostEqual(
+            score, 0.9, places=5, msg="score must be 1.0 - distance (similarity)"
+        )
         self.assertGreater(score, 0.5, "high-similarity result must score > 0.5")
 
 
@@ -556,15 +656,22 @@ class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
 
         async def fake_next(request):
             from starlette.responses import Response
+
             return Response()
 
         from starlette.testclient import TestClient
         from starlette.requests import Request as StarletteRequest
 
         valid_id = "123e4567-e89b-12d3-a456-426614174000"
-        scope = {"type": "http", "method": "GET", "path": "/", "headers": [
-            (b"x-request-id", valid_id.encode()),
-        ], "query_string": b""}
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [
+                (b"x-request-id", valid_id.encode()),
+            ],
+            "query_string": b"",
+        }
 
         middleware = middleware_module.RequestIDMiddleware(app=fake_next)
 
@@ -572,12 +679,17 @@ class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
 
         async def _next(request):
             import structlog
-            req_ids.append(structlog.contextvars.get_contextvars().get("request_id", ""))
+
+            req_ids.append(
+                structlog.contextvars.get_contextvars().get("request_id", "")
+            )
             from starlette.responses import Response
+
             return Response()
 
         middleware.app = _next
         from starlette.requests import Request as SR
+
         request = SR(scope)
         await middleware.dispatch(request, _next)
 
@@ -585,11 +697,18 @@ class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
 
     def test_malformed_header_is_rejected(self) -> None:
         import re
+
         self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("inject\nnewline")))
         self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("x" * 65)))
         self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("")))
         self.assertTrue(bool(middleware_module.REQUEST_ID_RE.match("abc-123")))
-        self.assertTrue(bool(middleware_module.REQUEST_ID_RE.match("123e4567-e89b-12d3-a456-426614174000")))
+        self.assertTrue(
+            bool(
+                middleware_module.REQUEST_ID_RE.match(
+                    "123e4567-e89b-12d3-a456-426614174000"
+                )
+            )
+        )
 
 
 class EntityTypeMaxLengthTest(unittest.TestCase):
@@ -597,6 +716,7 @@ class EntityTypeMaxLengthTest(unittest.TestCase):
 
     def test_entity_type_over_64_chars_raises(self) -> None:
         from pydantic import ValidationError
+
         long_type = "A" * 65
         with self.assertRaises(ValidationError):
             MemoryWriteRecord(content="x", domain="build", entity_type=long_type)
@@ -615,11 +735,13 @@ class DbPoolConfigTest(unittest.TestCase):
 
     def test_engine_has_pool_recycle(self) -> None:
         from src.db import engine
+
         self.assertEqual(engine.pool._recycle, 1800)
 
     def test_engine_has_statement_timeout_in_connect_args(self) -> None:
         import src.db as db_module
         import inspect
+
         source = inspect.getsource(db_module)
         self.assertIn("statement_timeout", source)
         self.assertIn("server_settings", source)
