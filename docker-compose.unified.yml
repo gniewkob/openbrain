@@ -1,43 +1,47 @@
-networks:
-  net_unified:
-    name: openbrain_net_unified
-    driver: bridge
-
-volumes:
-  openbrain_unified_data:
-  openbrain_ollama:
-  openbrain_grafana_data:
-  openbrain_prometheus_data:
-  openbrain_redis_data:
-
 services:
   db:
-    image: ankane/pgvector:v0.5.1
+    image: pgvector/pgvector:pg16
     container_name: openbrain-unified-db
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=openbrain_unified
+    volumes:
+      - openbrain_postgres_data:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
-    volumes:
-      - openbrain_unified_data:/var/lib/postgresql/data
     networks:
       - net_unified
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d openbrain_unified"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: openbrain-unified-redis
+    volumes:
+      - openbrain_redis_data:/data
+    networks:
+      - net_unified
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   migrate:
     build:
       context: ./unified
     container_name: openbrain-unified-migrate
-    working_dir: /app
-    command: ["alembic", "upgrade", "head"]
+    volumes:
+      - ./unified:/app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql+asyncpg://postgres:REDACTED_POSTGRES_PASSWORD@db:5432/openbrain_unified
+    command: alembic upgrade head
     networks:
       - net_unified
     depends_on:
@@ -51,51 +55,55 @@ services:
     volumes:
       - ./unified:/app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      - OLLAMA_URL=http://embedding-service:11434
-      - BRAIN_URL=http://127.0.0.1:80
-      - PUBLIC_MODE=${PUBLIC_MODE:-false}
-      - OIDC_ISSUER_URL=${OIDC_ISSUER_URL:-}
-      - OIDC_AUDIENCE=${OIDC_AUDIENCE:-https://openbrain-mcp}
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
-      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - DATABASE_URL=postgresql+asyncpg://postgres:REDACTED_POSTGRES_PASSWORD@db:5432/openbrain_unified
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - REDIS_URL=redis://redis:6379/0
+      - PUBLIC_MODE=true
+      - PUBLIC_BASE_URL=https://poutily-hemispheroidal-pia.ngrok-free.dev
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     ports:
       - "127.0.0.1:7010:80"
     networks:
       - net_unified
+      - net_shared_monitoring
     depends_on:
       db:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-
-  redis:
-    image: redis:7-alpine
-    container_name: openbrain-unified-redis
-    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
-    ports:
-      - "127.0.0.1:6379:6379"
-    volumes:
-      - openbrain_redis_data:/data
-    networks:
-      - net_unified
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
     restart: unless-stopped
 
-  embedding-service:
-    image: ollama/ollama:latest
-    container_name: openbrain-unified-ollama
-    volumes:
-      - openbrain_ollama:/root/.ollama
+  # Ollama działa lokalnie na macOS - używamy host.docker.internal
+  # Aby uruchomić lokalną Ollamę: ollama serve
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: openbrain-unified-ollama
+  #   volumes:
+  #     - openbrain_ollama_data:/root/.ollama
+  #   networks:
+  #     - net_unified
+  #   restart: unless-stopped
+
+  mcp-http:
+    build:
+      context: ./unified
+      dockerfile: mcp-gateway/Dockerfile
+    container_name: openbrain-mcp-http
+    profiles: ["public"]
+    environment:
+      - BRAIN_URL=http://unified-server:80
+      - PUBLIC_BASE_URL=https://poutily-hemispheroidal-pia.ngrok-free.dev
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - MCP_HTTP_PORT=7011
+      - REDIS_URL=redis://redis:6379/1
+    ports:
+      - "127.0.0.1:7011:7011"
     networks:
       - net_unified
+    depends_on:
+      - unified-server
+      - redis
+    restart: unless-stopped
 
   ngrok:
     image: ngrok/ngrok:latest
@@ -105,63 +113,21 @@ services:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     command:
       - "http"
-      - "unified-server:80"
+      - "--url=poutily-hemispheroidal-pia.ngrok-free.dev"
+      - "mcp-http:7011"
     networks:
       - net_unified
     depends_on:
-      - unified-server
+      - mcp-http
     restart: unless-stopped
 
-
-  metrics-bridge:
-    image: python:3.11-slim
-    container_name: openbrain-metrics-bridge
-    volumes:
-      - .:/app
-    working_dir: /app
-    environment:
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
-      - METRICS_UPSTREAM_URL=http://unified-server:80/metrics
-      - METRICS_LISTEN_HOST=0.0.0.0
-      - METRICS_LISTEN_PORT=9180
-    command: python3 monitoring/openbrain-metrics-bridge.py
-    networks:
-      - net_unified
-    restart: unless-stopped
-
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    container_name: openbrain-unified-prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-    volumes:
-      - openbrain_prometheus_data:/prometheus
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./docs/prometheus-alerts.yml:/etc/prometheus/openbrain-alerts.yml:ro
-    ports:
-      - "127.0.0.1:9090:9090"
-    networks:
-      - net_unified
-    depends_on:
-      - unified-server
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:11.1.5
-    container_name: openbrain-unified-grafana
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - openbrain_grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    ports:
-      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
-    networks:
-      - net_unified
-    depends_on:
-      - prometheus
-    restart: unless-stopped
+networks:
+  net_unified:
+    name: net_unified
+    driver: bridge
+  net_shared_monitoring:
+    external: true
+volumes:
+  openbrain_postgres_data:
+  openbrain_redis_data:
+  openbrain_ollama_data:
