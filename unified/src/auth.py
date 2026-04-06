@@ -137,23 +137,37 @@ class OIDCVerifier:
                 self._jwk_client.get_signing_key_from_jwt,  # type: ignore[union-attr]
                 token,
             )
+            # audience=None silently disables PyJWT audience validation — always
+            # pass a non-empty string so misconfiguration raises, not silently passes.
+            if not self.audience:
+                raise ValueError(
+                    "OIDC_AUDIENCE is not configured; refusing to accept tokens "
+                    "without audience validation."
+                )
             claims = jwt.decode(
                 token,
                 signing_key.key,
                 algorithms=["RS256"],
-                audience=self.audience or None,
+                audience=self.audience,
                 issuer=self._metadata.issuer,  # type: ignore[union-attr]
                 options={
-                    "require": ["exp", "iat"],
+                    "require": ["exp", "iat", "sub"],
                     "verify_exp": True,
                     "verify_iat": True,
                     "verify_nbf": True,
                 },
             )
+            sub = str(claims.get("sub", "")).strip()
+            if not sub:
+                raise ValueError("Token missing required 'sub' claim")
             return claims
+        except ValueError:
+            raise
         except Exception as e:
+            # Log full details server-side; return a generic message to avoid
+            # leaking expiry times, issuer, audience hints to the caller.
             logger.error("JWT verification failed: %s", e)
-            raise ValueError(f"Invalid access token: {e}") from e
+            raise ValueError("Invalid access token") from e
 
 
 # Singleton — created only if issuer URL is set.
@@ -234,7 +248,7 @@ def _current_registry() -> dict[str, Any]:
 
 def get_policy_registry() -> dict[str, Any]:
     """Get current policy registry configuration.
-    
+
     Returns:
         Dictionary with tenants and subjects policy configuration
     """
@@ -290,10 +304,16 @@ def validate_security_configuration() -> None:
     """
     if not PUBLIC_EXPOSURE:
         return
-    if not OIDC_ISSUER_URL:
+    # Require at least one auth mechanism: OIDC or a non-default INTERNAL_API_KEY.
+    # OIDC is optional when callers authenticate exclusively via X-Internal-Key
+    # (e.g. ChatGPT MCP, local MCP gateway). Missing both leaves the server open.
+    has_internal_key = (
+        bool(INTERNAL_API_KEY) and INTERNAL_API_KEY != LOCAL_DEV_INTERNAL_API_KEY
+    )
+    if not OIDC_ISSUER_URL and not has_internal_key:
         raise RuntimeError(
-            "PUBLIC_MODE=true or PUBLIC_BASE_URL set requires OIDC_ISSUER_URL. "
-            "Refusing to start with local-dev auth fallback."
+            "PUBLIC_MODE=true or PUBLIC_BASE_URL set requires either OIDC_ISSUER_URL "
+            "or a non-default INTERNAL_API_KEY. Refusing to start with no auth."
         )
     if not INTERNAL_API_KEY:
         raise RuntimeError(
@@ -312,10 +332,10 @@ validate_security_configuration()
 
 def get_subject(claims: dict[str, Any]) -> str:
     """Extract subject identifier from JWT claims.
-    
+
     Args:
         claims: JWT payload containing user claims
-        
+
     Returns:
         Subject identifier (sub claim) or empty string
     """
@@ -324,13 +344,13 @@ def get_subject(claims: dict[str, Any]) -> str:
 
 def get_tenant_id(claims: dict[str, Any]) -> str:
     """Extract tenant ID from JWT claims.
-    
+
     Checks multiple claim keys in order of preference:
     tenant_id, tenant, tid, org_id, organization_id
-    
+
     Args:
         claims: JWT payload containing tenant claims
-        
+
     Returns:
         Tenant identifier or empty string if not found
     """
@@ -363,11 +383,11 @@ def _claim_values(claims: dict[str, Any], *keys: str) -> list[str]:
 
 def get_domain_scope(claims: dict[str, Any], action: str) -> set[str]:
     """Extract domain scope for given action from JWT claims.
-    
+
     Args:
         claims: JWT payload with domain scope claims
         action: Action type (read, write, admin)
-        
+
     Returns:
         Set of allowed domains for the action
     """
@@ -433,10 +453,10 @@ def get_registry_domain_scope(subject: str, tenant_id: str, action: str) -> set[
 
 def is_privileged_user(claims: dict[str, Any]) -> bool:
     """Check if user has privileged/admin access based on claims.
-    
+
     Args:
         claims: JWT payload with role claims
-        
+
     Returns:
         True if user has admin/privileged role
     """

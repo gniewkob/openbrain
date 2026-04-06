@@ -49,29 +49,37 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 # ---------------------------------------------------------------------------
 
 _SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("openai_api_key",    re.compile(r"sk-[A-Za-z0-9]{20,}")),
-    ("github_token",      re.compile(r"ghp_[A-Za-z0-9]{30,}")),
-    ("slack_token",       re.compile(r"xoxb-[A-Za-z0-9\-]+")),
-    ("google_api_key",    re.compile(r"AIza[A-Za-z0-9\-_]{35}")),
-    ("jwt_token",         re.compile(
-        r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+"
-    )),
-    ("pem_private_key",   re.compile(r"-----BEGIN [A-Z ]+ PRIVATE KEY-----")),
-    ("auth_url",          re.compile(r"https?://[^:@/\s]+:[^@/\s]+@\S+")),
-    ("inline_credential", re.compile(
-        r"(?:password|secret|api_key)\s*=\s*\S{6,}", re.IGNORECASE
-    )),
+    ("openai_api_key", re.compile(r"sk-[A-Za-z0-9]{20,}")),
+    ("github_token", re.compile(r"ghp_[A-Za-z0-9]{30,}")),
+    ("slack_token", re.compile(r"xoxb-[A-Za-z0-9\-]+")),
+    ("google_api_key", re.compile(r"AIza[A-Za-z0-9\-_]{35}")),
+    ("jwt_token", re.compile(r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+")),
+    ("pem_private_key", re.compile(r"-----BEGIN [A-Z ]+ PRIVATE KEY-----")),
+    ("auth_url", re.compile(r"https?://[^:@/\s]+:[^@/\s]+@\S+")),
+    (
+        "inline_credential",
+        re.compile(r"(?:password|secret|api_key)\s*=\s*\S{6,}", re.IGNORECASE),
+    ),
 ]
 
-_WRITE_PATHS: frozenset[str] = frozenset([
-    "/api/v1/memory/write",
-    "/api/v1/memory/write-many",
-    "/api/v1/memory/bulk-upsert",
-])
+_WRITE_PATHS: frozenset[str] = frozenset(
+    [
+        "/api/v1/memory/write",
+        "/api/v1/memory/write-many",
+        "/api/v1/memory/bulk-upsert",
+    ]
+)
 
-_PATCH_NON_ID_SEGMENTS: frozenset[str] = frozenset([
-    "write", "write-many", "bulk-upsert", "search", "export", "sync-check",
-])
+_PATCH_NON_ID_SEGMENTS: frozenset[str] = frozenset(
+    [
+        "write",
+        "write-many",
+        "bulk-upsert",
+        "search",
+        "export",
+        "sync-check",
+    ]
+)
 
 _scan_logger = logging.getLogger(__name__)
 
@@ -187,6 +195,7 @@ class SecretScanMiddleware(BaseHTTPMiddleware):
                 )
                 incr_metric("secret_scan_blocks_total")
                 from fastapi.responses import JSONResponse
+
                 return JSONResponse(
                     status_code=400,
                     content={

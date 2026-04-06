@@ -236,6 +236,12 @@ async def _version_memory(
     """Create a new version of an existing memory."""
     new_embedding = await _get_embedding_compat(rec.content)
 
+    # Supersede old record first to release the unique-active constraint
+    # before inserting the new version with the same match_key.
+    existing_id = existing.id
+    existing.status = "superseded"
+    await session.flush()
+
     new_memory = Memory(
         domain=existing.domain,
         entity_type=rec.entity_type,
@@ -262,8 +268,8 @@ async def _version_memory(
             "custom_fields": rec.custom_fields
             or existing.metadata_.get("custom_fields", {}),
             "updated_by": actor,
-            "previous_id": existing.id,
-            "root_id": existing.metadata_.get("root_id") or existing.id,
+            "previous_id": existing_id,
+            "root_id": existing.metadata_.get("root_id") or existing_id,
             "source": rec.source.model_dump(),
             "governance": existing.metadata_.get("governance", {}),
         },
@@ -274,7 +280,6 @@ async def _version_memory(
         await maybe_add
     await session.flush()
 
-    existing.status = "superseded"
     existing.superseded_by = new_memory.id
 
     await _audit_compat(
@@ -834,8 +839,7 @@ async def run_maintenance(
                         action="fix_link",
                         memory_id=memory.id,
                         detail=(
-                            f"superseded_by {memory.superseded_by} "
-                            f"not found in active"
+                            f"superseded_by {memory.superseded_by} not found in active"
                         ),
                     )
                 )
