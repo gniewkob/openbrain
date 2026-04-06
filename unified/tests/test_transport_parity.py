@@ -107,6 +107,11 @@ class _GatewayClient:
             return _FakeResponse(200, LEGACY_MEMORY)
         raise AssertionError(f"Unexpected PUT path: {path}")
 
+    async def patch(self, path: str, json=None):
+        if path.startswith("/api/v1/memory/"):
+            return _FakeResponse(200, V1_RECORD)
+        raise AssertionError(f"Unexpected PATCH path: {path}")
+
     async def delete(self, path: str):
         if path in ("/api/memories/mem-1", "/api/v1/memory/mem-1"):
             return _FakeResponse(204, None)
