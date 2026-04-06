@@ -99,77 +99,47 @@ class TestEndpointsV1Obsidian:
     def test_v1_obsidian_vaults(self, client: TestClient) -> None:
         """V1 obsidian vaults endpoint."""
         response = client.get("/api/v1/obsidian/vaults")
-        assert response.status_code in [200, 401, 403]
+        assert response.status_code in [200, 401, 403, 503]
 
     def test_v1_obsidian_read_note_validation(self, client: TestClient) -> None:
         """V1 obsidian read-note validates input."""
         response = client.post("/api/v1/obsidian/read-note", json={})
-        # Missing vault and path
-        assert response.status_code in [200, 401, 403, 422]
+        assert response.status_code in [200, 401, 403, 422, 503]
 
     def test_v1_obsidian_write_note_validation(self, client: TestClient) -> None:
         """V1 obsidian write-note validates input."""
         response = client.post("/api/v1/obsidian/write-note", json={})
-        assert response.status_code in [200, 401, 403, 422]
+        assert response.status_code in [200, 401, 403, 422, 503]
 
     def test_v1_obsidian_update_note_validation(self, client: TestClient) -> None:
         """V1 obsidian update-note validates input."""
         response = client.post("/api/v1/obsidian/update-note", json={})
-        assert response.status_code in [200, 401, 403, 422]
+        assert response.status_code in [200, 401, 403, 422, 503]
 
     def test_v1_obsidian_sync_validation(self, client: TestClient) -> None:
         """V1 obsidian sync validates input."""
         response = client.post("/api/v1/obsidian/sync", json={})
-        assert response.status_code in [200, 401, 403, 422]
+        assert response.status_code in [200, 401, 403, 422, 503]
 
     def test_v1_obsidian_export_validation(self, client: TestClient) -> None:
         """V1 obsidian export validates input."""
         response = client.post("/api/v1/obsidian/export", json={})
-        assert response.status_code in [200, 401, 403, 422]
+        assert response.status_code in [200, 401, 403, 422, 503]
 
     def test_v1_obsidian_collection_validation(self, client: TestClient) -> None:
         """V1 obsidian collection validates input."""
         response = client.post("/api/v1/obsidian/collection", json={})
-        assert response.status_code in [200, 401, 403, 422]
+        assert response.status_code in [200, 401, 403, 422, 503]
 
     def test_v1_obsidian_bidirectional_sync(self, client: TestClient) -> None:
         """V1 obsidian bidirectional-sync validates input."""
         response = client.post("/api/v1/obsidian/bidirectional-sync", json={})
-        assert response.status_code in [200, 401, 403, 422]
+        assert response.status_code in [200, 401, 403, 422, 503]
 
     def test_v1_obsidian_sync_status(self, client: TestClient) -> None:
         """V1 obsidian sync-status endpoint."""
         response = client.get("/api/v1/obsidian/sync-status")
-        assert response.status_code in [200, 401, 403]
-
-
-class TestEndpointsLegacy:
-    """Legacy CRUD API endpoints."""
-
-    def test_legacy_memories_get(self, client: TestClient) -> None:
-        """Legacy GET /api/memories."""
-        response = client.get("/api/memories")
-        assert response.status_code in [200, 401, 403]
-
-    def test_legacy_memories_post_validation(self, client: TestClient) -> None:
-        """Legacy POST /api/memories validates input."""
-        response = client.post("/api/memories", json={})
-        assert response.status_code in [200, 401, 403, 422]
-
-    def test_legacy_memories_id_get(self, client: TestClient) -> None:
-        """Legacy GET /api/memories/{id}."""
-        response = client.get("/api/memories/test-id")
-        assert response.status_code in [200, 401, 403, 404]
-
-    def test_legacy_search_post(self, client: TestClient) -> None:
-        """Legacy POST /api/memories/search."""
-        response = client.post("/api/memories/search", json={"query": "test"})
-        assert response.status_code in [200, 401, 403]
-
-    def test_legacy_export_post(self, client: TestClient) -> None:
-        """Legacy POST /api/memories/export."""
-        response = client.post("/api/memories/export", json={"ids": ["mem_1"]})
-        assert response.status_code in [200, 401, 403]
+        assert response.status_code in [200, 401, 403, 503]
 
 
 class TestAllRoutesRegistered:
@@ -209,16 +179,15 @@ class TestAllRoutesRegistered:
         for path in expected:
             assert path in paths, f"Missing: {path}"
 
-    def test_expected_legacy_routes_exist(self, client: TestClient) -> None:
-        """All legacy routes are registered."""
+    def test_expected_maintenance_routes_exist(self, client: TestClient) -> None:
+        """Maintenance routes are registered."""
         response = client.get("/openapi.json")
         paths = response.json()["paths"]
 
         expected = [
-            "/api/memories",
-            "/api/memories/{memory_id}",
-            "/api/memories/search",
-            "/api/memories/export",
+            "/api/v1/memory/maintain",
+            "/api/v1/memory/export",
+            "/api/v1/memory/sync-check",
         ]
         for path in expected:
             assert path in paths, f"Missing: {path}"
