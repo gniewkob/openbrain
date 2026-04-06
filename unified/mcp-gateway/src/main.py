@@ -25,6 +25,7 @@ Tools:
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Literal
 
@@ -34,11 +35,26 @@ from pydantic import BaseModel
 
 from .obsidian_cli import ObsidianCliAdapter, ObsidianCliError, note_to_write_payload
 
+_gateway_logger = logging.getLogger("mcp_gateway")
+
 BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://localhost:7010")
 BACKEND_TIMEOUT: float = float(os.environ.get("BACKEND_TIMEOUT_S", "30"))
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
 OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"
 MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
+
+_MIN_KEY_LEN = 32
+if INTERNAL_API_KEY and len(INTERNAL_API_KEY) < _MIN_KEY_LEN:
+    _gateway_logger.warning(
+        "INTERNAL_API_KEY is only %d chars (minimum %d recommended). "
+        "Use a longer key in production.",
+        len(INTERNAL_API_KEY),
+        _MIN_KEY_LEN,
+    )
+elif not INTERNAL_API_KEY:
+    _gateway_logger.warning(
+        "INTERNAL_API_KEY is not set. Requests to backend will fail in public mode."
+    )
 
 # Parameter validation bounds (PERF-007)
 MAX_SEARCH_TOP_K: int = 100
