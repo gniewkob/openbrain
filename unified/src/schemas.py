@@ -36,7 +36,17 @@ EntityTypeStr = Annotated[str, Field(max_length=MAX_ENTITY_TYPE_LEN)]
 TitleStr = Annotated[str, Field(max_length=MAX_TITLE_LEN)]
 ContentStr = Annotated[str, Field(max_length=MAX_CONTENT_LEN)]
 OwnerStr = Annotated[str, Field(max_length=MAX_OWNER_LEN)]
-TenantIdStr = Annotated[str, Field(max_length=MAX_TENANT_ID_LEN)]
+# tenant_id must be non-empty and contain only safe identifier characters
+# (letters, digits, hyphens, underscores) to prevent path-traversal and
+# injection risks when used as a filter or partition key.
+TenantIdStr = Annotated[
+    str,
+    Field(
+        min_length=1,
+        max_length=MAX_TENANT_ID_LEN,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    ),
+]
 TagStr = Annotated[str, Field(max_length=MAX_TAG_LEN)]
 MatchKeyStr = Annotated[str, Field(max_length=MAX_MATCH_KEY_LEN)]
 QueryStr = Annotated[str, Field(max_length=MAX_QUERY_LEN)]
