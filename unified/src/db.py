@@ -2,6 +2,7 @@
 Database connection and session management for OpenBrain Unified.
 """
 
+import os
 from urllib.parse import urlsplit
 from collections.abc import AsyncGenerator
 
@@ -14,6 +15,13 @@ from .config import get_config
 # Local development defaults are intentionally plain strings.
 _D_U = "postgres"
 _D_P = "postgres"
+
+# Read directly from env at module load time so that test reloads pick up
+# patched env vars (get_config() is lru_cached and survives module reloads).
+DB_URL: str = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified",
+)
 
 
 def _uses_dev_database_credentials(db_url: str) -> bool:
@@ -32,12 +40,9 @@ def validate_database_configuration() -> None:
     Raises:
         RuntimeError: If using default dev credentials in public mode
     """
-    config = get_config()
-    public_mode = config.auth.public_mode
-    public_base_url = bool(config.auth.public_base_url)
-    if (public_mode or public_base_url) and _uses_dev_database_credentials(
-        config.database.url
-    ):
+    public_mode = os.environ.get("PUBLIC_MODE", "").lower() == "true"
+    public_base_url = os.environ.get("PUBLIC_BASE_URL", "").strip()
+    if (public_mode or public_base_url) and _uses_dev_database_credentials(DB_URL):
         raise RuntimeError(
             "PUBLIC_MODE=true or PUBLIC_BASE_URL set forbids dev default PostgreSQL "
             "credentials. Configure DATABASE_URL with a unique password."
@@ -47,7 +52,7 @@ def validate_database_configuration() -> None:
 validate_database_configuration()
 
 engine = create_async_engine(
-    get_config().database.url,
+    DB_URL,
     echo=False,
     pool_size=5,
     max_overflow=10,
