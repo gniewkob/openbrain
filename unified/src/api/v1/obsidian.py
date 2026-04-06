@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -361,12 +362,17 @@ async def v1_obsidian_bidirectional_sync(
     engine = await _get_sync_engine(req.strategy)
     adapter = ObsidianCliAdapter()
 
-    result = await engine.sync(
-        session=session,
-        adapter=adapter,
-        vault=req.vault,
-        dry_run=req.dry_run,
-    )
+    timeout_s = float(os.environ.get("OBSIDIAN_SYNC_TIMEOUT_S", "120"))
+    try:
+        async with asyncio.timeout(timeout_s):
+            result = await engine.sync(
+                session=session,
+                adapter=adapter,
+                vault=req.vault,
+                dry_run=req.dry_run,
+            )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=503, detail="Obsidian sync timed out")
 
     # Convert to response format
     changes_response = [

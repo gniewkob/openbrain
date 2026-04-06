@@ -43,6 +43,8 @@ jobs:
       - name: Install gateway package
         run: pip install -e mcp-gateway
       - name: Run smoke tests
+        env:
+          OBSIDIAN_SYNC_TIMEOUT_S: "10"
         run: python -m unittest discover -s tests -v
 
   gateway-smoke:
