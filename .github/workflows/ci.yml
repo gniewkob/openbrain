@@ -88,5 +88,4 @@ jobs:
     - name: Audit dependencies
       run: |
         cd unified
-        pip-audit --desc --format=json || true
-      continue-on-error: true
+        pip-audit --desc --format=json
