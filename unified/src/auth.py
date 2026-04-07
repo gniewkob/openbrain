@@ -501,6 +501,9 @@ def is_privileged_user(claims: dict[str, Any]) -> bool:
 # ---------------------------------------------------------------------------
 _rate_limit_store: dict[str, collections.deque] = {}
 _rate_limit_lock = threading.Lock()
+# Cap on tracked IPs to prevent unbounded memory growth (e.g. bot scans).
+# When exceeded, stale entries (empty windows) are purged.
+_MAX_RATE_LIMIT_IPS = 10_000
 
 
 def _get_rate_limit_rpm() -> int:
@@ -532,6 +535,16 @@ def check_internal_key_rate_limit(client_ip: str) -> None:
                 headers={"Retry-After": "60"},
             )
         q.append(now)
+        # Evict fully-expired IPs when store exceeds cap.
+        # dq[-1] is the most recent timestamp; if it's outside the window,
+        # all entries are stale (deque is insertion-ordered oldest-first).
+        if len(_rate_limit_store) > _MAX_RATE_LIMIT_IPS:
+            stale = [
+                ip for ip, dq in _rate_limit_store.items()
+                if not dq or dq[-1] < window_start
+            ]
+            for ip in stale:
+                del _rate_limit_store[ip]
 
 
 async def require_auth(

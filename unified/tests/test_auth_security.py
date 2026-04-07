@@ -185,6 +185,28 @@ class RateLimitTests(unittest.TestCase):
             # 10.0.0.1 is now at limit, 10.0.0.2 should still work
             check_internal_key_rate_limit("10.0.0.2")  # must not raise
 
+    def test_stale_ips_evicted_when_store_exceeds_cap(self) -> None:
+        """When _rate_limit_store exceeds _MAX_RATE_LIMIT_IPS, stale entries are removed."""
+        import time
+        from unittest.mock import patch as mpatch
+        from src.auth import check_internal_key_rate_limit, _rate_limit_store, _MAX_RATE_LIMIT_IPS
+
+        _rate_limit_store.clear()
+
+        # Fill store with _MAX_RATE_LIMIT_IPS stale entries (old timestamps → empty windows)
+        stale_time = time.time() - 120  # 2 minutes ago — outside 60s window
+        for i in range(_MAX_RATE_LIMIT_IPS):
+            import collections
+            dq = collections.deque()
+            dq.append(stale_time)
+            _rate_limit_store[f"10.{i // 65536}.{(i // 256) % 256}.{i % 256}"] = dq
+
+        # One more request triggers eviction
+        check_internal_key_rate_limit("192.0.2.100")
+
+        # Store should be much smaller now — all stale IPs evicted
+        self.assertLess(len(_rate_limit_store), _MAX_RATE_LIMIT_IPS)
+
 
 if __name__ == "__main__":
     unittest.main()

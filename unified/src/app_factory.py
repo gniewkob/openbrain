@@ -86,6 +86,9 @@ def create_app(*, public_base_url: str = "", lifespan) -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Configure CORS — explicit allowed headers, never wildcard
+    allowed_origins: list[str] = []
+    allowed_origin_regex: str | None = None
+
     if config.auth.public_mode:
         allowed_origins = config.cors.get_origins_list()
         if not allowed_origins or allowed_origins == [
@@ -94,14 +97,17 @@ def create_app(*, public_base_url: str = "", lifespan) -> FastAPI:
         ]:
             allowed_origins = [public_base_url] if public_base_url else []
     else:
-        allowed_origins = ["http://localhost:*", "http://127.0.0.1:*"]
+        # Local mode: match any localhost / 127.0.0.1 port via regex
+        # (Starlette does exact string match, so "localhost:*" never works)
+        allowed_origin_regex = r"http://(localhost|127\.0\.0\.1):\d+"
 
-    if allowed_origins:
+    if allowed_origins or allowed_origin_regex:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=allowed_origins,
+            allow_origin_regex=allowed_origin_regex,
             allow_credentials=True,
-            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=_ALLOWED_HEADERS,
             expose_headers=_EXPOSE_HEADERS,
             max_age=600,

@@ -59,7 +59,7 @@ services:
       - OLLAMA_URL=http://host.docker.internal:11434
       - REDIS_URL=redis://redis:6379/0
       - PUBLIC_MODE=true
-      - PUBLIC_BASE_URL=https://poutily-hemispheroidal-pia.ngrok-free.dev
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     ports:
       - "127.0.0.1:7010:80"
@@ -92,7 +92,7 @@ services:
     profiles: ["public"]
     environment:
       - BRAIN_URL=http://unified-server:80
-      - PUBLIC_BASE_URL=https://poutily-hemispheroidal-pia.ngrok-free.dev
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - MCP_HTTP_PORT=7011
       - REDIS_URL=redis://redis:6379/1
@@ -113,7 +113,7 @@ services:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     command:
       - "http"
-      - "--url=poutily-hemispheroidal-pia.ngrok-free.dev"
+      - "--url=${NGROK_DOMAIN}"
       - "mcp-http:7011"
     networks:
       - net_unified
