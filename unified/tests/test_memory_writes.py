@@ -241,6 +241,6 @@ class TestWriteTruncationWarning:
             from src.memory_writes import handle_memory_write
             response = asyncio.run(handle_memory_write(mock_session, request))
 
-        assert any("6" in w and "chars" in w for w in response.warnings), (
+        assert any("will be indexed for vector search" in w for w in response.warnings), (
             f"Expected truncation warning in response.warnings, got: {response.warnings}"
         )
