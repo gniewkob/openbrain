@@ -56,6 +56,7 @@ engine = create_async_engine(
     max_overflow=10,
     pool_timeout=30,
     pool_recycle=1800,  # recycle idle connections every 30 min
+    pool_pre_ping=True,  # detect stale connections before use
     connect_args={
         "timeout": 5,  # asyncpg TCP connect timeout (seconds); avoids CI hang
         "server_settings": {
