@@ -17,6 +17,10 @@ IGNORED_PATHS = {
     # Audit docs contain example/redacted credential URLs
     "docs/AUDIT_REPORT_2026-04-04.md",
     "docs/CRITICAL_CODE_AUDIT_2026-04-04.md",
+    # Implementation plans contain fake/example credentials as test fixtures
+    "docs/superpowers/plans/2026-04-05-track-a-p0-hardening.md",
+    "docs/superpowers/plans/2026-04-06-audit-remediation-p1-p2.md",
+    "docs/superpowers/specs/2026-04-05-track-a-p0-hardening-design.md",
 }
 
 IGNORED_SUFFIXES = {
@@ -127,6 +131,9 @@ def _is_placeholder(value: str) -> bool:
     if normalized.startswith(("str", "int", "bool", "list", "dict", "tuple", "None")):
         return True
     if re.match(r"^[a-z_][a-z0-9_.]*\.[a-z_][a-z0-9_.]*", normalized):
+        return True
+    # Numeric/arithmetic expressions (e.g. TTL constants: "30 * 24 * 3600 # comment")
+    if re.fullmatch(r"[\d\s\*\+\-\/\(\)]+(?:#[^\n]*)?", normalized):
         return True
     return False
 

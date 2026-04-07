@@ -5,7 +5,7 @@ services:
       dockerfile: monitoring/Dockerfile.bridge
     container_name: shared-metrics-bridge
     environment:
-      - INTERNAL_API_KEY=0FABJMzqD2cvBOC_dYbjKCnb51nDVlqo--f44nVwWrI
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - METRICS_UPSTREAM_URL=http://openbrain-unified-server:80/metrics
       - METRICS_LISTEN_HOST=0.0.0.0
       - METRICS_LISTEN_PORT=9180
