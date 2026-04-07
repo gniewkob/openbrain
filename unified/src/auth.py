@@ -540,7 +540,8 @@ def check_internal_key_rate_limit(client_ip: str) -> None:
         # all entries are stale (deque is insertion-ordered oldest-first).
         if len(_rate_limit_store) > _MAX_RATE_LIMIT_IPS:
             stale = [
-                ip for ip, dq in _rate_limit_store.items()
+                ip
+                for ip, dq in _rate_limit_store.items()
                 if not dq or dq[-1] < window_start
             ]
             for ip in stale:
