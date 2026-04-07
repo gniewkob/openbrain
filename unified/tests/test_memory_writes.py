@@ -206,3 +206,41 @@ class TestWriteTruncationWarning:
             )
         mock_log.warning.assert_not_called()
         assert result is None
+
+    def test_warning_appears_in_response_warnings(self):
+        """MemoryWriteResponse.warnings contains truncation message when content > limit."""
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from src.embed import EMBED_MAX_CHARS
+        from src.schemas import MemoryWriteRequest, MemoryWriteRecord, WriteMode, MemoryWriteResponse
+
+        long_content = "x" * (EMBED_MAX_CHARS + 500)
+        request = MemoryWriteRequest(
+            record=MemoryWriteRecord(
+                content=long_content,
+                domain="build",
+                entity_type="Test",
+            ),
+            write_mode=WriteMode.upsert,
+        )
+
+        mock_session = MagicMock()
+        # No existing record
+        mock_session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+        )
+
+        # Mock _create_new_memory to return a clean response — we only care that
+        # handle_memory_write appends the truncation warning to it
+        fake_response = MemoryWriteResponse(status="created")
+
+        with patch(
+            "src.memory_writes._create_new_memory",
+            new=AsyncMock(return_value=fake_response),
+        ):
+            from src.memory_writes import handle_memory_write
+            response = asyncio.run(handle_memory_write(mock_session, request))
+
+        assert any("6" in w and "chars" in w for w in response.warnings), (
+            f"Expected truncation warning in response.warnings, got: {response.warnings}"
+        )
