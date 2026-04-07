@@ -58,7 +58,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - OLLAMA_URL=http://host.docker.internal:11434
       - REDIS_URL=redis://redis:6379/0
-      - PUBLIC_MODE=true
+      - PUBLIC_MODE=${PUBLIC_MODE:-false}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     ports:

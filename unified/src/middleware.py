@@ -165,6 +165,9 @@ class SecretScanMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request, call_next):
         if os.environ.get("DISABLE_SECRET_SCANNING") == "1":
+            _scan_logger.warning(
+                "Secret scanning is DISABLED via DISABLE_SECRET_SCANNING=1"
+            )
             return await call_next(request)
 
         method = request.method.upper()

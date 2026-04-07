@@ -304,12 +304,13 @@ async def value_error_handler(
     exc: ValueError,
 ) -> JSONResponse:
     """Map ValueError from business logic to 422 semantic_error."""
+    message = "Invalid request" if is_production() else str(exc)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "error": {
                 "code": "semantic_error",
-                "message": str(exc),
+                "message": message,
                 "details": None,
                 "retryable": False,
             }
