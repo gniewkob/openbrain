@@ -19,8 +19,12 @@ IGNORED_PATHS = {
     "docs/CRITICAL_CODE_AUDIT_2026-04-04.md",
     # Implementation plans contain fake/example credentials as test fixtures
     "docs/superpowers/plans/2026-04-05-track-a-p0-hardening.md",
+    "docs/superpowers/plans/2026-04-05-track-b-p1-fixes.md",
     "docs/superpowers/plans/2026-04-06-audit-remediation-p1-p2.md",
+    "docs/superpowers/plans/2026-04-06-m2-write-truncation-warning.md",
     "docs/superpowers/specs/2026-04-05-track-a-p0-hardening-design.md",
+    "docs/superpowers/specs/2026-04-05-track-b-p1-fixes-design.md",
+    "docs/mcp-api-keys-and-configuration.md",
 }
 
 IGNORED_SUFFIXES = {

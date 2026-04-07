@@ -145,11 +145,14 @@ class TestLogDuplicateRisk:
         rec.entity_type = "Test"
         rec.owner = "test"
 
-        _log_duplicate_risk(rec)
+        from unittest.mock import patch
 
-        # Check that something was logged
-        # Note: structlog may not use standard logging, so this is a basic check
-        assert True  # If no exception, test passes
+        with patch("src.memory_writes.log") as mock_log:
+            _log_duplicate_risk(rec)
+
+        mock_log.warning.assert_called_once()
+        call_args = mock_log.warning.call_args
+        assert call_args[0][0] == "duplicate_risk_write"
 
     def test_no_log_with_match_key(self):
         """Test no warning when match_key present."""
@@ -212,7 +215,12 @@ class TestWriteTruncationWarning:
         import asyncio
         from unittest.mock import AsyncMock, MagicMock, patch
         from src.embed import EMBED_MAX_CHARS
-        from src.schemas import MemoryWriteRequest, MemoryWriteRecord, WriteMode, MemoryWriteResponse
+        from src.schemas import (
+            MemoryWriteRequest,
+            MemoryWriteRecord,
+            WriteMode,
+            MemoryWriteResponse,
+        )
 
         long_content = "x" * (EMBED_MAX_CHARS + 500)
         request = MemoryWriteRequest(
@@ -239,8 +247,9 @@ class TestWriteTruncationWarning:
             new=AsyncMock(return_value=fake_response),
         ):
             from src.memory_writes import handle_memory_write
+
             response = asyncio.run(handle_memory_write(mock_session, request))
 
-        assert any("will be indexed for vector search" in w for w in response.warnings), (
-            f"Expected truncation warning in response.warnings, got: {response.warnings}"
-        )
+        assert any(
+            "will be indexed for vector search" in w for w in response.warnings
+        ), f"Expected truncation warning in response.warnings, got: {response.warnings}"
