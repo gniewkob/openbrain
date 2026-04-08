@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+import ast
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -35,41 +35,59 @@ def _check_manifest() -> list[str]:
     return errors
 
 
-def _extract_function_block(text: str, function_name: str) -> str:
-    pattern = rf"^async def {function_name}\(.*?(?=^async def |\Z)"
-    match = re.search(pattern, text, flags=re.MULTILINE | re.DOTALL)
-    if not match:
-        raise RuntimeError(f"missing function: {function_name}")
-    return match.group(0)
+def _find_async_function(tree: ast.AST, function_name: str) -> ast.AsyncFunctionDef | None:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == function_name:
+            return node
+    return None
+
+
+def _function_calls_name(func: ast.AsyncFunctionDef, call_name: str) -> bool:
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name) and node.func.id == call_name:
+            return True
+    return False
+
+
+def _http_obsidian_tools_defined_under_flag(text: str, tool_names: list[str]) -> bool:
+    tree = ast.parse(text)
+    required_defs = {f"brain_{name}" for name in tool_names}
+    found_defs: set[str] = set()
+
+    for node in tree.body:
+        if not isinstance(node, ast.If):
+            continue
+        cond = node.test
+        if not (isinstance(cond, ast.Name) and cond.id == "ENABLE_HTTP_OBSIDIAN_TOOLS"):
+            continue
+        for stmt in node.body:
+            if isinstance(stmt, ast.AsyncFunctionDef):
+                if stmt.name in required_defs:
+                    found_defs.add(stmt.name)
+    return found_defs == required_defs
 
 
 def _check_gateway_gating() -> list[str]:
     errors: list[str] = []
     text = GATEWAY_MAIN.read_text(encoding="utf-8")
+    tree = ast.parse(text)
+    payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    local_tools = payload.get("local_obsidian_tools", [])
+
     if 'OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"' not in text:
         errors.append("gateway must define ENABLE_LOCAL_OBSIDIAN_TOOLS env constant")
-    if "_require_obsidian_local_tools_enabled()" not in text:
+    if "_require_obsidian_local_tools_enabled" not in text:
         errors.append("gateway must guard local obsidian tools with _require_obsidian_local_tools_enabled")
-
-    guarded_tools = (
-        "brain_obsidian_vaults",
-        "brain_obsidian_read_note",
-        "brain_obsidian_sync",
-        "brain_obsidian_write_note",
-        "brain_obsidian_export",
-        "brain_obsidian_collection",
-        "brain_obsidian_bidirectional_sync",
-        "brain_obsidian_sync_status",
-        "brain_obsidian_update_note",
-    )
-    for tool in guarded_tools:
-        try:
-            block = _extract_function_block(text, tool)
-        except RuntimeError as exc:
-            errors.append(str(exc))
+    for tool in local_tools:
+        fn_name = f"brain_{tool}"
+        fn = _find_async_function(tree, fn_name)
+        if fn is None:
+            errors.append(f"missing function: {fn_name}")
             continue
-        if "_require_obsidian_local_tools_enabled()" not in block:
-            errors.append(f"{tool} must call _require_obsidian_local_tools_enabled()")
+        if not _function_calls_name(fn, "_require_obsidian_local_tools_enabled"):
+            errors.append(f"{fn_name} must call _require_obsidian_local_tools_enabled()")
 
     required_caps = (
         '"obsidian": {',
@@ -85,8 +103,15 @@ def _check_gateway_gating() -> list[str]:
 def _check_http_transport_contract() -> list[str]:
     errors: list[str] = []
     text = HTTP_TRANSPORT.read_text(encoding="utf-8")
+    payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    http_tools = payload.get("http_obsidian_tools", [])
+
     if "if ENABLE_HTTP_OBSIDIAN_TOOLS:" not in text:
         errors.append("HTTP transport must gate Obsidian tools with ENABLE_HTTP_OBSIDIAN_TOOLS")
+    elif not _http_obsidian_tools_defined_under_flag(text, http_tools):
+        errors.append(
+            "HTTP transport must define all http_obsidian_tools under ENABLE_HTTP_OBSIDIAN_TOOLS gate"
+        )
     required_caps = (
         '"obsidian": {',
         '"obsidian_http": {',
