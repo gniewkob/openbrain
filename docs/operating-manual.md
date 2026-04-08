@@ -147,6 +147,10 @@ Branch protection policy (recommended):
 - Dismiss stale pull request approvals when new commits are pushed.
 - Include administrators (no bypass in normal mode).
 
+Backup branch inventory note (2026-04-08):
+- Local `backup/local-pre-sync-20260401-232135` has no unique commits relative to `master` and can be removed safely when no longer needed.
+- Remote `origin/backup/local-pre-sync-20260401-232135` still contains unique historical commits (ahead of `origin/master`), so deletion should be treated as a deliberate archive decision (tag/patch export first, then delete).
+
 ## Export Policy
 - **Admin callers** (privileged users authenticated via JWT) receive fully unredacted records.
 - **Service account callers** (`X-Internal-Key` subject = `internal`) also receive full records since they have already passed `_require_admin()`.
@@ -156,7 +160,7 @@ Branch protection policy (recommended):
 ## Known Limitations
 - `tenant_id` is now available as a first-class indexed column and remains mirrored in `metadata_` only for compatibility with older records and tools. New code should treat the column as the source of truth.
 - Telemetry gauges and histograms remain process-local. Counter metrics can now be shared across workers by setting `TELEMETRY_BACKEND=redis`.
-- MCP transport still uses a per-request backend `httpx.AsyncClient`, which is acceptable for current volume but not the best shape for sustained high-throughput gateway traffic.
+- MCP transport and stdio gateway now reuse shared backend `httpx.AsyncClient` instances to preserve connection pooling under sustained tool traffic.
 - The metrics bridge still uses Python's basic `HTTPServer`, which is sufficient for the current single-scrape local topology but not intended as a hardened multi-client ingress component.
 
 ## Operational Thresholds

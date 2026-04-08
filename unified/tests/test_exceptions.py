@@ -46,7 +46,7 @@ class TestExceptionHierarchy(unittest.TestCase):
     def test_validation_error(self) -> None:
         """Test ValidationError has correct status code."""
         exc = ValidationError("Invalid input")
-        self.assertEqual(exc.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(exc.status_code, status.HTTP_422_UNPROCESSABLE_CONTENT)
         self.assertEqual(exc.error_code, "validation_error")
 
     def test_not_found_error(self) -> None:
@@ -219,7 +219,7 @@ class TestExceptionHandlers(unittest.IsolatedAsyncioTestCase):
         
         response = await openbrain_exception_handler(mock_request, exc)
         
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_CONTENT)
         self.assertIn("error", response.body.decode())
 
     async def test_generic_exception_handler_openbrain(self) -> None:
