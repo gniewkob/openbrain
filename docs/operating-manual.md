@@ -34,6 +34,7 @@ The following security improvements were applied:
 - **Access denial telemetry**: Prometheus counters now expose `access_denied_total` and reason-specific breakdowns for `admin`, `domain`, `owner`, and `tenant`.
 - **Metadata-aware idempotent writes**: writes are no longer silently skipped when only metadata changes and `content_hash` stays the same.
 - **Telemetry durability**: counters and histograms are now restored across restarts via PostgreSQL-backed persistence.
+- **Shared telemetry counters**: `TELEMETRY_BACKEND=redis` enables cross-worker counter aggregation using Redis (`TELEMETRY_REDIS_URL` or `REDIS_URL`), with automatic fallback to in-memory counters when Redis is unavailable.
 - **Metrics exception accounting**: unhandled request failures are counted as `500` and still contribute to request-duration histograms.
 - **MCP log redaction**: transport logging now redacts `content`, `title`, `tenant_id`, `match_key`, `obsidian_ref`, and `custom_fields`.
 - **Lazy OIDC refresh lock**: the OIDC verifier avoids import-time event-loop binding by creating the async lock lazily.
@@ -154,7 +155,7 @@ Branch protection policy (recommended):
 
 ## Known Limitations
 - `tenant_id` is now available as a first-class indexed column and remains mirrored in `metadata_` only for compatibility with older records and tools. New code should treat the column as the source of truth.
-- Telemetry state is now durable across restarts, but the registry is still per-process. Multi-worker uvicorn deployments will report inconsistent live metrics per scrape unless replaced with a shared backend.
+- Telemetry gauges and histograms remain process-local. Counter metrics can now be shared across workers by setting `TELEMETRY_BACKEND=redis`.
 - MCP transport still uses a per-request backend `httpx.AsyncClient`, which is acceptable for current volume but not the best shape for sustained high-throughput gateway traffic.
 - The metrics bridge still uses Python's basic `HTTPServer`, which is sufficient for the current single-scrape local topology but not intended as a hardened multi-client ingress component.
 
