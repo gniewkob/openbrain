@@ -53,8 +53,9 @@ Latest local verification (2026-04-08):
     - `unified-server` container now receives `OBSIDIAN_CLI_COMMAND` and `OBSIDIAN_VAULT_PATHS` env passthrough.
   - Controlled Obsidian E2E behavior:
     - integration roundtrip tests are gated and skip with explicit reason when backend reports `backend_unavailable`.
+  - Controlled Obsidian E2E execution:
+    - live run completed successfully (`2 passed`) with isolated vault mapping (`OBSIDIAN_VAULT_PATHS={"Controlled E2E":"/app/.controlled-vault"}`).
 - **Deferred**
-  - Controlled live Obsidian E2E execution in target environment (coverage and graceful skip path are in place; full write/read/sync success still requires vault mapping reachable from container runtime).
   - Additional doc consolidation outside current governance stream.
 
 ## Current check posture (latest branch head)

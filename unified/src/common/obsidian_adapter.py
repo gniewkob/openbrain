@@ -88,15 +88,18 @@ def _parse_vault_paths_mapping(raw: str) -> dict[str, str]:
             if str(k).strip() and str(v).strip()
         }
 
-    # Legacy format: "Name:/path,Other:/path2"
+    # Legacy format: "Name:/path,Other:/path2" (optionally wrapped in braces)
+    if text.startswith("{") and text.endswith("}"):
+        text = text[1:-1].strip()
+
     result: dict[str, str] = {}
     for item in text.split(","):
         pair = item.strip()
         if not pair or ":" not in pair:
             continue
         name, path = pair.split(":", 1)
-        name = name.strip()
-        path = path.strip()
+        name = name.strip().strip("'\"")
+        path = path.strip().strip("'\"")
         if name and path:
             result[name] = path
     return result

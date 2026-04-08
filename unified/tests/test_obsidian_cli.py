@@ -96,6 +96,12 @@ class ObsidianVaultDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(parsed, {"Memory": "/vault/memory", "Work": "/vault/work"})
 
+    def test_parse_vault_paths_mapping_supports_braced_legacy_format(self) -> None:
+        parsed = _parse_vault_paths_mapping(
+            "{Memory:/vault/memory,Work:/vault/work}"
+        )
+        self.assertEqual(parsed, {"Memory": "/vault/memory", "Work": "/vault/work"})
+
     def test_configured_vaults_from_json_and_named_env(self) -> None:
         with patch.dict(
             os.environ,

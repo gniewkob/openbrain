@@ -22,6 +22,7 @@ Raport obejmuje głównie iteracje:
 - 50 (Obsidian vault discovery env fallback + tests),
 - 51 (controlled Obsidian roundtrip E2E coverage under explicit opt-in),
 - 52 (Obsidian runtime resilience: env passthrough + legacy vault-map parsing + graceful backend-unavailable skip semantics).
+- 53 (controlled Obsidian live E2E closure on isolated container-reachable vault mapping).
 
 ## Current platform state
 
@@ -74,7 +75,7 @@ Raport obejmuje głównie iteracje:
 ## Deferred items (with rationale)
 
 - **Full Obsidian live sync E2E on local vaults**: wymaga controlled runtime z odpowiednią konfiguracją środowiska i explicit scope operacyjnego.
-- **Full Obsidian live sync E2E success path**: coverage i skip-semantyka są gotowe; pełny sukces write/read/sync wymaga vault mappingu osiągalnego z runtime kontenera.
+- **Obsidian live sync E2E**: controlled write/read/sync został wykonany sukcesem na izolowanym mapowaniu kontenerowym; dla innych środowisk dalej wymagany jest kontenerowo-osiągalny vault mapping.
 - **Repo cleanup execution**: iteracyjne raporty i legacy plan/audit docs zostały zarchiwizowane; dalszy cleanup zależy od nowych artefaktów.
 - **Doc consolidation** (duplikaty audytowe/plany): częściowo wykonane (iteracyjne raporty zarchiwizowane i zindeksowane), pozostały dokumenty audytowo-planistyczne do decyzji keep/archive.
 
