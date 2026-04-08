@@ -45,7 +45,7 @@ class OpenBrainError(Exception):
 class ValidationError(OpenBrainError):
     """Invalid input data."""
 
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     error_code = "validation_error"
     safe_message = "Invalid input data"
 
@@ -306,7 +306,7 @@ async def value_error_handler(
     """Map ValueError from business logic to 422 semantic_error."""
     message = "Invalid request" if is_production() else str(exc)
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "error": {
                 "code": "semantic_error",

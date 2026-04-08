@@ -147,6 +147,10 @@ Branch protection policy (recommended):
 - Dismiss stale pull request approvals when new commits are pushed.
 - Include administrators (no bypass in normal mode).
 
+Backup branch inventory note (2026-04-08):
+- Local `backup/local-pre-sync-20260401-232135` has no unique commits relative to `master` and can be removed safely when no longer needed.
+- Remote `origin/backup/local-pre-sync-20260401-232135` still contains unique historical commits (ahead of `origin/master`), so deletion should be treated as a deliberate archive decision (tag/patch export first, then delete).
+
 ## Export Policy
 - **Admin callers** (privileged users authenticated via JWT) receive fully unredacted records.
 - **Service account callers** (`X-Internal-Key` subject = `internal`) also receive full records since they have already passed `_require_admin()`.
