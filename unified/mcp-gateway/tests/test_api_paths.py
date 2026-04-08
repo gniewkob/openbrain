@@ -342,6 +342,64 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             json={"content": "payload", "updated_by": "agent"},
         )
 
+    async def test_brain_update_corporate_returns_versioned_record(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.status_code = 200
+        response.json.return_value = {
+            "id": "corp-2",
+            "tenant_id": None,
+            "domain": "corporate",
+            "entity_type": "Decision",
+            "title": None,
+            "summary": None,
+            "content": "policy v2",
+            "owner": "ops@example.com",
+            "status": "active",
+            "version": 2,
+            "sensitivity": "internal",
+            "superseded_by": None,
+            "tags": ["governance"],
+            "relations": {},
+            "obsidian_ref": None,
+            "custom_fields": {},
+            "content_hash": "hash-v2",
+            "match_key": "corp:policy:auth",
+            "previous_id": "corp-1",
+            "root_id": "corp-1",
+            "valid_from": None,
+            "created_at": "2026-04-01T00:00:00Z",
+            "updated_at": "2026-04-01T00:00:00Z",
+            "created_by": "tester",
+            "updated_by": "admin@example.com",
+            "source": None,
+            "governance": {"policy_mode": "append_only"},
+        }
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.patch.return_value = response
+            mock_client.return_value = client
+
+            result = await gateway.brain_update(
+                memory_id="corp-1",
+                content="policy v2",
+                updated_by="admin@example.com",
+            )
+
+        self.assertEqual(result.domain, "corporate")
+        self.assertEqual(result.id, "corp-2")
+        self.assertEqual(result.previous_id, "corp-1")
+        self.assertEqual(result.root_id, "corp-1")
+        self.assertEqual(result.version, 2)
+        client.patch.assert_awaited_once_with(
+            "/api/v1/memory/corp-1",
+            json={"content": "policy v2", "updated_by": "admin@example.com"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
