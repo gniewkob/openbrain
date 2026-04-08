@@ -51,7 +51,9 @@ from .request_builders import (
     build_find_search_payload,
     build_list_filters,
     build_sync_check_payload,
+    normalize_optional_text,
     normalize_updated_by,
+    validate_store_inputs,
 )
 from .response_normalizers import (
     normalize_find_hits_to_records,
@@ -357,6 +359,14 @@ async def brain_store(
     match_key — optional idempotency key for bulk sync (prevents duplicates).
     obsidian_ref — path to source note in Obsidian vault.
     """
+    owner_normalized = normalize_optional_text(owner) or ""
+    match_key_normalized = normalize_optional_text(match_key)
+    validate_store_inputs(
+        domain=domain,
+        owner=owner_normalized,
+        match_key=match_key_normalized,
+    )
+
     async with _client() as c:
         r = await c.post(
             memory_absolute_path("write"),
@@ -367,12 +377,12 @@ async def brain_store(
                     "entity_type": entity_type,
                     "title": title,
                     "sensitivity": sensitivity,
-                    "owner": owner,
+                    "owner": owner_normalized,
                     "tenant_id": tenant_id,
                     "tags": tags or [],
                     "custom_fields": custom_fields or {},
                     "obsidian_ref": obsidian_ref,
-                    "match_key": match_key,
+                    "match_key": match_key_normalized,
                     "source": {"type": "agent", "system": MCP_SOURCE_SYSTEM},
                 },
                 "write_mode": "upsert",

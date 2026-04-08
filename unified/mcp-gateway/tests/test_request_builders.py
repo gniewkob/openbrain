@@ -50,3 +50,26 @@ class GatewayRequestBuildersTests(unittest.TestCase):
                 "file_hash": "sha256:xyz",
             },
         )
+
+    def test_validate_store_inputs_corporate_requires_owner_and_match_key(self) -> None:
+        gateway = load_gateway_main()
+        with self.assertRaises(ValueError):
+            gateway.validate_store_inputs(
+                domain="corporate",
+                owner="",
+                match_key="mk:1",
+            )
+        with self.assertRaises(ValueError):
+            gateway.validate_store_inputs(
+                domain="corporate",
+                owner="ops@example.com",
+                match_key=None,
+            )
+
+    def test_validate_store_inputs_non_corporate_allows_empty_fields(self) -> None:
+        gateway = load_gateway_main()
+        gateway.validate_store_inputs(
+            domain="build",
+            owner="",
+            match_key=None,
+        )

@@ -93,3 +93,24 @@ def normalize_updated_by(updated_by: str | None) -> str:
         if actor:
             return actor
     return str(_CONTRACTS["updated_by_default"])
+
+
+def normalize_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def validate_store_inputs(
+    *,
+    domain: str,
+    owner: str | None,
+    match_key: str | None,
+) -> None:
+    if domain.lower() != "corporate":
+        return
+    if not owner:
+        raise ValueError("brain_store(domain='corporate') requires non-empty owner")
+    if not match_key:
+        raise ValueError("brain_store(domain='corporate') requires non-empty match_key")
