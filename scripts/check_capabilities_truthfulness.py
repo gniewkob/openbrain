@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import sys
 from pathlib import Path
@@ -65,15 +66,54 @@ def _check_metadata() -> list[str]:
     return errors
 
 
+def _find_async_function(tree: ast.AST, name: str) -> ast.AsyncFunctionDef | None:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == name:
+            return node
+    return None
+
+
+def _has_health_payload_in_brain_capabilities(text: str) -> bool:
+    tree = ast.parse(text)
+    fn = _find_async_function(tree, "brain_capabilities")
+    if fn is None:
+        return False
+    for node in ast.walk(fn):
+        if not isinstance(node, ast.Return):
+            continue
+        value = node.value
+        if not isinstance(value, ast.Dict):
+            continue
+        for key, item in zip(value.keys, value.values):
+            if not isinstance(key, ast.Constant) or key.value != "health":
+                continue
+            if isinstance(item, ast.Name) and item.id == "health":
+                return True
+    return False
+
+
+def _check_health_probe_fallback_semantics(text: str, label: str) -> list[str]:
+    errors: list[str] = []
+    tree = ast.parse(text)
+    fn = _find_async_function(tree, "_get_backend_status")
+    if fn is None:
+        return [f"{label} must define _get_backend_status"]
+    constants = {
+        node.value for node in ast.walk(fn) if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+    if "/api/v1/health" not in constants:
+        errors.append(f"{label} must probe /api/v1/health before reporting unavailable")
+    if "api_health_fallback" not in constants:
+        errors.append(f"{label} must include api_health_fallback probe marker")
+    return errors
+
+
 def _check_transport_source(path: Path, label: str) -> list[str]:
     errors: list[str] = []
     text = path.read_text(encoding="utf-8")
-    if '"health": health' not in text:
+    if not _has_health_payload_in_brain_capabilities(text):
         errors.append(f"{label} must include health payload in capabilities response")
-    if "api_health_fallback" not in text:
-        errors.append(f"{label} must include api_health_fallback probe marker")
-    if "/api/v1/health" not in text:
-        errors.append(f"{label} must probe /api/v1/health before reporting unavailable")
+    errors.extend(_check_health_probe_fallback_semantics(text, label))
     return errors
 
 

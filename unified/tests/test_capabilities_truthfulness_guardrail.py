@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+import sys
+
+
+def _load_capabilities_truthfulness_module():
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "check_capabilities_truthfulness.py"
+    spec = importlib.util.spec_from_file_location(
+        "check_capabilities_truthfulness", script_path
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_capabilities_truthfulness_guardrail_passes_for_current_sources() -> None:
+    module = _load_capabilities_truthfulness_module()
+    assert module.main() == 0
+
+
+def test_capabilities_truthfulness_ast_helpers() -> None:
+    module = _load_capabilities_truthfulness_module()
+
+    src_ok = """
+async def _get_backend_status():
+    return {"probe": "api_health_fallback", "path": "/api/v1/health"}
+
+async def brain_capabilities():
+    health = {"overall": "healthy"}
+    return {"health": health}
+"""
+    assert module._has_health_payload_in_brain_capabilities(src_ok) is True
+    assert module._check_health_probe_fallback_semantics(src_ok, "x") == []
+
+    src_missing_health = """
+async def brain_capabilities():
+    return {"backend": {"status": "ok"}}
+"""
+    assert module._has_health_payload_in_brain_capabilities(src_missing_health) is False
+
+    src_missing_fallback = """
+async def _get_backend_status():
+    return {"probe": "readyz"}
+"""
+    errors = module._check_health_probe_fallback_semantics(src_missing_fallback, "x")
+    assert any("api_health_fallback" in err for err in errors)
+    assert any("/api/v1/health" in err for err in errors)
