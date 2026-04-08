@@ -149,6 +149,7 @@ Local PR readiness:
 Local monitoring contract check:
 - `make monitoring-check`
 - optional live-mode validation: `python3 scripts/validate_monitoring_contract.py --check-live --metrics-url http://127.0.0.1:9180/metrics`
+- default mode forbids `vector(0)` in dashboard PromQL (opt-out for migration only: `--allow-vector-zero`)
 
 Branch protection policy (recommended):
 - Require pull request before merging.

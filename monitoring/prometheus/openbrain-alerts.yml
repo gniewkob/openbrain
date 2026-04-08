@@ -1,7 +1,81 @@
 groups:
-  - name: openbrain-metrics
+  - name: openbrain-recording-rules
     rules:
-      - record: active_memories_total
-        expr: (memories_created_total or vector(0)) - (memories_deleted_total or vector(0))
-      - record: operational_health_status
-        expr: vector(1)
+      - record: openbrain_up
+        expr: max(up{job="openbrain-unified"})
+
+      - record: openbrain_active_memories_estimated
+        expr: clamp_min(memories_created_total{job="openbrain-unified"} - memories_deleted_total{job="openbrain-unified"}, 0)
+
+      - record: openbrain_http_requests_rate_5m
+        expr: sum(rate(http_requests_total_200{job="openbrain-unified"}[5m]) + rate(http_requests_total_201{job="openbrain-unified"}[5m]) + rate(http_requests_total_204{job="openbrain-unified"}[5m]) + rate(http_requests_total_400{job="openbrain-unified"}[5m]) + rate(http_requests_total_401{job="openbrain-unified"}[5m]) + rate(http_requests_total_403{job="openbrain-unified"}[5m]) + rate(http_requests_total_404{job="openbrain-unified"}[5m]) + rate(http_requests_total_422{job="openbrain-unified"}[5m]) + rate(http_requests_total_500{job="openbrain-unified"}[5m]) + rate(http_requests_total_502{job="openbrain-unified"}[5m]) + rate(http_requests_total_503{job="openbrain-unified"}[5m]))
+
+      - record: openbrain_http_5xx_rate_5m
+        expr: sum(rate(http_requests_total_500{job="openbrain-unified"}[5m]) + rate(http_requests_total_502{job="openbrain-unified"}[5m]) + rate(http_requests_total_503{job="openbrain-unified"}[5m]))
+
+      - record: openbrain_http_5xx_ratio_5m
+        expr: openbrain_http_5xx_rate_5m / clamp_min(openbrain_http_requests_rate_5m, 0.000001)
+
+      - record: openbrain_search_zero_hit_ratio_1h
+        expr: increase(search_zero_hit_total{job="openbrain-unified"}[1h]) / clamp_min(increase(search_requests_total{job="openbrain-unified"}[1h]), 1)
+
+      - record: openbrain_policy_skip_ratio_1h
+        expr: increase(policy_skip_total{job="openbrain-unified"}[1h]) / clamp_min(increase(maintain_runs_total{job="openbrain-unified"}[1h]), 1)
+
+      - record: openbrain_duplicate_candidate_ratio_1h
+        expr: increase(duplicate_candidates_total{job="openbrain-unified"}[1h]) / clamp_min(increase(maintain_runs_total{job="openbrain-unified"}[1h]), 1)
+
+      - record: openbrain_sync_missing_ratio_1h
+        expr: increase(sync_missing_total{job="openbrain-unified"}[1h]) / clamp_min(increase(sync_checks_total{job="openbrain-unified"}[1h]), 1)
+
+  - name: openbrain-alerts
+    rules:
+      - alert: OpenBrainTargetDown
+        expr: openbrain_up < 1
+        for: 2m
+        labels:
+          severity: critical
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain target is down"
+          description: "Prometheus cannot scrape openbrain-unified metrics for at least 2 minutes."
+
+      - alert: OpenBrainHigh5xxRatio
+        expr: openbrain_http_5xx_ratio_5m > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain 5xx ratio elevated"
+          description: "HTTP 5xx ratio exceeded 5% over 5m for at least 10 minutes."
+
+      - alert: OpenBrainHighP95Latency
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="openbrain-unified"}[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain p95 latency elevated"
+          description: "p95 request latency stayed above 1 second for at least 10 minutes."
+
+      - alert: OpenBrainPolicySkipPressure
+        expr: openbrain_policy_skip_ratio_1h > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain policy-skip pressure elevated"
+          description: "More than 20% of maintenance runs in the last hour are policy-skipped."
+
+      - alert: OpenBrainSearchZeroHitRatioHigh
+        expr: openbrain_search_zero_hit_ratio_1h > 0.6 and increase(search_requests_total{job="openbrain-unified"}[1h]) > 20
+        for: 30m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain zero-hit ratio elevated"
+          description: "Search zero-hit ratio exceeded 60% in the last hour with meaningful traffic volume."

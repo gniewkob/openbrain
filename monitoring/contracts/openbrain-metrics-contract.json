@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "service": "openbrain-unified",
   "required_metrics": [
     "active_memories_build_total",
@@ -7,14 +7,22 @@
     "active_memories_personal_total",
     "active_memories_total",
     "duplicate_candidates_per_maintain_run_ratio",
+    "duplicate_candidates_total",
+    "exports_total",
+    "get_context_requests_total",
     "http_request_duration_seconds",
     "http_requests_total_200",
+    "http_requests_total_201",
+    "http_requests_total_204",
+    "http_requests_total_400",
     "http_requests_total_401",
     "http_requests_total_403",
     "http_requests_total_404",
+    "http_requests_total_422",
     "http_requests_total_500",
     "http_requests_total_502",
     "http_requests_total_503",
+    "maintain_runs_total",
     "macmini_canary_component_status",
     "memories_created_total",
     "memories_deleted_total",
@@ -24,7 +32,10 @@
     "policy_skip_dedup_total",
     "policy_skip_delete_total",
     "policy_skip_owner_normalization_total",
-    "policy_skip_per_maintain_run_ratio"
+    "policy_skip_per_maintain_run_ratio",
+    "policy_skip_total",
+    "search_requests_total",
+    "up"
   ],
   "dashboard_files": [
     "monitoring/grafana/dashboards/openbrain/openbrain-overview.json"

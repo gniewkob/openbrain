@@ -49,19 +49,14 @@
             {
               "options": {
                 "0": {
-                  "color": "green",
+                  "color": "red",
                   "index": 0,
-                  "text": "HEALTHY"
+                  "text": "DOWN"
                 },
                 "1": {
-                  "color": "orange",
+                  "color": "green",
                   "index": 1,
-                  "text": "WATCH"
-                },
-                "2": {
-                  "color": "red",
-                  "index": 2,
-                  "text": "ELEVATED"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -71,16 +66,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
               },
               {
-                "color": "orange",
+                "color": "green",
                 "value": 1
-              },
-              {
-                "color": "red",
-                "value": 2
               }
             ]
           }
@@ -110,11 +101,11 @@
       },
       "targets": [
         {
-          "expr": "operational_health_status{job=\"openbrain-unified\"}",
+          "expr": "max(up{job=\"openbrain-unified\"})",
           "refId": "A"
         }
       ],
-      "title": "Operational Health Status",
+      "title": "API Availability",
       "type": "stat"
     },
     {
@@ -154,11 +145,11 @@
       },
       "targets": [
         {
-          "expr": "active_memories_total{job=\"openbrain-unified\"}",
+          "expr": "clamp_min(memories_created_total{job=\"openbrain-unified\"} - memories_deleted_total{job=\"openbrain-unified\"}, 0)",
           "refId": "A"
         }
       ],
-      "title": "Total Active Memories",
+      "title": "Estimated Active Memories",
       "type": "stat"
     },
     {
@@ -184,7 +175,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "percentunit"
         }
       },
       "gridPos": {
@@ -210,11 +201,11 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(http_requests_total_500{job=\"openbrain-unified\"}[5m])) or vector(0)",
+          "expr": "((rate(http_requests_total_500{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_502{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_503{job=\"openbrain-unified\"}[5m])) / clamp_min(rate(http_requests_total_200{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_201{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_204{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_400{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_401{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_403{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_404{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_422{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_500{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_502{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_503{job=\"openbrain-unified\"}[5m]), 0.000001))",
           "refId": "A"
         }
       ],
-      "title": "Errors (Last 5m)",
+      "title": "5xx Error Rate (5m)",
       "type": "stat"
     },
     {
@@ -307,22 +298,22 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (rate(http_requests_total_200{job=\"openbrain-unified\"}[5m]))",
+          "expr": "sum(rate(http_requests_total_200{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_201{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_204{job=\"openbrain-unified\"}[5m]))",
           "legendFormat": "2xx Success",
           "refId": "A"
         },
         {
-          "expr": "sum by (status) (rate(http_requests_total_401{job=\"openbrain-unified\"}[5m])) + sum by (status) (rate(http_requests_total_403{job=\"openbrain-unified\"}[5m]))",
+          "expr": "sum(rate(http_requests_total_401{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_403{job=\"openbrain-unified\"}[5m]))",
           "legendFormat": "4xx Auth/Forbidden",
           "refId": "B"
         },
         {
-          "expr": "sum by (status) (rate(http_requests_total_404{job=\"openbrain-unified\"}[5m]))",
+          "expr": "sum(rate(http_requests_total_404{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_400{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_422{job=\"openbrain-unified\"}[5m]))",
           "legendFormat": "404 Not Found",
           "refId": "C"
         },
         {
-          "expr": "sum by (status) (rate(http_requests_total_500{job=\"openbrain-unified\"}[5m])) + sum by (status) (rate(http_requests_total_502{job=\"openbrain-unified\"}[5m])) + sum by (status) (rate(http_requests_total_503{job=\"openbrain-unified\"}[5m]))",
+          "expr": "sum(rate(http_requests_total_500{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_502{job=\"openbrain-unified\"}[5m]) + rate(http_requests_total_503{job=\"openbrain-unified\"}[5m]))",
           "legendFormat": "5xx Errors",
           "refId": "D"
         }
@@ -453,22 +444,22 @@
       },
       "targets": [
         {
-          "expr": "active_memories_corporate_total{job=\"openbrain-unified\"}",
-          "legendFormat": "Corporate",
+          "expr": "sum(rate(search_requests_total{job=\"openbrain-unified\"}[5m]))",
+          "legendFormat": "Search Requests",
           "refId": "A"
         },
         {
-          "expr": "active_memories_build_total{job=\"openbrain-unified\"}",
-          "legendFormat": "Build",
+          "expr": "sum(rate(get_context_requests_total{job=\"openbrain-unified\"}[5m]))",
+          "legendFormat": "Get Context",
           "refId": "B"
         },
         {
-          "expr": "active_memories_personal_total{job=\"openbrain-unified\"}",
-          "legendFormat": "Personal",
+          "expr": "sum(rate(exports_total{job=\"openbrain-unified\"}[5m]))",
+          "legendFormat": "Exports",
           "refId": "C"
         }
       ],
-      "title": "Active Memories Distribution",
+      "title": "Read & Export Activity (Rate/s)",
       "type": "timeseries"
     },
     {
@@ -504,17 +495,17 @@
       },
       "targets": [
         {
-          "expr": "policy_skip_per_maintain_run_ratio{job=\"openbrain-unified\"}",
+          "expr": "increase(policy_skip_total{job=\"openbrain-unified\"}[1h]) / clamp_min(increase(maintain_runs_total{job=\"openbrain-unified\"}[1h]), 1)",
           "legendFormat": "Policy Skip Ratio",
           "refId": "A"
         },
         {
-          "expr": "duplicate_candidates_per_maintain_run_ratio{job=\"openbrain-unified\"}",
+          "expr": "increase(duplicate_candidates_total{job=\"openbrain-unified\"}[1h]) / clamp_min(increase(maintain_runs_total{job=\"openbrain-unified\"}[1h]), 1)",
           "legendFormat": "Duplicate Candidate Ratio",
           "refId": "B"
         }
       ],
-      "title": "Maintenance Ratios",
+      "title": "Maintenance Ratios (1h)",
       "type": "timeseries"
     },
     {
@@ -537,22 +528,22 @@
       },
       "targets": [
         {
-          "expr": "policy_skip_delete_total{job=\"openbrain-unified\"}",
+          "expr": "increase(policy_skip_delete_total{job=\"openbrain-unified\"}[1h])",
           "legendFormat": "Delete Blocked",
           "refId": "A"
         },
         {
-          "expr": "policy_skip_dedup_total{job=\"openbrain-unified\"}",
+          "expr": "increase(policy_skip_dedup_total{job=\"openbrain-unified\"}[1h])",
           "legendFormat": "Dedup Blocked",
           "refId": "B"
         },
         {
-          "expr": "policy_skip_owner_normalization_total{job=\"openbrain-unified\"}",
+          "expr": "increase(policy_skip_owner_normalization_total{job=\"openbrain-unified\"}[1h])",
           "legendFormat": "Normalization Blocked",
           "refId": "C"
         }
       ],
-      "title": "Policy Skip Reasons (Cumulative)",
+      "title": "Policy Skip Reasons (1h)",
       "type": "timeseries"
     },
     {
