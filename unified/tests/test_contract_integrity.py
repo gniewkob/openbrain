@@ -12,6 +12,7 @@ from src.request_builders import (
     normalize_updated_by,
 )
 from src.runtime_limits import load_runtime_limits
+from src import mcp_transport
 
 
 def _contracts_dir() -> Path:
@@ -72,3 +73,22 @@ def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
     msg = backend_error_message(500, {"detail": "secret"})
     assert "500" in msg
     assert "secret" not in msg
+
+
+def test_capabilities_tools_map_to_real_http_transport_functions() -> None:
+    manifest = load_capabilities_manifest()
+    expected = {"capabilities"}
+    expected.update(manifest["core_tools"])
+    expected.update(manifest["advanced_tools"])
+    expected.update(manifest["admin_tools"])
+
+    for tool in sorted(expected):
+        fn = getattr(mcp_transport, f"brain_{tool}", None)
+        assert callable(fn), f"brain_{tool} must be implemented by HTTP MCP transport"
+
+    if mcp_transport.ENABLE_HTTP_OBSIDIAN_TOOLS:
+        for tool in manifest["http_obsidian_tools"]:
+            fn = getattr(mcp_transport, f"brain_{tool}", None)
+            assert callable(fn), (
+                f"brain_{tool} must exist when ENABLE_HTTP_OBSIDIAN_TOOLS=true"
+            )
