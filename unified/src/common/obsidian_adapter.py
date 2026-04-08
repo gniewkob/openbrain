@@ -51,14 +51,10 @@ def _configured_vault_names_from_env() -> list[str]:
     """Best-effort discovery of vault names from env configuration."""
     names: set[str] = set()
 
-    paths_json = os.environ.get("OBSIDIAN_VAULT_PATHS")
-    if paths_json:
-        try:
-            parsed = json.loads(paths_json)
-            if isinstance(parsed, dict):
-                names.update(str(k).strip() for k in parsed.keys() if str(k).strip())
-        except json.JSONDecodeError:
-            pass
+    paths_raw = os.environ.get("OBSIDIAN_VAULT_PATHS")
+    if paths_raw:
+        parsed = _parse_vault_paths_mapping(paths_raw)
+        names.update(str(k).strip() for k in parsed.keys() if str(k).strip())
 
     prefix = "OBSIDIAN_VAULT_"
     suffix = "_PATH"
@@ -72,6 +68,38 @@ def _configured_vault_names_from_env() -> list[str]:
         names.add(raw_name.replace("_", " "))
 
     return sorted(names)
+
+
+def _parse_vault_paths_mapping(raw: str) -> dict[str, str]:
+    """Parse OBSIDIAN_VAULT_PATHS from JSON or legacy `name:path,name:path` format."""
+    text = raw.strip()
+    if not text:
+        return {}
+
+    # Preferred format: JSON object
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        return {
+            str(k).strip(): str(v).strip()
+            for k, v in parsed.items()
+            if str(k).strip() and str(v).strip()
+        }
+
+    # Legacy format: "Name:/path,Other:/path2"
+    result: dict[str, str] = {}
+    for item in text.split(","):
+        pair = item.strip()
+        if not pair or ":" not in pair:
+            continue
+        name, path = pair.split(":", 1)
+        name = name.strip()
+        path = path.strip()
+        if name and path:
+            result[name] = path
+    return result
 
 
 def _clean_cli_output(raw: str) -> str:
@@ -548,16 +576,13 @@ class ObsidianCliAdapter:
                 _VAULT_PATHS_CACHE[vault] = path
                 return path
 
-            # Try JSON config: OBSIDIAN_VAULT_PATHS
-            paths_json = os.environ.get("OBSIDIAN_VAULT_PATHS")
-            if paths_json:
-                try:
-                    paths_map = json.loads(paths_json)
-                    if isinstance(paths_map, dict) and vault in paths_map:
-                        _VAULT_PATHS_CACHE[vault] = paths_map[vault]
-                        return paths_map[vault]
-                except json.JSONDecodeError:
-                    pass
+            # Try aggregated config: OBSIDIAN_VAULT_PATHS
+            paths_raw = os.environ.get("OBSIDIAN_VAULT_PATHS")
+            if paths_raw:
+                paths_map = _parse_vault_paths_mapping(paths_raw)
+                if vault in paths_map:
+                    _VAULT_PATHS_CACHE[vault] = paths_map[vault]
+                    return paths_map[vault]
 
             return None
 

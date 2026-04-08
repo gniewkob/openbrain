@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 from src.common.obsidian_adapter import (
     _clean_cli_output,
     _configured_vault_names_from_env,
+    _parse_vault_paths_mapping,
     _parse_frontmatter,
     note_to_memory_write_record,
     ObsidianCliAdapter,
@@ -89,6 +90,12 @@ class ObsidianCliHelperTests(unittest.TestCase):
 
 
 class ObsidianVaultDiscoveryTests(unittest.IsolatedAsyncioTestCase):
+    def test_parse_vault_paths_mapping_supports_legacy_format(self) -> None:
+        parsed = _parse_vault_paths_mapping(
+            "Memory:/vault/memory, Work:/vault/work,InvalidEntry"
+        )
+        self.assertEqual(parsed, {"Memory": "/vault/memory", "Work": "/vault/work"})
+
     def test_configured_vaults_from_json_and_named_env(self) -> None:
         with patch.dict(
             os.environ,

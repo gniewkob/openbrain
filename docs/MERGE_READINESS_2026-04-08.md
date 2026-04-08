@@ -48,8 +48,13 @@ Latest local verification (2026-04-08):
     - explicit domain-update policy tests (corporate versioning vs build in-place).
   - Obsidian adapter hardening:
     - vault discovery now falls back to configured env vault mappings when CLI is unavailable.
+    - `OBSIDIAN_VAULT_PATHS` parsing supports JSON and legacy `name:path,name:path` forms.
+  - Unified runtime configuration:
+    - `unified-server` container now receives `OBSIDIAN_CLI_COMMAND` and `OBSIDIAN_VAULT_PATHS` env passthrough.
+  - Controlled Obsidian E2E behavior:
+    - integration roundtrip tests are gated and skip with explicit reason when backend reports `backend_unavailable`.
 - **Deferred**
-  - Controlled live Obsidian E2E execution in target environment (roundtrip test coverage exists, but runtime execution still needs explicit environment approval/variables).
+  - Controlled live Obsidian E2E execution in target environment (coverage and graceful skip path are in place; full write/read/sync success still requires vault mapping reachable from container runtime).
   - Additional doc consolidation outside current governance stream.
 
 ## Current check posture (latest branch head)

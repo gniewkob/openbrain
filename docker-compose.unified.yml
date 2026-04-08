@@ -61,6 +61,8 @@ services:
       - PUBLIC_MODE=${PUBLIC_MODE:-false}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - OBSIDIAN_CLI_COMMAND=${OBSIDIAN_CLI_COMMAND:-obsidian}
+      - OBSIDIAN_VAULT_PATHS=${OBSIDIAN_VAULT_PATHS:-}
     ports:
       - "127.0.0.1:7010:80"
     networks:

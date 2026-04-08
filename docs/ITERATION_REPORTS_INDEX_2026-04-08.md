@@ -8,7 +8,7 @@ Cleanup tracker:
 - `docs/CLEANUP_REGISTER_2026-04-08.md`
 
 Detailed iteration logs:
-- `docs/archive/iterations/2026-04-08/ITERATION_REPORT_2026-04-08_01.md` ... `ITERATION_REPORT_2026-04-08_51.md`
+- `docs/archive/iterations/2026-04-08/ITERATION_REPORT_2026-04-08_01.md` ... `ITERATION_REPORT_2026-04-08_52.md`
 
 Recommended reading order:
 1. `ITERATION_SYNTHESIS_2026-04-08.md` (current state and decisions)
@@ -28,3 +28,4 @@ Stream mapping (high level):
 - 49: CI hygiene/perf pass (`ci.yml` password-style literal removal + workflow concurrency cancellation)
 - 50: Obsidian resilience pass (vault discovery env-fallback when CLI unavailable + regression tests)
 - 51: controlled Obsidian E2E roundtrip coverage (write/read/sync), execution remains opt-in by env
+- 52: Obsidian runtime execution hardening (env passthrough + legacy vault-map parsing + backend_unavailable skip semantics)
