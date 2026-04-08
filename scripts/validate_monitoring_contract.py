@@ -8,7 +8,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-PROMQL_TOKENS_TO_IGNORE = {
+PROMQL_RESERVED_WORDS = {
     "sum",
     "rate",
     "increase",
@@ -32,7 +32,7 @@ PROMQL_TOKENS_TO_IGNORE = {
 }
 
 PROMQL_LABELS_TO_IGNORE = {"le", "job", "component", "status", "domain", "instance"}
-TOKEN_RE = re.compile(r"\b[a-zA-Z_:][a-zA-Z0-9_:]*\b")
+PROMQL_SYMBOL_RE = re.compile(r"\b[a-zA-Z_:][a-zA-Z0-9_:]*\b")
 METRIC_TYPE_RE = re.compile(r"^# TYPE\s+([a-zA-Z_:][a-zA-Z0-9_:]*)\s+")
 QUOTED_STRING_RE = re.compile(r'"[^"]*"')
 
@@ -55,18 +55,18 @@ def load_dashboard_exprs(path: Path) -> list[tuple[str, str]]:
 
 def extract_metric_tokens(expr: str) -> set[str]:
     expr_wo_strings = QUOTED_STRING_RE.sub("", expr)
-    tokens = set(TOKEN_RE.findall(expr_wo_strings))
+    symbols = set(PROMQL_SYMBOL_RE.findall(expr_wo_strings))
     result: set[str] = set()
-    for token in tokens:
-        if token in PROMQL_TOKENS_TO_IGNORE:
+    for symbol in symbols:
+        if symbol in PROMQL_RESERVED_WORDS:
             continue
-        if token in PROMQL_LABELS_TO_IGNORE:
+        if symbol in PROMQL_LABELS_TO_IGNORE:
             continue
-        if token.startswith("refId"):
+        if symbol.startswith("refId"):
             continue
-        if token.isupper():
+        if symbol.isupper():
             continue
-        result.add(token)
+        result.add(symbol)
     return result
 
 
