@@ -16,6 +16,12 @@ Raport obejmuje głównie iteracje:
 - 30–32 (cleanup pass etap 1 + repo hygiene CI guardrail),
 - 33–34 (capabilities metadata parity + dedup into shared contract),
 - 35–46 (archive cleanup + legacy docs archiving + component-level health contract + API health fallback + truthfulness guardrail + audit-semantics guardrail + Obsidian contract guardrail + local guardrails runner + CI runner tests + local PR-readiness bundle + merge-readiness snapshot).
+- 47 (backlog closure: gateway corporate store contract + domain policy tests + telemetry shared counters),
+- 48 (GitGuardian unblock via workflow sanitization + branch history rewrite),
+- 49 (CI hygiene/performance: concurrency cancellation + legacy postgres auth cleanup),
+- 50 (Obsidian vault discovery env fallback + tests),
+- 51 (controlled Obsidian roundtrip E2E coverage under explicit opt-in),
+- 52 (Obsidian runtime resilience: env passthrough + legacy vault-map parsing + graceful backend-unavailable skip semantics).
 
 ## Current platform state
 
@@ -34,6 +40,7 @@ Raport obejmuje głównie iteracje:
 - **Guardrails CI depth**: job `guardrails` uruchamia też dedykowane testy runnerów policy-check.
 - **PR readiness UX**: jedna lokalna komenda `python3 scripts/check_pr_readiness.py` (lub `make pr-readiness`) uruchamia guardrails + szybkie smoke policy/contract.
 - **Merge decision artifact**: snapshot gotowości do merge jest utrzymywany w `docs/MERGE_READINESS_2026-04-08.md`.
+- **External gate posture**: `GitGuardian Security Checks` is currently green on PR after history sanitation.
 
 ## Confirmed problems
 
@@ -67,6 +74,7 @@ Raport obejmuje głównie iteracje:
 ## Deferred items (with rationale)
 
 - **Full Obsidian live sync E2E on local vaults**: wymaga controlled runtime z odpowiednią konfiguracją środowiska i explicit scope operacyjnego.
+- **Full Obsidian live sync E2E success path**: coverage i skip-semantyka są gotowe; pełny sukces write/read/sync wymaga vault mappingu osiągalnego z runtime kontenera.
 - **Repo cleanup execution**: iteracyjne raporty i legacy plan/audit docs zostały zarchiwizowane; dalszy cleanup zależy od nowych artefaktów.
 - **Doc consolidation** (duplikaty audytowe/plany): częściowo wykonane (iteracyjne raporty zarchiwizowane i zindeksowane), pozostały dokumenty audytowo-planistyczne do decyzji keep/archive.
 
@@ -80,4 +88,4 @@ Raport obejmuje głównie iteracje:
 
 1. Wykonać finalny pass cleanup zgodnie z `docs/CLEANUP_REGISTER_2026-04-08.md` (doc consolidation + archiwizacja iteracji).
 2. Ustalić doc policy: które raporty iteracyjne zostają, a które przechodzą do archiwum z jednym indeksem.
-3. Uruchomić controlled Obsidian E2E (vault read/write/sync status) na jawnie zatwierdzonej konfiguracji.
+3. Domknąć profil runtime dla Obsidiana (container-reachable vault mapping), potem uruchomić controlled E2E write/read/sync jako finalny exit criterion.
