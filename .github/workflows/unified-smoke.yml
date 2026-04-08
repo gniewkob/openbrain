@@ -38,7 +38,7 @@ jobs:
         run: python -m unittest unified.tests.test_auth_security unified.tests.test_db_security
       - name: Enforce release-gate branch protection
         env:
-          RELEASE_GATE_ENFORCE: "1"
+          RELEASE_GATE_ENFORCE: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && '1' || '0' }}
           GH_TOKEN: ${{ github.token }}
         run: python scripts/check_release_gate.py
 

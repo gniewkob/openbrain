@@ -303,14 +303,14 @@ class ObsidianCliAdapter:
         Tries direct filesystem listing first, falls back to CLI.
         """
         self._validate_vault_path(vault, folder)
-        
+
         # Try direct filesystem access
         vault_root = await self._get_vault_path(vault)
         if vault_root:
             base_path = Path(vault_root)
             if folder:
                 base_path = base_path / folder
-            
+
             if base_path.exists() and base_path.is_dir():
                 try:
                     # Recursive search for .md files
@@ -339,11 +339,11 @@ class ObsidianCliAdapter:
 
     async def read_note(self, vault: str, path: str) -> ObsidianNote:
         """
-        Read a note from Obsidian. 
+        Read a note from Obsidian.
         Tries direct filesystem access first, falls back to CLI.
         """
         self._validate_vault_path(vault, path)
-        
+
         # Try direct filesystem access
         vault_root = await self._get_vault_path(vault)
         if vault_root:
@@ -352,15 +352,17 @@ class ObsidianCliAdapter:
                 try:
                     import aiofiles
 
-                    async with aiofiles.open(full_path, mode='r', encoding='utf-8') as f:
+                    async with aiofiles.open(
+                        full_path, mode="r", encoding="utf-8"
+                    ) as f:
                         raw_content = await f.read()
-                    
+
                     frontmatter, body = _parse_frontmatter(raw_content)
                     # For direct read, we only get tags from frontmatter
                     # Inline tags (#tag) are not parsed yet without CLI
                     tags = _merge_tags(frontmatter, [])
                     title = _derive_title(path, frontmatter, body)
-                    
+
                     return ObsidianNote(
                         vault=vault,
                         path=path,
@@ -406,12 +408,24 @@ class ObsidianCliAdapter:
             except json.JSONDecodeError:
                 parsed = None
             if isinstance(parsed, list):
-                cli_tags = [str(item).strip().lstrip("#") for item in parsed if str(item).strip()]
+                cli_tags = [
+                    str(item).strip().lstrip("#")
+                    for item in parsed
+                    if str(item).strip()
+                ]
             elif isinstance(parsed, dict):
-                cli_tags = [str(key).strip().lstrip("#") for key in parsed.keys() if str(key).strip()]
+                cli_tags = [
+                    str(key).strip().lstrip("#")
+                    for key in parsed.keys()
+                    if str(key).strip()
+                ]
             else:
-                cli_tags = [line.strip().strip('"').lstrip("#") for line in tags_raw.splitlines() if line.strip()]
-        
+                cli_tags = [
+                    line.strip().strip('"').lstrip("#")
+                    for line in tags_raw.splitlines()
+                    if line.strip()
+                ]
+
         tags = _merge_tags(frontmatter, cli_tags)
         title = _derive_title(path, frontmatter, body)
         return ObsidianNote(

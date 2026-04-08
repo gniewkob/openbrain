@@ -39,7 +39,9 @@ def backend_error_message(status_code: int, detail: Any) -> str:
         labels = _CONTRACT["status_labels"]
         label = labels.get(
             str(status_code),
-            _CONTRACT["fallback_5xx"] if status_code >= 500 else _CONTRACT["fallback_other"],
+            _CONTRACT["fallback_5xx"]
+            if status_code >= 500
+            else _CONTRACT["fallback_other"],
         )
         return f"Backend {status_code}: {label}"
 
@@ -48,4 +50,3 @@ def backend_error_message(status_code: int, detail: Any) -> str:
     else:
         detail_text = str(detail)
     return f"Backend {status_code}: {detail_text}"
-

@@ -35,6 +35,7 @@ def _record_access_denied(reason: str) -> None:
 def require_admin(user: dict[str, Any]) -> None:
     """Require admin privileges for the operation."""
     from ..auth import PUBLIC_EXPOSURE
+
     if not PUBLIC_EXPOSURE:
         return
     if not is_privileged_user(user):
@@ -56,6 +57,7 @@ def _effective_domain_scope(user: dict[str, Any], action: str) -> set[str]:
 def enforce_domain_access(user: dict[str, Any], domain: str, action: str) -> None:
     """Enforce domain access control for the action."""
     from ..auth import PUBLIC_EXPOSURE
+
     if not PUBLIC_EXPOSURE:
         return
     allowed = _effective_domain_scope(user, action)

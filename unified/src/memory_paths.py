@@ -56,4 +56,3 @@ def memory_absolute_path(name: str) -> str:
 
 def memory_item_absolute_path(memory_id: str) -> str:
     return f"{_MEMORY_BASE}/{memory_id}"
-

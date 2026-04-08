@@ -57,4 +57,3 @@ def normalize_find_hits_to_scored_memories(
         else:
             out.append(hit)
     return out
-

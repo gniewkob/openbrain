@@ -24,4 +24,3 @@ def load_runtime_limits() -> dict[str, int]:
         value = data.get(key, default)
         out[key] = int(value) if isinstance(value, (int, float)) else default
     return out
-

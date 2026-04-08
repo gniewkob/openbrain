@@ -24,7 +24,9 @@ _DEFAULTS = {
 
 
 def load_capabilities_manifest() -> dict[str, list[str]]:
-    manifest_path = Path(__file__).resolve().parents[1] / "contracts" / "capabilities_manifest.json"
+    manifest_path = (
+        Path(__file__).resolve().parents[1] / "contracts" / "capabilities_manifest.json"
+    )
     try:
         data: Any = json.loads(manifest_path.read_text(encoding="utf-8"))
     except Exception:
@@ -38,4 +40,3 @@ def load_capabilities_manifest() -> dict[str, list[str]]:
         else:
             normalized[key] = list(default)
     return normalized
-

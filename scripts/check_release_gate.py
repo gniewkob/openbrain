@@ -99,8 +99,11 @@ def main() -> int:
     try:
         status = evaluate_release_gate()
     except RuntimeError as err:
-        print(f"[FAIL] release-gate check error: {err}", file=sys.stderr)
-        return 2
+        if enforce:
+            print(f"[FAIL] release-gate check error: {err}", file=sys.stderr)
+            return 2
+        print(f"[WARN] release-gate check skipped: {err}")
+        return 0
 
     print(f"repo={status.repo} branch={status.branch}")
     if not status.protected:

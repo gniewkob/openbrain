@@ -132,7 +132,9 @@ async def v1_obsidian_sync(
                 req.vault, folder=req.folder, limit=req.limit
             )
 
-        notes = await asyncio.gather(*(adapter.read_note(req.vault, path) for path in resolved_paths))
+        notes = await asyncio.gather(
+            *(adapter.read_note(req.vault, path) for path in resolved_paths)
+        )
     except ObsidianCliError as e:
         raise HTTPException(status_code=503, detail=str(e))
     records = [

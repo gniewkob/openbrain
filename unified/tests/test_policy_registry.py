@@ -32,7 +32,9 @@ class PolicyRegistryTests(unittest.IsolatedAsyncioTestCase):
             tenants={"tenant-a": {"write_domains": ["build"]}},
             subjects={"admin@example.com": {"admin_domains": ["corporate", "build", "personal"]}},
         )
-        with patch("src.auth.PUBLIC_EXPOSURE", True), patch("src.auth.is_privileged_user", return_value=True):
+        with patch("src.auth.PUBLIC_EXPOSURE", True), patch(
+            "src.security.policy.is_privileged_user", return_value=True
+        ):
             saved = await update_policy_registry(registry=registry, _user={"sub": "admin"})
         self.assertEqual(saved.tenants["tenant-a"].write_domains, ["build"])
         self.assertEqual(saved.subjects["admin@example.com"].admin_domains, ["corporate", "build", "personal"])
