@@ -136,9 +136,9 @@ def main() -> int:
     parser.add_argument("--metrics-url", default="http://127.0.0.1:9180/metrics")
     parser.add_argument("--check-live", action="store_true", help="Validate contract against live /metrics")
     parser.add_argument(
-        "--forbid-vector-zero",
+        "--allow-vector-zero",
         action="store_true",
-        help="Fail when dashboard expressions use vector(0).",
+        help="Allow vector(0) usage in dashboard expressions (default: forbidden).",
     )
     args = parser.parse_args()
 
@@ -150,7 +150,7 @@ def main() -> int:
     errors, referenced_metrics, live_metrics = validate_monitoring_contract(
         contract,
         dashboard_paths,
-        forbid_vector_zero=args.forbid_vector_zero,
+        forbid_vector_zero=not args.allow_vector_zero,
         check_live_metrics=args.check_live,
         metrics_url=args.metrics_url,
     )

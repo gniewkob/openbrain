@@ -73,3 +73,31 @@ def test_main_fails_when_live_metrics_check_errors(monkeypatch) -> None:
     )
     monkeypatch.setattr(sys, "argv", ["validate_monitoring_contract.py", "--check-live"])
     assert module.main() == 1
+
+
+def test_main_forbids_vector_zero_by_default(monkeypatch) -> None:
+    module = _load_monitoring_contract_module()
+    seen: dict[str, bool] = {}
+
+    def _validate(*_args, **kwargs):
+        seen["forbid_vector_zero"] = kwargs["forbid_vector_zero"]
+        return [], set(), set()
+
+    monkeypatch.setattr(module, "validate_monitoring_contract", _validate)
+    monkeypatch.setattr(sys, "argv", ["validate_monitoring_contract.py"])
+    assert module.main() == 0
+    assert seen["forbid_vector_zero"] is True
+
+
+def test_main_can_allow_vector_zero(monkeypatch) -> None:
+    module = _load_monitoring_contract_module()
+    seen: dict[str, bool] = {}
+
+    def _validate(*_args, **kwargs):
+        seen["forbid_vector_zero"] = kwargs["forbid_vector_zero"]
+        return [], set(), set()
+
+    monkeypatch.setattr(module, "validate_monitoring_contract", _validate)
+    monkeypatch.setattr(sys, "argv", ["validate_monitoring_contract.py", "--allow-vector-zero"])
+    assert module.main() == 0
+    assert seen["forbid_vector_zero"] is False
