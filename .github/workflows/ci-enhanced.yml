@@ -65,15 +65,14 @@ jobs:
       run: |
         cd unified
         uv sync --group dev
-        python -m pip install --upgrade pip
-        pip install mypy
+        uv pip install --python .venv/bin/python mypy
     
     - name: Type check with mypy
       run: |
         cd unified
         # Keep CI deterministic: enforce typing on the hardened contract surface.
         # Full-repo strict typing is tracked separately as technical debt.
-        uv run mypy \
+        .venv/bin/mypy \
           src/capabilities_health.py \
           src/capabilities_manifest.py \
           src/capabilities_metadata.py \
