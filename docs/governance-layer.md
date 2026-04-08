@@ -267,7 +267,7 @@ The following items from the original v2.1 backlog have been resolved in v2.2:
 Remaining backlog:
 1. Replace in-memory `TelemetryRegistry` with a shared counter backend for multi-worker deployments.
 2. ~~Add regression test ensuring `brain_store(domain="corporate")` succeeds end-to-end via the MCP gateway.~~ ✅ Done — gateway now enforces corporate write contract (`owner` + `match_key`) and includes regression tests for successful corporate store flow.
-3. Add policy tests for domain-specific update semantics (corporate versioning, build in-place).
+3. ~~Add policy tests for domain-specific update semantics (corporate versioning, build in-place).~~ ✅ Done — policy enforcement tests now assert corporate uses append-version updates while build remains in-place/upsert.
 
 ## Known Technical Debt
 

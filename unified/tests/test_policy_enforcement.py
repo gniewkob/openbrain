@@ -5,11 +5,18 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from fastapi import HTTPException
-
 from src import crud, memory_writes
 from src.models import DomainEnum, Memory
-from src.schemas import MaintenanceRequest, MemoryCreate, MemoryUpsertItem, MemoryWriteRecord, MemoryWriteRequest
+from src.schemas import (
+    MaintenanceRequest,
+    MemoryOut,
+    MemoryUpdate,
+    MemoryUpsertItem,
+    MemoryWriteRecord,
+    MemoryWriteRequest,
+)
+
+
 class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
     async def test_upsert_memories_bulk_requires_match_key_for_every_record(self) -> None:
         session = AsyncMock()
@@ -376,7 +383,6 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ingest_warns_on_missing_match_key_for_build_domain(self) -> None:
         """build/personal writes without match_key must trigger a duplicate_risk_write warning."""
-        import logging
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
         session.add = lambda obj: None
@@ -385,8 +391,6 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session.refresh = AsyncMock()
 
         warning_events: list[str] = []
-
-        original_warning = crud.log.warning
 
         def _capture_warning(event, **kw):
             warning_events.append(event)
@@ -409,6 +413,126 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("duplicate_risk_write", warning_events,
                       "Expected duplicate_risk_write warning for build write without match_key")
+
+    async def test_policy_update_semantics_corporate_uses_append_version(self) -> None:
+        """Domain policy: corporate updates must use append-version semantics."""
+        now = datetime.now(timezone.utc)
+        existing = Memory(
+            id="corp-1",
+            domain=DomainEnum.corporate,
+            entity_type="Decision",
+            content="before",
+            embedding=None,
+            owner="owner-a",
+            created_by="tester",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=[],
+            relations={},
+            metadata_={"root_id": "corp-1"},
+            obsidian_ref=None,
+            content_hash="hash-before",
+            match_key="corp:decision:1",
+            valid_from=None,
+            created_at=now,
+            updated_at=now,
+        )
+        session = AsyncMock()
+        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+
+        with (
+            patch.object(
+                memory_writes,
+                "handle_memory_write",
+                new=AsyncMock(return_value=SimpleNamespace(status="versioned", record=None)),
+            ) as handle_write,
+            patch.object(
+                memory_writes,
+                "get_memory",
+                new=AsyncMock(
+                    return_value=MemoryOut(
+                        id="corp-2",
+                        domain="corporate",
+                        entity_type="Decision",
+                        content="after",
+                        owner="owner-a",
+                        status="active",
+                        version=2,
+                        sensitivity="internal",
+                        superseded_by=None,
+                        tags=[],
+                        relations={},
+                        obsidian_ref=None,
+                        custom_fields={},
+                        content_hash="hash-after",
+                        match_key="corp:decision:1",
+                        previous_id="corp-1",
+                        root_id="corp-1",
+                        valid_from=None,
+                        created_at=now,
+                        updated_at=now,
+                        created_by="tester",
+                    )
+                ),
+            ),
+        ):
+            await crud.update_memory(
+                session,
+                "corp-1",
+                MemoryUpdate(content="after"),
+                actor="policy-admin",
+            )
+
+        request = handle_write.await_args.args[1]
+        self.assertEqual(request.write_mode.value, "append_version")
+
+    async def test_policy_update_semantics_build_uses_in_place_upsert(self) -> None:
+        """Domain policy: build updates stay mutable (in-place/upsert)."""
+        now = datetime.now(timezone.utc)
+        existing = Memory(
+            id="build-1",
+            domain=DomainEnum.build,
+            entity_type="Decision",
+            content="before",
+            embedding=None,
+            owner="owner-a",
+            created_by="tester",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=[],
+            relations={},
+            metadata_={"root_id": "build-1"},
+            obsidian_ref=None,
+            content_hash="hash-before",
+            match_key="build:decision:1",
+            valid_from=None,
+            created_at=now,
+            updated_at=now,
+        )
+        session = AsyncMock()
+        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+
+        with (
+            patch.object(
+                memory_writes,
+                "handle_memory_write",
+                new=AsyncMock(return_value=SimpleNamespace(status="updated", record=None)),
+            ) as handle_write,
+            patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=None)),
+        ):
+            await crud.update_memory(
+                session,
+                "build-1",
+                MemoryUpdate(content="after"),
+                actor="builder",
+            )
+
+        request = handle_write.await_args.args[1]
+        self.assertEqual(request.write_mode.value, "upsert")
 
 
 if __name__ == "__main__":
