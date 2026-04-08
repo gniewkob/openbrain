@@ -466,6 +466,11 @@ async def handle_memory_write_many(
     }
     atomic = request.atomic
 
+    # Pre-fetch embeddings in parallel to populate the LRU cache (speed up batch processing)
+    # Exceptions are ignored here; they will be handled individually during write.
+    if request.records:
+        await asyncio.gather(*(get_embedding(r.content) for r in request.records), return_exceptions=True)
+
     # Batch lookup: collect all match_keys first to avoid N+1 queries
     match_keys = [r.match_key for r in request.records if r.match_key]
     existing_id_map: dict[str, str | None] = {}

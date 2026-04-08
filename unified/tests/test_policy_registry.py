@@ -22,7 +22,7 @@ AUTH_MODULE = "src.auth"
 
 class PolicyRegistryTests(unittest.IsolatedAsyncioTestCase):
     async def test_read_policy_registry_requires_admin(self) -> None:
-        with patch("src.security.policy.PUBLIC_MODE", True), patch("src.security.policy.is_privileged_user", return_value=False):
+        with patch("src.auth.PUBLIC_EXPOSURE", True), patch("src.security.policy.is_privileged_user", return_value=False):
             with self.assertRaises(HTTPException) as ctx:
                 await read_policy_registry(_user={"sub": "user-1"})
         self.assertEqual(ctx.exception.status_code, 403)

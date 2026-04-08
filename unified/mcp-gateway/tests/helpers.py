@@ -21,8 +21,12 @@ def load_gateway_main():
 
     gateway_root = Path(__file__).resolve().parents[1]
     src_dir = gateway_root / "src"
+    shared_src_dir = gateway_root.parent / "src"
     package_init = src_dir / "__init__.py"
     main_path = src_dir / "main.py"
+
+    if str(shared_src_dir) not in sys.path:
+        sys.path.insert(0, str(shared_src_dir))
 
     alias = "_gateway_src"
 

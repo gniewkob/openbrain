@@ -1,5 +1,10 @@
 # OpenBrain Unified Architecture
 
+Architecture decisions are recorded in ADRs:
+
+- [ADR-0001: Architecture Baseline and Module Ownership](./adr/ADR-0001-architecture-baseline.md)
+- [ADR-0002: Canonical MCP Transport and Compatibility Posture](./adr/ADR-0002-canonical-mcp-transport.md)
+
 ## Module boundaries
 
 The unified service is split into narrow modules with explicit responsibilities.
@@ -22,6 +27,9 @@ The unified service is split into narrow modules with explicit responsibilities.
   Owns reads, search, export, sync-check, maintenance report reads, and grounding-pack synthesis.
 - `unified/src/memory_writes.py`
   Owns create/update/delete/upsert flows and maintenance mutations.
+- `unified/src/use_cases/memory.py`
+  Application orchestration boundary for memory-centric flows. Keeps adapters
+  thin by delegating to read/write modules.
 - `unified/src/telemetry_store.py`
   Persists counters and histograms.
 - `unified/src/crud_common.py`
@@ -53,6 +61,21 @@ The cleanup intentionally separates read and write paths.
 HTTP MCP transport and stdio gateway must expose the same logical record shape.
 
 - Shared schema drift should be treated as a regression.
+- `brain_capabilities` must expose:
+  - probe-level backend details (`backend`),
+  - normalized operator truth view (`health.overall` + `health.components`).
+- Capability health probe chain must be consistent across transports:
+  `readyz -> healthz -> /api/v1/health` before reporting hard outage.
+- Tool inventory drift should be prevented via one manifest file:
+  - `unified/contracts/capabilities_manifest.json`
+- Request payload defaults shared by transports should be centralized via:
+  - `unified/contracts/request_contracts.json`
+- Runtime limit defaults shared by transports should be centralized via:
+  - `unified/contracts/runtime_limits.json`
+- HTTP error message semantics shared by transports should be centralized via:
+  - `unified/contracts/http_error_contracts.json`
+- Memory endpoint path mapping shared by transports should be centralized via:
+  - `unified/contracts/memory_paths.json`
 - Transport parity tests are required for:
   - `brain_get`
   - `brain_find`
@@ -66,6 +89,16 @@ HTTP MCP transport and stdio gateway must expose the same logical record shape.
 - Keep compatibility tests for `main.py` and `crud.py` only where they protect public API stability.
 - Use full regression discovery in CI in addition to targeted smoke tests.
 - If a refactor needs monkey-patching compatibility, preserve it deliberately and document why.
+- Keep a single contract integrity test in each gateway test suite to assert
+  contract files and adapters stay in sync.
+- Keep capabilities truthfulness policy check in guardrails CI:
+  - `scripts/check_capabilities_truthfulness.py`
+- Keep audit-semantics policy check in guardrails CI:
+  - `scripts/check_audit_semantics.py`
+- Keep Obsidian feature-gating/contract policy check in guardrails CI:
+  - `scripts/check_obsidian_contract.py`
+- Keep consolidated local policy runner in guardrails CI:
+  - `scripts/check_local_guardrails.py`
 
 ## Operational rules
 

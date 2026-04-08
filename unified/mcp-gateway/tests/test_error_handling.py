@@ -7,6 +7,8 @@ import unittest
 
 import httpx
 
+from helpers import load_gateway_main
+
 
 class RaiseProductionModeTests(unittest.TestCase):
     """In production mode, errors include HTTP status code but hide body details."""
@@ -25,10 +27,10 @@ class RaiseProductionModeTests(unittest.TestCase):
         )
 
     def _call_raise(self, status: int) -> str:
-        from src.main import _raise
+        gateway = load_gateway_main()
 
         with self.assertRaises(ValueError) as ctx:
-            _raise(self._make_response(status))
+            gateway._raise(self._make_response(status))
         return str(ctx.exception)
 
     def test_500_includes_status_code(self) -> None:
@@ -56,14 +58,14 @@ class RaiseProductionModeTests(unittest.TestCase):
         self.assertIn("422", msg)
 
     def test_200_does_not_raise(self) -> None:
-        from src.main import _raise
+        gateway = load_gateway_main()
 
         response = httpx.Response(
             200,
             json={"id": "mem_1"},
             request=httpx.Request("GET", "http://backend/api/v1/memory/x"),
         )
-        _raise(response)  # must not raise
+        gateway._raise(response)  # must not raise
 
 
 class RaiseDevelopmentModeTests(unittest.TestCase):
@@ -73,7 +75,7 @@ class RaiseDevelopmentModeTests(unittest.TestCase):
         os.environ.pop("ENV", None)
 
     def test_dev_mode_includes_body(self) -> None:
-        from src.main import _raise
+        gateway = load_gateway_main()
 
         response = httpx.Response(
             500,
@@ -81,14 +83,14 @@ class RaiseDevelopmentModeTests(unittest.TestCase):
             request=httpx.Request("GET", "http://backend/api/v1/memory/x"),
         )
         with self.assertRaises(ValueError) as ctx:
-            _raise(response)
+            gateway._raise(response)
 
         msg = str(ctx.exception)
         self.assertIn("500", msg)
         self.assertIn("NullPointerException", msg)
 
     def test_dev_mode_non_json_body(self) -> None:
-        from src.main import _raise
+        gateway = load_gateway_main()
 
         response = httpx.Response(
             503,
@@ -96,7 +98,7 @@ class RaiseDevelopmentModeTests(unittest.TestCase):
             request=httpx.Request("GET", "http://backend/api/v1/memory/x"),
         )
         with self.assertRaises(ValueError) as ctx:
-            _raise(response)
+            gateway._raise(response)
 
         msg = str(ctx.exception)
         self.assertIn("503", msg)

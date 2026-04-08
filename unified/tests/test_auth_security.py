@@ -95,20 +95,23 @@ class AuthSecurityTests(unittest.TestCase):
                 self._reload_auth()
 
     def test_local_mode_logs_warning_once_when_auth_is_disabled(self) -> None:
-        auth = self._reload_auth()
-        request = Request({"type": "http", "headers": []})
+        with patch.dict(os.environ, {"PUBLIC_MODE": "false", "PUBLIC_BASE_URL": ""}):
+            from src import config
+            config.get_config.cache_clear()
+            auth = self._reload_auth()
+            request = Request({"type": "http", "headers": []})
 
-        with patch.object(auth.logger, "warning") as warning:
-            result_one = asyncio.run(
-                auth.require_auth(request=request, credentials=None)
-            )
-            result_two = asyncio.run(
-                auth.require_auth(request=request, credentials=None)
-            )
+            with patch.object(auth.logger, "warning") as warning:
+                result_one = asyncio.run(
+                    auth.require_auth(request=request, credentials=None)
+                )
+                result_two = asyncio.run(
+                    auth.require_auth(request=request, credentials=None)
+                )
 
-        self.assertEqual(result_one, {"sub": "local-dev"})
-        self.assertEqual(result_two, {"sub": "local-dev"})
-        warning.assert_called_once()
+            self.assertEqual(result_one, {"sub": "local-dev"})
+            self.assertEqual(result_two, {"sub": "local-dev"})
+            warning.assert_called_once()
 
     def test_oidc_verifier_creates_refresh_lock_lazily(self) -> None:
         auth = self._reload_auth()

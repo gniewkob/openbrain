@@ -19,8 +19,6 @@ from ...auth import (
 )
 from ...db import get_session
 from ...memory_reads import (
-    find_memories_v1,
-    get_grounding_pack,
     get_memory_as_record,
     export_memories,
     get_memory,
@@ -28,13 +26,15 @@ from ...memory_reads import (
     get_maintenance_report,
     sync_check,
 )
-from ...memory_writes import (
-    handle_memory_write,
-    handle_memory_write_many,
-    run_maintenance,
+from ...use_cases.memory import (
+    store_memory as handle_memory_write,
+    store_memories_many as handle_memory_write_many,
+    search_memories as find_memories_v1,
+    get_memory_context as get_grounding_pack,
     delete_memory,
-    upsert_memories_bulk,
     update_memory,
+    run_maintenance,
+    upsert_memories_bulk,
 )
 from ...schemas import (
     MemoryFindRequest,
@@ -196,7 +196,10 @@ async def v1_update(
     enforce_domain_access(_user, memory_out.domain, "write")
     enforce_memory_access(_user, memory_out)
     actor = get_subject(_user)
-    updated = await update_memory(session, memory_id, data, actor=actor)
+    # Governance hardening: request-level updated_by is compatibility metadata only.
+    # The authenticated subject is authoritative for audit actor identity.
+    safe_data = data.model_copy(update={"updated_by": actor})
+    updated = await update_memory(session, memory_id, safe_data, actor=actor)
     if updated is None:
         raise HTTPException(status_code=404, detail="Memory not found")
     updated_record, _ = await get_memory_as_record(session, updated.id)

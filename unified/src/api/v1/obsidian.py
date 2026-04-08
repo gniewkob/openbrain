@@ -12,13 +12,13 @@ from ...auth import require_auth
 from ...common.obsidian_adapter import ObsidianCliAdapter, ObsidianCliError
 from ...db import get_session
 from ...memory_reads import get_memory, search_memories
-from ...memory_writes import handle_memory_write_many
 from ...obsidian_cli import note_to_memory_write_record
 from ...obsidian_sync import (
     BidirectionalSyncEngine,
     ObsidianChangeTracker,
     SyncStrategy,
 )
+from ...use_cases.memory import store_memories_many as handle_memory_write_many
 from ...schemas import (
     MemoryWriteManyRequest,
     ObsidianBidirectionalSyncRequest,
@@ -132,7 +132,7 @@ async def v1_obsidian_sync(
                 req.vault, folder=req.folder, limit=req.limit
             )
 
-        notes = [await adapter.read_note(req.vault, path) for path in resolved_paths]
+        notes = await asyncio.gather(*(adapter.read_note(req.vault, path) for path in resolved_paths))
     except ObsidianCliError as e:
         raise HTTPException(status_code=503, detail=str(e))
     records = [

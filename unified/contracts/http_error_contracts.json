@@ -1,0 +1,11 @@
+{
+  "status_labels": {
+    "401": "Authentication required",
+    "403": "Access denied",
+    "404": "Resource not found",
+    "422": "Validation error"
+  },
+  "fallback_5xx": "Internal server error",
+  "fallback_other": "Request failed"
+}
+

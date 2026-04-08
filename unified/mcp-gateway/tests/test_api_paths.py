@@ -86,7 +86,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
 
         client.post.assert_awaited_once_with(
             "/api/v1/memory/find",
-            json={"query": None, "limit": 1, "filters": {}},
+            json={"query": None, "limit": 1, "filters": {}, "sort": "updated_at_desc"},
         )
 
     async def test_brain_search_calls_api_search_path(self) -> None:
@@ -152,6 +152,112 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
         client.post.assert_awaited_once_with(
             "/api/v1/memory/bulk-upsert",
             json=[{"match_key": "mk-1", "content": "x"}],
+        )
+
+    async def test_brain_update_trims_updated_by_actor(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.status_code = 200
+        response.json.return_value = {
+            "id": "mem-1",
+            "tenant_id": None,
+            "domain": "build",
+            "entity_type": "Decision",
+            "title": None,
+            "summary": None,
+            "content": "payload",
+            "owner": "",
+            "status": "active",
+            "version": 1,
+            "sensitivity": "internal",
+            "superseded_by": None,
+            "tags": [],
+            "relations": {},
+            "obsidian_ref": None,
+            "custom_fields": {},
+            "content_hash": "hash",
+            "match_key": None,
+            "previous_id": None,
+            "root_id": "mem-1",
+            "valid_from": None,
+            "created_at": "2026-04-01T00:00:00Z",
+            "updated_at": "2026-04-01T00:00:00Z",
+            "created_by": "tester",
+            "updated_by": "gateway-user",
+            "source": None,
+            "governance": None,
+        }
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.patch.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_update(
+                memory_id="mem-1",
+                content="payload",
+                updated_by="  gateway-user  ",
+            )
+
+        client.patch.assert_awaited_once_with(
+            "/api/v1/memory/mem-1",
+            json={"content": "payload", "updated_by": "gateway-user"},
+        )
+
+    async def test_brain_update_empty_updated_by_falls_back_to_agent(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.status_code = 200
+        response.json.return_value = {
+            "id": "mem-1",
+            "tenant_id": None,
+            "domain": "build",
+            "entity_type": "Decision",
+            "title": None,
+            "summary": None,
+            "content": "payload",
+            "owner": "",
+            "status": "active",
+            "version": 1,
+            "sensitivity": "internal",
+            "superseded_by": None,
+            "tags": [],
+            "relations": {},
+            "obsidian_ref": None,
+            "custom_fields": {},
+            "content_hash": "hash",
+            "match_key": None,
+            "previous_id": None,
+            "root_id": "mem-1",
+            "valid_from": None,
+            "created_at": "2026-04-01T00:00:00Z",
+            "updated_at": "2026-04-01T00:00:00Z",
+            "created_by": "tester",
+            "updated_by": "agent",
+            "source": None,
+            "governance": None,
+        }
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.patch.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_update(
+                memory_id="mem-1",
+                content="payload",
+                updated_by="   ",
+            )
+
+        client.patch.assert_awaited_once_with(
+            "/api/v1/memory/mem-1",
+            json={"content": "payload", "updated_by": "agent"},
         )
 
 

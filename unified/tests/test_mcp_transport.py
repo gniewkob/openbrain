@@ -35,7 +35,94 @@ class _FakeClient:
         return self._response
 
 
+class _ProbeClient:
+    def __init__(self, responses: dict[str, object]) -> None:
+        self._responses = responses
+        self.calls: list[tuple[str, str, dict]] = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def request(self, method: str, path: str, **kwargs):
+        self.calls.append((method, path, kwargs))
+        result = self._responses[path]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
 class McpTransportTests(unittest.IsolatedAsyncioTestCase):
+    async def test_brain_capabilities_hide_http_obsidian_tools_when_disabled(self) -> None:
+        with (
+            patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
+            patch.object(
+                mcp_transport,
+                "_get_backend_status",
+                AsyncMock(
+                    return_value={
+                        "status": "ok",
+                        "api": "reachable",
+                        "db": "ok",
+                        "vector_store": "ok",
+                        "probe": "readyz",
+                    }
+                ),
+            ),
+        ):
+            result = await mcp_transport.brain_capabilities()
+
+        self.assertEqual(result["backend"]["status"], "ok")
+        self.assertEqual(result["health"]["overall"], "healthy")
+        self.assertEqual(result["health"]["components"]["api"], "healthy")
+        self.assertEqual(result["health"]["components"]["obsidian"], "disabled")
+        self.assertEqual(result["obsidian"]["mode"], "http")
+        self.assertEqual(result["obsidian"]["status"], "disabled")
+        self.assertEqual(result["obsidian"]["tools"], [])
+        self.assertEqual(result["obsidian"]["reason"], result["obsidian_http"]["reason"])
+        self.assertEqual(result["obsidian_http"]["status"], "disabled")
+        self.assertEqual(result["obsidian_http"]["tools"], [])
+        self.assertIn("disabled", result["obsidian_http"]["reason"])
+        self.assertNotIn("obsidian_vaults", result["tier_2_advanced"]["tools"])
+
+    async def test_brain_capabilities_include_http_obsidian_tools_when_enabled(self) -> None:
+        with (
+            patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", True),
+            patch.object(
+                mcp_transport,
+                "_get_backend_status",
+                AsyncMock(
+                    return_value={
+                        "status": "ok",
+                        "api": "reachable",
+                        "db": "ok",
+                        "vector_store": "ok",
+                        "probe": "readyz",
+                    }
+                ),
+            ),
+        ):
+            result = await mcp_transport.brain_capabilities()
+
+        self.assertEqual(result["backend"]["status"], "ok")
+        self.assertEqual(result["health"]["overall"], "healthy")
+        self.assertEqual(result["health"]["components"]["api"], "healthy")
+        self.assertEqual(result["health"]["components"]["obsidian"], "enabled")
+        self.assertEqual(result["obsidian"]["mode"], "http")
+        self.assertEqual(result["obsidian"]["status"], "enabled")
+        self.assertEqual(result["obsidian"]["tools"], result["obsidian_http"]["tools"])
+        self.assertIsNone(result["obsidian"]["reason"])
+        self.assertEqual(result["obsidian_http"]["status"], "enabled")
+        self.assertEqual(
+            result["obsidian_http"]["tools"],
+            ["obsidian_vaults", "obsidian_read_note", "obsidian_sync"],
+        )
+        self.assertIsNone(result["obsidian_http"]["reason"])
+        for tool in result["obsidian_http"]["tools"]:
+            self.assertIn(tool, result["tier_2_advanced"]["tools"])
+
     async def test_safe_req_raises_on_http_error(self) -> None:
         response = _FakeResponse(404, payload={"detail": "Memory not found"})
         with patch.object(mcp_transport, "_client", return_value=_FakeClient(response)):
@@ -218,11 +305,12 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             fake_client.last_request,
             (
-                "PUT",
-                "/api/memories/mem-1",
+                "PATCH",
+                "/api/v1/memory/mem-1",
                 {
                     "json": {
                         "content": "after",
+                        "updated_by": "agent",
                         "title": None,
                         "owner": None,
                         "tenant_id": "tenant-a",
@@ -235,17 +323,100 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
+    async def test_brain_update_allows_updated_by_override(self) -> None:
+        response = _FakeResponse(200, payload={"id": "mem-1"})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            await mcp_transport.brain_update(
+                "mem-1",
+                content="after",
+                updated_by="gateway-user",
+            )
+        self.assertEqual(
+            fake_client.last_request[2]["json"]["updated_by"],
+            "gateway-user",
+        )
+
+    async def test_brain_update_empty_updated_by_falls_back_to_agent(self) -> None:
+        response = _FakeResponse(200, payload={"id": "mem-1"})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            await mcp_transport.brain_update(
+                "mem-1",
+                content="after",
+                updated_by="   ",
+            )
+        self.assertEqual(
+            fake_client.last_request[2]["json"]["updated_by"],
+            "agent",
+        )
+
     async def test_brain_delete_returns_gateway_shape(self) -> None:
         response = _FakeResponse(204, payload=None)
-        with patch.object(mcp_transport, "_client", return_value=_FakeClient(response)):
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
             result = await mcp_transport.brain_delete("mem-1")
         self.assertEqual(result, {"deleted": True, "id": "mem-1"})
+        self.assertEqual(fake_client.last_request[0], "DELETE")
+        self.assertEqual(fake_client.last_request[1], "/api/v1/memory/mem-1")
+
+    async def test_brain_export_uses_v1_export_endpoint(self) -> None:
+        response = _FakeResponse(200, payload=[{"id": "mem-1"}])
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            result = await mcp_transport.brain_export(["mem-1"])
+        self.assertEqual(result, [{"id": "mem-1"}])
+        self.assertEqual(
+            fake_client.last_request,
+            ("POST", "/api/v1/memory/export", {"json": {"ids": ["mem-1"]}}),
+        )
 
     async def test_brain_list_uses_legacy_list_shape(self) -> None:
-        response = _FakeResponse(200, payload=[{"id": "mem-1", "domain": "build"}])
-        with patch.object(mcp_transport, "_client", return_value=_FakeClient(response)):
+        response = _FakeResponse(
+            200,
+            payload=[
+                {
+                    "record": {
+                        "id": "mem-1",
+                        "domain": "build",
+                        "entity_type": "Note",
+                        "content": "x",
+                        "owner": "",
+                        "status": "active",
+                        "version": 1,
+                        "sensitivity": "internal",
+                        "tags": [],
+                        "relations": {},
+                        "custom_fields": {},
+                        "created_by": "internal",
+                        "updated_by": "internal",
+                        "created_at": "2026-03-27T00:00:00Z",
+                        "updated_at": "2026-03-27T00:00:00Z",
+                    },
+                    "score": 1.0,
+                }
+            ],
+        )
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
             result = await mcp_transport.brain_list(domain="build", limit=5)
-        self.assertEqual(result, [{"id": "mem-1", "domain": "build"}])
+        self.assertEqual(result[0]["id"], "mem-1")
+        self.assertEqual(result[0]["domain"], "build")
+        self.assertEqual(
+            fake_client.last_request,
+            (
+                "POST",
+                "/api/v1/memory/find",
+                {
+                    "json": {
+                        "query": None,
+                        "filters": {"domain": "build"},
+                        "limit": 5,
+                        "sort": "updated_at_desc",
+                    }
+                },
+            ),
+        )
 
     async def test_brain_sync_check_posts_json_payload(self) -> None:
         response = _FakeResponse(
@@ -259,7 +430,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             fake_client.last_request,
             (
                 "POST",
-                "/api/memories/sync-check",
+                "/api/v1/memory/sync-check",
                 {
                     "json": {
                         "memory_id": None,
@@ -285,9 +456,20 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             fake_client.last_request,
             (
                 "POST",
-                "/api/memories/bulk-upsert",
+                "/api/v1/memory/bulk-upsert",
                 {"json": [{"match_key": "mk-1", "content": "x"}]},
             ),
+        )
+
+    async def test_brain_maintain_uses_v1_endpoint(self) -> None:
+        response = _FakeResponse(200, payload={"dry_run": True, "actions": []})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            result = await mcp_transport.brain_maintain(dry_run=True)
+        self.assertEqual(result, {"dry_run": True, "actions": []})
+        self.assertEqual(
+            fake_client.last_request,
+            ("POST", "/api/v1/memory/maintain", {"json": {"dry_run": True}}),
         )
 
     async def test_guard_re_raises_as_tool_error(self) -> None:
@@ -297,6 +479,77 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaisesRegex(ValueError, "Tool execution failed: boom"):
             await broken()
+
+    async def test_get_backend_status_prefers_readyz(self) -> None:
+        readyz = _FakeResponse(
+            200,
+            payload={"status": "ok", "db": "ok", "vector_store": "ok"},
+        )
+        with patch.object(
+            mcp_transport,
+            "_client",
+            return_value=_ProbeClient({"/readyz": readyz}),
+        ):
+            result = await mcp_transport._get_backend_status()
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["probe"], "readyz")
+        self.assertEqual(result["api"], "reachable")
+        self.assertEqual(result["db"], "ok")
+        self.assertEqual(result["vector_store"], "ok")
+
+    async def test_get_backend_status_falls_back_to_healthz(self) -> None:
+        with patch.object(
+            mcp_transport,
+            "_client",
+            side_effect=[
+                _ProbeClient({"/readyz": RuntimeError("timeout")}),
+                _ProbeClient({"/healthz": _FakeResponse(200, payload={"status": "ok"})}),
+            ],
+        ):
+            result = await mcp_transport._get_backend_status()
+
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(result["probe"], "healthz_fallback")
+        self.assertEqual(result["api"], "reachable")
+        self.assertIn("/readyz probe failed", result["reason"])
+
+    async def test_get_backend_status_reports_unavailable_when_both_probes_fail(self) -> None:
+        with patch.object(
+            mcp_transport,
+            "_client",
+            side_effect=[
+                _ProbeClient({"/readyz": RuntimeError("readyz down")}),
+                _ProbeClient({"/healthz": RuntimeError("healthz down")}),
+                _ProbeClient({"/api/v1/health": RuntimeError("api health down")}),
+            ],
+        ):
+            result = await mcp_transport._get_backend_status()
+
+        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(result["api"], "unreachable")
+        self.assertEqual(result["probe"], "api_health_fallback")
+        self.assertIn("readyz down", result["reason"])
+        self.assertIn("healthz down", result["reason"])
+        self.assertIn("api health down", result["reason"])
+
+    async def test_get_backend_status_uses_api_health_when_readyz_and_healthz_fail(self) -> None:
+        with patch.object(
+            mcp_transport,
+            "_client",
+            side_effect=[
+                _ProbeClient({"/readyz": RuntimeError("readyz timeout")}),
+                _ProbeClient({"/healthz": RuntimeError("healthz timeout")}),
+                _ProbeClient({"/api/v1/health": _FakeResponse(200, payload={"status": "ok"})}),
+            ],
+        ):
+            result = await mcp_transport._get_backend_status()
+
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(result["api"], "reachable")
+        self.assertEqual(result["probe"], "api_health_fallback")
+        self.assertIn("/readyz probe failed", result["reason"])
+        self.assertIn("/healthz probe failed", result["reason"])
 
 
 if __name__ == "__main__":

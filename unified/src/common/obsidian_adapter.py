@@ -300,16 +300,34 @@ class ObsidianCliAdapter:
     ) -> list[str]:
         """
         List markdown files in a vault.
-
-        Args:
-            vault: Vault name
-            folder: Optional subfolder to filter
-            limit: Maximum number of files to return
-
-        Returns:
-            List of file paths
+        Tries direct filesystem listing first, falls back to CLI.
         """
         self._validate_vault_path(vault, folder)
+        
+        # Try direct filesystem access
+        vault_root = await self._get_vault_path(vault)
+        if vault_root:
+            base_path = Path(vault_root)
+            if folder:
+                base_path = base_path / folder
+            
+            if base_path.exists() and base_path.is_dir():
+                try:
+                    # Recursive search for .md files
+                    paths = []
+                    for p in base_path.rglob("*.md"):
+                        if p.is_file():
+                            # Return path relative to vault root
+                            rel_path = p.relative_to(Path(vault_root))
+                            paths.append(str(rel_path))
+                            if limit and len(paths) >= limit:
+                                break
+                    return paths
+                except Exception:
+                    # Fallback to CLI on error
+                    pass
+
+        # CLI Fallback
         args = ["files", "ext=md", f"vault={vault}"]
         if folder:
             args.append(f"folder={folder}")
@@ -321,16 +339,40 @@ class ObsidianCliAdapter:
 
     async def read_note(self, vault: str, path: str) -> ObsidianNote:
         """
-        Read a note from Obsidian.
-
-        Args:
-            vault: Vault name
-            path: Note path within vault
-
-        Returns:
-            ObsidianNote with content and metadata
+        Read a note from Obsidian. 
+        Tries direct filesystem access first, falls back to CLI.
         """
         self._validate_vault_path(vault, path)
+        
+        # Try direct filesystem access
+        vault_root = await self._get_vault_path(vault)
+        if vault_root:
+            full_path = Path(vault_root) / path
+            if full_path.exists() and full_path.is_file():
+                try:
+                    async with aiofiles.open(full_path, mode='r', encoding='utf-8') as f:
+                        raw_content = await f.read()
+                    
+                    frontmatter, body = _parse_frontmatter(raw_content)
+                    # For direct read, we only get tags from frontmatter
+                    # Inline tags (#tag) are not parsed yet without CLI
+                    tags = _merge_tags(frontmatter, [])
+                    title = _derive_title(path, frontmatter, body)
+                    
+                    return ObsidianNote(
+                        vault=vault,
+                        path=path,
+                        title=title,
+                        content=raw_content,
+                        frontmatter=frontmatter,
+                        tags=tags,
+                        file_hash=_compute_hash(raw_content),
+                    )
+                except Exception:
+                    # Fallback to CLI on error
+                    pass
+
+        # CLI Fallback
         content = await self._run("read", f"path={path}", f"vault={vault}")
         tags_raw = await self._run(
             "tags", f"path={path}", "format=json", f"vault={vault}"
@@ -343,23 +385,12 @@ class ObsidianCliAdapter:
             except json.JSONDecodeError:
                 parsed = None
             if isinstance(parsed, list):
-                cli_tags = [
-                    str(item).strip().lstrip("#")
-                    for item in parsed
-                    if str(item).strip()
-                ]
+                cli_tags = [str(item).strip().lstrip("#") for item in parsed if str(item).strip()]
             elif isinstance(parsed, dict):
-                cli_tags = [
-                    str(key).strip().lstrip("#")
-                    for key in parsed.keys()
-                    if str(key).strip()
-                ]
+                cli_tags = [str(key).strip().lstrip("#") for key in parsed.keys() if str(key).strip()]
             else:
-                cli_tags = [
-                    line.strip().strip('"').lstrip("#")
-                    for line in tags_raw.splitlines()
-                    if line.strip()
-                ]
+                cli_tags = [line.strip().strip('"').lstrip("#") for line in tags_raw.splitlines() if line.strip()]
+        
         tags = _merge_tags(frontmatter, cli_tags)
         title = _derive_title(path, frontmatter, body)
         return ObsidianNote(
