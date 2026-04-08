@@ -46,6 +46,8 @@ Latest local verification (2026-04-08):
     - shared telemetry counter backend (`memory`/`redis` with fallback),
     - gateway corporate store contract hardening (`owner` + `match_key`),
     - explicit domain-update policy tests (corporate versioning vs build in-place).
+  - Obsidian adapter hardening:
+    - vault discovery now falls back to configured env vault mappings when CLI is unavailable.
 - **Deferred**
   - Controlled live Obsidian E2E (real vault I/O with explicit environment approval).
   - Additional doc consolidation outside current governance stream.

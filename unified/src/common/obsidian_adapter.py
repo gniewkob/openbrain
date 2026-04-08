@@ -47,6 +47,33 @@ def _compute_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
+def _configured_vault_names_from_env() -> list[str]:
+    """Best-effort discovery of vault names from env configuration."""
+    names: set[str] = set()
+
+    paths_json = os.environ.get("OBSIDIAN_VAULT_PATHS")
+    if paths_json:
+        try:
+            parsed = json.loads(paths_json)
+            if isinstance(parsed, dict):
+                names.update(str(k).strip() for k in parsed.keys() if str(k).strip())
+        except json.JSONDecodeError:
+            pass
+
+    prefix = "OBSIDIAN_VAULT_"
+    suffix = "_PATH"
+    for key in os.environ:
+        if not (key.startswith(prefix) and key.endswith(suffix)):
+            continue
+        raw_name = key[len(prefix) : -len(suffix)].strip()
+        if not raw_name:
+            continue
+        # OBSIDIAN_VAULT_FOO_BAR_PATH -> "FOO BAR"
+        names.add(raw_name.replace("_", " "))
+
+    return sorted(names)
+
+
 def _clean_cli_output(raw: str) -> str:
     lines: list[str] = []
     for line in raw.splitlines():
@@ -282,8 +309,15 @@ class ObsidianCliAdapter:
         Returns:
             List of vault names
         """
-        raw = await self._run("vaults")
-        return [line.strip() for line in raw.splitlines() if line.strip()]
+        configured = _configured_vault_names_from_env()
+        try:
+            raw = await self._run("vaults")
+            cli_names = [line.strip() for line in raw.splitlines() if line.strip()]
+            return sorted(set(cli_names) | set(configured))
+        except ObsidianCliError:
+            if configured:
+                return configured
+            raise
 
     @staticmethod
     def _validate_vault_path(vault: str, path: str | None = None) -> None:

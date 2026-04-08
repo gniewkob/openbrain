@@ -1,8 +1,18 @@
+import os
 import sys
 import types
 import unittest
+from unittest.mock import AsyncMock, patch
 
-from src.common.obsidian_adapter import _clean_cli_output, _parse_frontmatter, note_to_memory_write_record, ObsidianNote
+from src.common.obsidian_adapter import (
+    _clean_cli_output,
+    _configured_vault_names_from_env,
+    _parse_frontmatter,
+    note_to_memory_write_record,
+    ObsidianCliAdapter,
+    ObsidianCliError,
+    ObsidianNote,
+)
 
 
 class ObsidianCliHelperTests(unittest.TestCase):
@@ -76,6 +86,47 @@ class ObsidianCliHelperTests(unittest.TestCase):
             self.assertEqual(record.obsidian_ref, "Architecture/OpenBrain.md")
         finally:
             del sys.modules["src.schemas"]
+
+
+class ObsidianVaultDiscoveryTests(unittest.IsolatedAsyncioTestCase):
+    def test_configured_vaults_from_json_and_named_env(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "OBSIDIAN_VAULT_PATHS": '{"Documents":"/tmp/docs"}',
+                "OBSIDIAN_VAULT_TEAM_NOTES_PATH": "/tmp/team",
+            },
+            clear=False,
+        ):
+            names = _configured_vault_names_from_env()
+        self.assertEqual(names, ["Documents", "TEAM NOTES"])
+
+    async def test_list_vaults_falls_back_to_env_when_cli_unavailable(self) -> None:
+        adapter = ObsidianCliAdapter(command="obsidian")
+        with patch.object(
+            adapter,
+            "_run",
+            new=AsyncMock(side_effect=ObsidianCliError("cli unavailable")),
+        ), patch.dict(
+            os.environ,
+            {"OBSIDIAN_VAULT_PATHS": '{"Controlled":"/tmp/controlled"}'},
+            clear=False,
+        ):
+            vaults = await adapter.list_vaults()
+
+        self.assertEqual(vaults, ["Controlled"])
+
+    async def test_list_vaults_raises_when_cli_unavailable_and_no_env(self) -> None:
+        adapter = ObsidianCliAdapter(command="obsidian")
+        with patch.object(
+            adapter,
+            "_run",
+            new=AsyncMock(side_effect=ObsidianCliError("cli unavailable")),
+        ), patch.dict(
+            os.environ, {}, clear=True
+        ):
+            with self.assertRaises(ObsidianCliError):
+                await adapter.list_vaults()
 
 
 if __name__ == "__main__":
