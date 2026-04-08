@@ -8,7 +8,7 @@ Cleanup tracker:
 - `docs/CLEANUP_REGISTER_2026-04-08.md`
 
 Detailed iteration logs:
-- `docs/archive/iterations/2026-04-08/ITERATION_REPORT_2026-04-08_01.md` ... `ITERATION_REPORT_2026-04-08_46.md`
+- `docs/archive/iterations/2026-04-08/ITERATION_REPORT_2026-04-08_01.md` ... `ITERATION_REPORT_2026-04-08_47.md`
 
 Recommended reading order:
 1. `ITERATION_SYNTHESIS_2026-04-08.md` (current state and decisions)
@@ -23,3 +23,4 @@ Stream mapping (high level):
 - 23–26: release gate enforcement + hygiene setup
 - 27–34: governance hardening + capabilities contract normalization and metadata deduplication
 - 35–46: iteration archive cleanup + legacy docs archiving + component-level health contract + API health fallback + truthfulness guardrail + audit-semantics guardrail + Obsidian contract guardrail + consolidated local guardrails runner + CI runner tests + local PR-readiness bundle + merge-readiness snapshot
+- 47: backlog closure pass (corporate gateway contract hardening + domain update policy regression tests + shared telemetry counters with Redis fallback)
