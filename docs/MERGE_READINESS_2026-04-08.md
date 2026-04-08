@@ -42,9 +42,19 @@ Latest local verification (2026-04-08):
     Obsidian contract.
   - Consolidated local runners + unit tests for runner behavior.
   - Iteration and cleanup traceability archived/indexed.
+  - Governance backlog closure:
+    - shared telemetry counter backend (`memory`/`redis` with fallback),
+    - gateway corporate store contract hardening (`owner` + `match_key`),
+    - explicit domain-update policy tests (corporate versioning vs build in-place).
 - **Deferred**
   - Controlled live Obsidian E2E (real vault I/O with explicit environment approval).
   - Additional doc consolidation outside current governance stream.
+  - External provider check triage (`GitGuardian Security Checks`) outside repo-side CI logic.
+
+## Current check posture (latest branch head)
+
+- Internal CI checks: **pass** (`lint`, `test`, `security`, `contract-integrity`, and full `Unified Smoke Tests` set).
+- External check: **fail** (`GitGuardian Security Checks`) — requires provider-side incident triage/allowlisting in GitGuardian dashboard.
 
 ## Risks before merge
 
