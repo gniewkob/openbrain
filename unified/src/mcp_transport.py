@@ -114,15 +114,31 @@ _SENSITIVE_LOG_FIELDS = {
 }
 
 
-def _client() -> httpx.AsyncClient:
-    headers = {}
-    if INTERNAL_API_KEY:
-        headers["X-Internal-Key"] = INTERNAL_API_KEY
-    return httpx.AsyncClient(
-        base_url=BRAIN_URL,
-        timeout=BACKEND_TIMEOUT,
-        headers=headers,
-    )
+def _client() -> "_SharedClient":
+    return _SharedClient()
+
+
+_http_client: httpx.AsyncClient | None = None
+
+
+class _SharedClient:
+    """Context-manager wrapper that reuses a single AsyncClient connection pool."""
+
+    async def __aenter__(self) -> httpx.AsyncClient:
+        global _http_client
+        if _http_client is None:
+            headers: dict[str, str] = {}
+            if INTERNAL_API_KEY:
+                headers["X-Internal-Key"] = INTERNAL_API_KEY
+            _http_client = httpx.AsyncClient(
+                base_url=BRAIN_URL,
+                timeout=BACKEND_TIMEOUT,
+                headers=headers,
+            )
+        return _http_client
+
+    async def __aexit__(self, exc_type, exc, tb) -> bool:
+        return False
 
 
 def mcp_tool_guard(func):

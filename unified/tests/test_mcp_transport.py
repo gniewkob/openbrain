@@ -55,6 +55,33 @@ class _ProbeClient:
 
 
 class McpTransportTests(unittest.IsolatedAsyncioTestCase):
+    async def test_client_reuses_shared_async_client_instance(self) -> None:
+        created_clients: list[object] = []
+
+        class _CtorClient:
+            def __init__(self, **kwargs) -> None:
+                self.kwargs = kwargs
+                created_clients.append(self)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def request(self, method: str, path: str, **kwargs):
+                return _FakeResponse(200, payload={"status": "ok"})
+
+        mcp_transport._http_client = None
+        with patch.object(mcp_transport.httpx, "AsyncClient", _CtorClient):
+            async with mcp_transport._client() as c1:
+                self.assertIsNotNone(c1)
+            async with mcp_transport._client() as c2:
+                self.assertIs(c1, c2)
+
+        self.assertEqual(len(created_clients), 1)
+        mcp_transport._http_client = None
+
     async def test_brain_capabilities_hide_http_obsidian_tools_when_disabled(self) -> None:
         with (
             patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
