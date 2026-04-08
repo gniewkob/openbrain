@@ -34,7 +34,9 @@ class InMemoryCounterBackend:
     def bulk_load(self, values: dict[str, int]) -> None:
         with self._lock:
             for name, val in values.items():
-                if name in self._known_counters or name.startswith("http_requests_total_"):
+                if name in self._known_counters or name.startswith(
+                    "http_requests_total_"
+                ):
                     self._counters[name] = val
 
     def reset(self) -> None:
@@ -54,7 +56,9 @@ class RedisCounterBackend:
         try:
             import redis
         except ImportError as exc:
-            raise RuntimeError("redis package is required for TELEMETRY_BACKEND=redis") from exc
+            raise RuntimeError(
+                "redis package is required for TELEMETRY_BACKEND=redis"
+            ) from exc
 
         self._known_counters = known_counters
         self._hash_key = redis_hash_key
@@ -107,9 +111,7 @@ def build_counter_backend(known_counters: tuple[str, ...]) -> CounterBackend:
         return InMemoryCounterBackend(known_counters)
 
     redis_url = (
-        os.getenv("TELEMETRY_REDIS_URL")
-        or os.getenv("REDIS_URL")
-        or ""
+        os.getenv("TELEMETRY_REDIS_URL") or os.getenv("REDIS_URL") or ""
     ).strip()
     if not redis_url:
         return InMemoryCounterBackend(known_counters)
