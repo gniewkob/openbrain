@@ -37,6 +37,7 @@ jobs:
         cd unified
         uv sync --group dev
         uv pip install --python .venv/bin/python pytest-cov
+        uv pip install --python .venv/bin/python pytest-cov
         python -m pip install --upgrade pip
         pip install ruff
     
