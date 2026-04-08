@@ -151,6 +151,74 @@ class PatchEndpointBuildDomainTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.id, "build-1")
         self.assertEqual(result.content, "updated")
 
+    async def test_patch_uses_authenticated_subject_for_audit_actor(self) -> None:
+        from src.api.v1 import memory as mem_module
+
+        original = _make_memory_out(mem_id="build-1", domain="build", content="original")
+        updated = _make_memory_out(mem_id="build-1", domain="build", content="updated")
+        original_record = _make_memory_record(original)
+        updated_record = _make_memory_record(updated)
+        update_mock = AsyncMock(return_value=updated)
+
+        with (
+            patch.object(
+                mem_module,
+                "get_memory_as_record",
+                new=AsyncMock(
+                    side_effect=[
+                        (original_record, original),
+                        (updated_record, updated),
+                    ]
+                ),
+            ),
+            patch.object(mem_module, "update_memory", new=update_mock),
+        ):
+            from src.api.v1.memory import v1_update
+
+            await v1_update(
+                memory_id="build-1",
+                data=MemoryUpdate(content="updated", updated_by="spoofed-user"),
+                session=AsyncMock(),
+                _user={"sub": "auth-sub"},
+            )
+
+        self.assertEqual(update_mock.await_args.kwargs["actor"], "auth-sub")
+
+    async def test_patch_overrides_payload_updated_by_with_authenticated_subject(self) -> None:
+        from src.api.v1 import memory as mem_module
+
+        original = _make_memory_out(mem_id="build-1", domain="build", content="original")
+        updated = _make_memory_out(mem_id="build-1", domain="build", content="updated")
+        original_record = _make_memory_record(original)
+        updated_record = _make_memory_record(updated)
+        update_mock = AsyncMock(return_value=updated)
+
+        with (
+            patch.object(
+                mem_module,
+                "get_memory_as_record",
+                new=AsyncMock(
+                    side_effect=[
+                        (original_record, original),
+                        (updated_record, updated),
+                    ]
+                ),
+            ),
+            patch.object(mem_module, "update_memory", new=update_mock),
+        ):
+            from src.api.v1.memory import v1_update
+
+            await v1_update(
+                memory_id="build-1",
+                data=MemoryUpdate(content="updated", updated_by="spoofed-user"),
+                session=AsyncMock(),
+                _user={"sub": "auth-sub"},
+            )
+
+        passed_data = update_mock.await_args.args[2]
+        self.assertEqual(passed_data.updated_by, "auth-sub")
+        self.assertEqual(update_mock.await_args.kwargs["actor"], "auth-sub")
+
     async def test_patch_raises_404_for_nonexistent_memory(self) -> None:
         from src.api.v1 import memory as mem_module
         from fastapi import HTTPException

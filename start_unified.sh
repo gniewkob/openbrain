@@ -80,6 +80,23 @@ validate_runtime_security() {
     fi
 }
 
+# Preserve explicit shell overrides for selected runtime knobs.
+_HAS_OBSIDIAN_VAULT_PATHS=0
+_HAS_OBSIDIAN_CLI_COMMAND=0
+_HAS_ENABLE_NGROK=0
+if [ "${OBSIDIAN_VAULT_PATHS+x}" = "x" ]; then
+    _HAS_OBSIDIAN_VAULT_PATHS=1
+    _OVERRIDE_OBSIDIAN_VAULT_PATHS="$OBSIDIAN_VAULT_PATHS"
+fi
+if [ "${OBSIDIAN_CLI_COMMAND+x}" = "x" ]; then
+    _HAS_OBSIDIAN_CLI_COMMAND=1
+    _OVERRIDE_OBSIDIAN_CLI_COMMAND="$OBSIDIAN_CLI_COMMAND"
+fi
+if [ "${ENABLE_NGROK+x}" = "x" ]; then
+    _HAS_ENABLE_NGROK=1
+    _OVERRIDE_ENABLE_NGROK="$ENABLE_NGROK"
+fi
+
 # Load .env if it exists
 if [ -f .env ]; then
     set -a
@@ -87,6 +104,17 @@ if [ -f .env ]; then
     . ./.env
     set +a
     ok "Loaded .env"
+fi
+
+# Re-apply explicit caller overrides after sourcing .env
+if [ "$_HAS_OBSIDIAN_VAULT_PATHS" -eq 1 ]; then
+    export OBSIDIAN_VAULT_PATHS="$_OVERRIDE_OBSIDIAN_VAULT_PATHS"
+fi
+if [ "$_HAS_OBSIDIAN_CLI_COMMAND" -eq 1 ]; then
+    export OBSIDIAN_CLI_COMMAND="$_OVERRIDE_OBSIDIAN_CLI_COMMAND"
+fi
+if [ "$_HAS_ENABLE_NGROK" -eq 1 ]; then
+    export ENABLE_NGROK="$_OVERRIDE_ENABLE_NGROK"
 fi
 
 compose_up() {

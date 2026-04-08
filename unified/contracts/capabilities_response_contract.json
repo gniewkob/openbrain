@@ -1,0 +1,50 @@
+{
+  "required_top_level_keys": [
+    "platform",
+    "api_version",
+    "schema_changelog",
+    "backend",
+    "health",
+    "obsidian",
+    "tier_1_core",
+    "tier_2_advanced",
+    "tier_3_admin"
+  ],
+  "backend_required_keys": [
+    "status",
+    "api",
+    "db",
+    "vector_store",
+    "probe"
+  ],
+  "health_required_keys": [
+    "overall",
+    "source",
+    "components"
+  ],
+  "health_component_required_keys": [
+    "api",
+    "db",
+    "vector_store",
+    "obsidian"
+  ],
+  "health_overall_values": [
+    "healthy",
+    "degraded",
+    "unavailable"
+  ],
+  "obsidian_required_keys": [
+    "mode",
+    "status",
+    "tools",
+    "reason"
+  ],
+  "obsidian_modes": [
+    "http",
+    "local"
+  ],
+  "obsidian_statuses": [
+    "enabled",
+    "disabled"
+  ]
+}

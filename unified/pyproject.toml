@@ -32,3 +32,8 @@ dev = [
     "pytest-asyncio>=1.3.0",
     "fastmcp>=2.0",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: integration tests that require explicit environment opt-in",
+]

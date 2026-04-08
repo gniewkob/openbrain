@@ -98,20 +98,20 @@ class TestInternalAPIKey:
         """Test that INTERNAL_API_KEY is loaded from env."""
         from src import config
         
-        monkeypatch.setenv("INTERNAL_API_KEY", "secret-key-123")
+        monkeypatch.setenv("INTERNAL_API_KEY", "secret-key-123-long-enough-for-32-chars")
         config.get_config.cache_clear()
         
         cfg = config.get_config()
-        assert cfg.auth.internal_api_key == "secret-key-123"
+        assert cfg.auth.internal_api_key == "secret-key-123-long-enough-for-32-chars"
     
     def test_get_internal_api_key_helper(self, monkeypatch):
         """Test get_internal_api_key helper function."""
         from src import config
         
-        monkeypatch.setenv("INTERNAL_API_KEY", "test-key")
+        monkeypatch.setenv("INTERNAL_API_KEY", "test-key-long-enough-for-32-chars")
         config.get_config.cache_clear()
         
-        assert config.get_internal_api_key() == "test-key"
+        assert config.get_internal_api_key() == "test-key-long-enough-for-32-chars"
 
 
 class TestCORSConfig:

@@ -6,7 +6,7 @@ UNIFIED_PIP := $(ROOT)/.venv/bin/pip
 GATEWAY_PYTHON := $(ROOT)/unified/mcp-gateway/.venv/bin/python
 GATEWAY_PIP := $(ROOT)/unified/mcp-gateway/.venv/bin/pip
 
-.PHONY: help check-unified-venv check-gateway-venv bootstrap-unified-venv bootstrap-gateway-venv test-unified test-gateway test
+.PHONY: help check-unified-venv check-gateway-venv bootstrap-unified-venv bootstrap-gateway-venv test-unified test-gateway test pr-readiness
 
 help:
 	@echo "Available targets:"
@@ -15,6 +15,7 @@ help:
 	@echo "  make test-unified   # Run unified backend tests with the root virtualenv"
 	@echo "  make test-gateway   # Run MCP gateway tests with the gateway virtualenv"
 	@echo "  make test           # Run both test suites"
+	@echo "  make pr-readiness   # Run local guardrails + fast policy/contract checks"
 
 check-unified-venv:
 	@test -x "$(UNIFIED_PYTHON)" || (echo "Missing $(UNIFIED_PYTHON)"; exit 1)
@@ -53,3 +54,6 @@ test-gateway: check-gateway-venv
 	cd unified/mcp-gateway && PYTHONPATH=.:../.. ./.venv/bin/python -m unittest discover -s tests -v
 
 test: test-unified test-gateway
+
+pr-readiness: check-unified-venv
+	"$(UNIFIED_PYTHON)" scripts/check_pr_readiness.py

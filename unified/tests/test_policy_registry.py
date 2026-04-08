@@ -22,7 +22,7 @@ AUTH_MODULE = "src.auth"
 
 class PolicyRegistryTests(unittest.IsolatedAsyncioTestCase):
     async def test_read_policy_registry_requires_admin(self) -> None:
-        with patch("src.security.policy.PUBLIC_MODE", True), patch("src.security.policy.is_privileged_user", return_value=False):
+        with patch("src.auth.PUBLIC_EXPOSURE", True), patch("src.security.policy.is_privileged_user", return_value=False):
             with self.assertRaises(HTTPException) as ctx:
                 await read_policy_registry(_user={"sub": "user-1"})
         self.assertEqual(ctx.exception.status_code, 403)
@@ -32,7 +32,9 @@ class PolicyRegistryTests(unittest.IsolatedAsyncioTestCase):
             tenants={"tenant-a": {"write_domains": ["build"]}},
             subjects={"admin@example.com": {"admin_domains": ["corporate", "build", "personal"]}},
         )
-        with patch("src.auth.PUBLIC_EXPOSURE", True), patch("src.auth.is_privileged_user", return_value=True):
+        with patch("src.auth.PUBLIC_EXPOSURE", True), patch(
+            "src.security.policy.is_privileged_user", return_value=True
+        ):
             saved = await update_policy_registry(registry=registry, _user={"sub": "admin"})
         self.assertEqual(saved.tenants["tenant-a"].write_domains, ["build"])
         self.assertEqual(saved.subjects["admin@example.com"].admin_domains, ["corporate", "build", "personal"])

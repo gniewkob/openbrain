@@ -21,10 +21,17 @@ Tools:
   brain_obsidian_vaults — list local Obsidian vaults
   brain_obsidian_read_note — read a local Obsidian note
   brain_obsidian_sync   — one-way sync from Obsidian into OpenBrain
+  brain_obsidian_write_note — write a local Obsidian note
+  brain_obsidian_export — export memories to local Obsidian notes
+  brain_obsidian_collection — build an Obsidian collection note from memories
+  brain_obsidian_bidirectional_sync — sync OpenBrain and Obsidian in both directions
+  brain_obsidian_sync_status — inspect bidirectional sync status
+  brain_obsidian_update_note — update an existing local Obsidian note
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any, Literal
@@ -33,7 +40,26 @@ import httpx
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
+from .capabilities_health import build_capabilities_health
+from .capabilities_manifest import load_capabilities_manifest
+from .capabilities_metadata import load_capabilities_metadata
+from .http_error_adapter import backend_error_message
+from .memory_paths import memory_absolute_path, memory_item_absolute_path
 from .obsidian_cli import ObsidianCliAdapter, ObsidianCliError, note_to_write_payload
+from .request_builders import (
+    build_find_list_payload,
+    build_find_search_payload,
+    build_list_filters,
+    build_sync_check_payload,
+    normalize_optional_text,
+    normalize_updated_by,
+    validate_store_inputs,
+)
+from .response_normalizers import (
+    normalize_find_hits_to_records,
+    normalize_find_hits_to_scored_memories,
+)
+from .runtime_limits import load_runtime_limits
 
 _gateway_logger = logging.getLogger("mcp_gateway")
 
@@ -57,9 +83,18 @@ elif not INTERNAL_API_KEY:
     )
 
 # Parameter validation bounds (PERF-007)
-MAX_SEARCH_TOP_K: int = 100
-MAX_LIST_LIMIT: int = 200
-MAX_SYNC_LIMIT: int = 200
+_LIMITS = load_runtime_limits()
+MAX_SEARCH_TOP_K: int = _LIMITS["max_search_top_k"]
+MAX_LIST_LIMIT: int = _LIMITS["max_list_limit"]
+MAX_SYNC_LIMIT: int = _LIMITS["max_sync_limit"]
+HEALTH_PROBE_TIMEOUT: float = 5.0
+
+_CAPS = load_capabilities_manifest()
+_CAP_META = load_capabilities_metadata()
+CORE_TOOLS = _CAPS["core_tools"]
+ADVANCED_TOOLS = _CAPS["advanced_tools"]
+ADMIN_TOOLS = _CAPS["admin_tools"]
+OBSIDIAN_LOCAL_TOOLS = _CAPS["local_obsidian_tools"]
 
 mcp = FastMCP(
     name="OpenBrain",
@@ -139,27 +174,11 @@ def _client() -> _SharedClient:
 
 def _raise(r: httpx.Response) -> None:
     if r.is_error:
-        # Always include the HTTP status code so callers can correlate with server logs.
-        # In production, omit the response body to prevent internal detail leakage.
-        is_production = os.environ.get("ENV", "development").lower() == "production"
-        if is_production:
-            _STATUS_LABELS = {
-                401: "Authentication required",
-                403: "Access denied",
-                404: "Resource not found",
-                422: "Validation error",
-            }
-            label = _STATUS_LABELS.get(
-                r.status_code,
-                "Internal server error" if r.status_code >= 500 else "Request failed",
-            )
-            raise ValueError(f"Backend {r.status_code}: {label}")
-        else:
-            try:
-                detail = r.json()
-            except Exception:
-                detail = r.text
-            raise ValueError(f"Backend {r.status_code}: {detail}")
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text
+        raise ValueError(backend_error_message(r.status_code, detail))
 
 
 def _obsidian_local_tools_enabled() -> bool:
@@ -186,64 +205,115 @@ def _require_obsidian_local_tools_enabled() -> None:
 
 
 async def _get_backend_status() -> dict:
-    """Query /readyz on the backend with a 5s timeout.
-
-    Returns a backend status dict regardless of reachability.
-    """
+    """Probe backend readiness without conflating degradation with outage."""
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=HEALTH_PROBE_TIMEOUT) as client:
             r = await client.get(f"{BRAIN_URL}/readyz")
-        if r.status_code == 200:
-            data = r.json()
+        data = r.json()
+        if r.status_code in {200, 503} and isinstance(data, dict):
             return {
-                "status": "ok",
+                "status": data.get(
+                    "status",
+                    "ok" if r.status_code == 200 else "degraded",
+                ),
                 "url": BRAIN_URL,
+                "api": "reachable",
                 "db": data.get("db", "unknown"),
                 "vector_store": data.get("vector_store", "unknown"),
+                "readyz_status_code": r.status_code,
+                "probe": "readyz",
             }
-        return {
-            "status": "unavailable",
-            "url": BRAIN_URL,
-            "db": "unknown",
-            "vector_store": "unknown",
-        }
-    except Exception:
-        return {
-            "status": "unavailable",
-            "url": BRAIN_URL,
-            "db": "unknown",
-            "vector_store": "unknown",
-        }
+        readyz_error = f"Unexpected /readyz response ({r.status_code})"
+    except Exception as exc:
+        readyz_error = str(exc)
+
+    try:
+        async with httpx.AsyncClient(timeout=HEALTH_PROBE_TIMEOUT) as client:
+            r = await client.get(f"{BRAIN_URL}/healthz")
+        if r.status_code == 200:
+            return {
+                "status": "degraded",
+                "url": BRAIN_URL,
+                "api": "reachable",
+                "db": "unknown",
+                "vector_store": "unknown",
+                "probe": "healthz_fallback",
+                "reason": f"/readyz probe failed: {readyz_error}",
+            }
+        healthz_error = f"Unexpected /healthz response ({r.status_code})"
+    except Exception as exc:
+        healthz_error = str(exc)
+
+    try:
+        async with _client() as c:
+            r = await c.request("GET", "/api/v1/health", timeout=HEALTH_PROBE_TIMEOUT)
+        if r.status_code == 200:
+            return {
+                "status": "degraded",
+                "url": BRAIN_URL,
+                "api": "reachable",
+                "db": "unknown",
+                "vector_store": "unknown",
+                "probe": "api_health_fallback",
+                "reason": (
+                    f"/readyz probe failed: {readyz_error}; "
+                    f"/healthz probe failed: {healthz_error}"
+                ),
+            }
+        api_health_error = f"Unexpected /api/v1/health response ({r.status_code})"
+    except Exception as exc:
+        api_health_error = str(exc)
+
+    return {
+        "status": "unavailable",
+        "url": BRAIN_URL,
+        "api": "unreachable",
+        "db": "unknown",
+        "vector_store": "unknown",
+        "probe": "api_health_fallback",
+        "reason": (
+            f"/readyz probe failed: {readyz_error}; "
+            f"/healthz probe failed: {healthz_error}; "
+            f"/api/v1/health probe failed: {api_health_error}"
+        ),
+    }
 
 
 @mcp.tool()
 async def brain_capabilities() -> dict:
     """Check the operational status of the Memory Platform V1."""
-    tier_2_tools = ["list", "get_context", "delete", "export", "sync_check"]
-    if _obsidian_local_tools_enabled():
-        tier_2_tools.extend(["obsidian_vaults", "obsidian_read_note", "obsidian_sync"])
-
     obsidian_enabled = _obsidian_local_tools_enabled()
     backend = await _get_backend_status()
+    tier_2_tools = [*ADVANCED_TOOLS]
+    obsidian_tools = [*OBSIDIAN_LOCAL_TOOLS] if obsidian_enabled else []
+    obsidian_status = "enabled" if obsidian_enabled else "disabled"
+    obsidian_reason = (
+        None if obsidian_enabled else f"Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1 to enable"
+    )
+    if obsidian_tools:
+        tier_2_tools.extend(obsidian_tools)
+    health = build_capabilities_health(backend, obsidian_status)
 
     return {
         "platform": "OpenBrain V1 (Gateway)",
-        "api_version": "2.2.0",
-        "schema_changelog": {
-            "2.2.0": "Added PATCH support for partial updates (brain_update); circuit breaker for Ollama",
-            "2.1.0": "Unified V1 API endpoints; corporate append-only enforcement; rate limiting",
-            "2.0.0": "Initial unified server release",
-        },
+        "api_version": _CAP_META["api_version"],
+        "schema_changelog": _CAP_META["schema_changelog"],
         "backend": backend,
+        "health": health,
+        "obsidian": {
+            "mode": "local",
+            "status": obsidian_status,
+            "tools": obsidian_tools,
+            "reason": obsidian_reason,
+        },
         "obsidian_local": {
-            "status": "enabled" if obsidian_enabled else "disabled",
-            "reason": None
-            if obsidian_enabled
-            else f"Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1 to enable",
+            "status": obsidian_status,
+            "tools": obsidian_tools,
+            "reason": obsidian_reason,
         },
         "tier_1_core": {
             "status": "stable",
-            "tools": ["search", "get", "store", "update"],
+            "tools": CORE_TOOLS,
         },
         "tier_2_advanced": {
             "status": "active",
@@ -251,7 +321,7 @@ async def brain_capabilities() -> dict:
         },
         "tier_3_admin": {
             "status": "guarded",
-            "tools": ["store_bulk", "upsert_bulk", "maintain"],
+            "tools": ADMIN_TOOLS,
         },
     }
 
@@ -289,9 +359,17 @@ async def brain_store(
     match_key — optional idempotency key for bulk sync (prevents duplicates).
     obsidian_ref — path to source note in Obsidian vault.
     """
+    owner_normalized = normalize_optional_text(owner) or ""
+    match_key_normalized = normalize_optional_text(match_key)
+    validate_store_inputs(
+        domain=domain,
+        owner=owner_normalized,
+        match_key=match_key_normalized,
+    )
+
     async with _client() as c:
         r = await c.post(
-            "/api/v1/memory/write",
+            memory_absolute_path("write"),
             json={
                 "record": {
                     "content": content,
@@ -299,12 +377,12 @@ async def brain_store(
                     "entity_type": entity_type,
                     "title": title,
                     "sensitivity": sensitivity,
-                    "owner": owner,
+                    "owner": owner_normalized,
                     "tenant_id": tenant_id,
                     "tags": tags or [],
                     "custom_fields": custom_fields or {},
                     "obsidian_ref": obsidian_ref,
-                    "match_key": match_key,
+                    "match_key": match_key_normalized,
                     "source": {"type": "agent", "system": MCP_SOURCE_SYSTEM},
                 },
                 "write_mode": "upsert",
@@ -318,7 +396,7 @@ async def brain_store(
 async def brain_get(memory_id: str) -> BrainMemory:
     """Retrieve a specific memory by its ID."""
     async with _client() as c:
-        r = await c.get(f"/api/v1/memory/{memory_id}")
+        r = await c.get(memory_item_absolute_path(memory_id))
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         _raise(r)
@@ -343,32 +421,23 @@ async def brain_list(
     """
     if not 1 <= limit <= MAX_LIST_LIMIT:
         raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
-    params: dict[str, Any] = {"limit": limit}
-    if domain:
-        params["domain"] = domain
-    if entity_type:
-        params["entity_type"] = entity_type
-    if status:
-        params["status"] = status
-    if sensitivity:
-        params["sensitivity"] = sensitivity
-    if owner:
-        params["owner"] = owner
-    if tenant_id:
-        params["tenant_id"] = tenant_id
+    filters = build_list_filters(
+        domain=domain,
+        entity_type=entity_type,
+        status=status,
+        sensitivity=sensitivity,
+        owner=owner,
+        tenant_id=tenant_id,
+    )
+    payload = build_find_list_payload(limit=limit, filters=filters)
 
     async with _client() as c:
         r = await c.post(
-            "/api/v1/memory/find",
-            json={
-                "query": None,
-                "limit": params.get("limit", 20),
-                "filters": {k: v for k, v in params.items() if k != "limit"},
-            },
+            memory_absolute_path("find"),
+            json=payload,
         )
         _raise(r)
-        # /find returns [{"record": {...}, "score": ...}]; extract records only
-        return [hit.get("record", hit) for hit in r.json()]
+        return normalize_find_hits_to_records(r.json())
 
 
 @mcp.tool()
@@ -376,7 +445,7 @@ async def brain_get_context(query: str, domain: str | None = None) -> dict:
     """Synthesize a grounding pack for the current conversation topic."""
     async with _client() as c:
         r = await c.post(
-            "/api/v1/memory/get-context",
+            memory_absolute_path("get_context"),
             json={"query": query, "domain": domain, "max_items": 10},
         )
         _raise(r)
@@ -398,32 +467,20 @@ async def brain_search(
     """
     if not 1 <= top_k <= MAX_SEARCH_TOP_K:
         raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
-    filters: dict[str, Any] = {}
-    if domain:
-        filters["domain"] = domain
-    if entity_type:
-        filters["entity_type"] = entity_type
-    if sensitivity:
-        filters["sensitivity"] = sensitivity
+    filters = build_list_filters(
+        domain=domain,
+        entity_type=entity_type,
+        sensitivity=sensitivity,
+    )
+    payload = build_find_search_payload(query=query, limit=top_k, filters=filters)
 
     async with _client() as c:
         r = await c.post(
-            "/api/v1/memory/find",
-            json={
-                "query": query,
-                "limit": top_k,
-                "filters": filters,
-            },
+            memory_absolute_path("find"),
+            json=payload,
         )
         _raise(r)
-        # V1 /find returns [{record: ..., score: similarity}] — normalize to flat list
-        hits = r.json()
-        return [
-            {"memory": hit["record"], "score": hit["score"]}
-            if isinstance(hit, dict) and "record" in hit
-            else hit
-            for hit in hits
-        ]
+        return normalize_find_hits_to_scored_memories(r.json())
 
 
 @mcp.tool()
@@ -447,7 +504,7 @@ async def brain_update(
     # Build patch payload — only include fields explicitly provided
     payload: dict[str, Any] = {
         "content": content,
-        "updated_by": updated_by,
+        "updated_by": normalize_updated_by(updated_by),
     }
     if title is not None:
         payload["title"] = title
@@ -466,7 +523,7 @@ async def brain_update(
 
     async with _client() as c:
         r = await c.patch(
-            f"/api/v1/memory/{memory_id}",
+            memory_item_absolute_path(memory_id),
             json=payload,
         )
         if r.status_code == 404:
@@ -482,7 +539,7 @@ async def brain_delete(memory_id: str) -> dict:
     Corporate memories cannot be deleted (returns 403).
     """
     async with _client() as c:
-        r = await c.delete(f"/api/v1/memory/{memory_id}")
+        r = await c.delete(memory_item_absolute_path(memory_id))
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         if r.status_code == 403:
@@ -506,7 +563,7 @@ async def brain_maintain(
     """
     async with _client() as c:
         r = await c.post(
-            "/api/v1/memory/maintain",
+            memory_absolute_path("maintain"),
             json={
                 "dry_run": dry_run,
                 "dedup_threshold": dedup_threshold,
@@ -526,7 +583,7 @@ async def brain_export(ids: list[str]) -> list[dict]:
     Restricted-sensitivity content is redacted automatically.
     """
     async with _client() as c:
-        r = await c.post("/api/v1/memory/export", json={"ids": ids})
+        r = await c.post(memory_absolute_path("export"), json={"ids": ids})
         _raise(r)
         return r.json()
 
@@ -543,14 +600,14 @@ async def brain_sync_check(
     Provide exactly one of memory_id, match_key, or obsidian_ref.
     If file_hash is omitted, returns existence status only.
     """
-    payload: dict[str, Any] = {
-        "memory_id": memory_id,
-        "match_key": match_key,
-        "obsidian_ref": obsidian_ref,
-        "file_hash": file_hash,
-    }
+    payload = build_sync_check_payload(
+        memory_id=memory_id,
+        match_key=match_key,
+        obsidian_ref=obsidian_ref,
+        file_hash=file_hash,
+    )
     async with _client() as c:
-        r = await c.post("/api/v1/memory/sync-check", json=payload)
+        r = await c.post(memory_absolute_path("sync_check"), json=payload)
         _raise(r)
         return r.json()
 
@@ -611,7 +668,7 @@ async def brain_obsidian_sync(
             if paths
             else await adapter.list_files(vault, folder=folder, limit=limit)
         )
-        notes = [await adapter.read_note(vault, path) for path in resolved_paths]
+        notes = await asyncio.gather(*(adapter.read_note(vault, path) for path in resolved_paths))
     except ObsidianCliError as e:
         raise ValueError(str(e))
 
@@ -629,7 +686,7 @@ async def brain_obsidian_sync(
         "write_mode": "upsert",
     }
     async with _client() as c:
-        r = await c.post("/api/v1/memory/write-many", json=payload)
+        r = await c.post(memory_absolute_path("write_many"), json=payload)
         _raise(r)
         result = r.json()
         return {
@@ -780,7 +837,7 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict:
     """Bulk store memories. Use for archiving or synchronization."""
     async with _client() as c:
         r = await c.post(
-            "/api/v1/memory/write-many", json={"records": items, "write_mode": "upsert"}
+            memory_absolute_path("write_many"), json={"records": items, "write_mode": "upsert"}
         )
         _raise(r)
         return r.json()
@@ -790,7 +847,7 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict:
 async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict:
     """Idempotent bulk synchronization using match_key."""
     async with _client() as c:
-        r = await c.post("/api/v1/memory/bulk-upsert", json=items)
+        r = await c.post(memory_absolute_path("bulk_upsert"), json=items)
         _raise(r)
         return r.json()
 

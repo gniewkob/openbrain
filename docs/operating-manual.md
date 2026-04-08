@@ -34,6 +34,7 @@ The following security improvements were applied:
 - **Access denial telemetry**: Prometheus counters now expose `access_denied_total` and reason-specific breakdowns for `admin`, `domain`, `owner`, and `tenant`.
 - **Metadata-aware idempotent writes**: writes are no longer silently skipped when only metadata changes and `content_hash` stays the same.
 - **Telemetry durability**: counters and histograms are now restored across restarts via PostgreSQL-backed persistence.
+- **Shared telemetry counters**: `TELEMETRY_BACKEND=redis` enables cross-worker counter aggregation using Redis (`TELEMETRY_REDIS_URL` or `REDIS_URL`), with automatic fallback to in-memory counters when Redis is unavailable.
 - **Metrics exception accounting**: unhandled request failures are counted as `500` and still contribute to request-duration histograms.
 - **MCP log redaction**: transport logging now redacts `content`, `title`, `tenant_id`, `match_key`, `obsidian_ref`, and `custom_fields`.
 - **Lazy OIDC refresh lock**: the OIDC verifier avoids import-time event-loop binding by creating the async lock lazily.
@@ -49,12 +50,19 @@ The system guides AI behavior by categorizing tools:
 - **Tier 2 (Advanced)**: `list`, `get_context`, `delete`, `export`, `sync_check`, `obsidian_vaults`, `obsidian_read_note`, `obsidian_sync` — Require explicit user intent.
 - **Tier 3 (Admin)**: `store_bulk`, `upsert_bulk`, `maintain` — Batch and system-wide operations.
 
+Capabilities payload note:
+- `brain_capabilities` now includes a transport-agnostic `obsidian` object (`mode`, `status`, `tools`, `reason`).
+- `brain_capabilities` now includes `health.overall` plus `health.components` (`api`, `db`, `vector_store`, `obsidian`) for component-level truthfulness.
+- Legacy transport-specific keys (`obsidian_http`, `obsidian_local`) remain for backward compatibility.
+
 ## Governance Rules
 - `corporate` is append-only by policy. Treat `update` as version creation, not overwrite.
 - `build` and `personal` are mutable by default. Use append-only only when historical state matters.
 - `store_bulk` is for net-new ingestion. `upsert_bulk` is for deterministic pipelines with stable `match_key`.
 - Run `maintain` with `dry_run=true` first. Treat non-dry-run maintenance as a controlled operation.
 - `search` and `get_context` should represent active truth, not superseded history.
+- For `PATCH /api/v1/memory/{id}`, authenticated subject is authoritative audit actor.
+  Request-level `updated_by` is accepted for compatibility but overridden at API boundary.
 
 ## V1 API Reference (Canonical Endpoints)
 
@@ -82,6 +90,62 @@ The idempotency check now includes metadata state as well, so metadata-only upda
 - Transport parity tests remain part of CI, but they are skipped during bare `unified` discovery when gateway-only dependencies are not installed.
 - Route registration, middleware, lifespan, and app-factory modules now have direct tests instead of relying only on indirect coverage through `main.py`.
 - `main.py` and `crud.py` remain intentionally covered only where they still represent public assembly or compatibility surfaces.
+- Controlled Obsidian E2E harness (opt-in only):
+  - test file: `unified/tests/integration/test_obsidian_controlled_e2e.py`
+  - run with: `RUN_CONTROLLED_OBSIDIAN_E2E=1 OPENBRAIN_BASE_URL=http://127.0.0.1:7010 pytest -q unified/tests/integration/test_obsidian_controlled_e2e.py`
+  - optional assertion: set `OBSIDIAN_TEST_VAULT=<vault-name>`
+
+## CI Release Gate (Branch Protection)
+
+Baseline branch in this repository is `master` (`gh repo view`).
+As of 2026-04-08 the branch is protected (verified via `gh api repos/gniewkob/openbrain/branches/master/protection`).
+
+Recommended required checks:
+- `CI / lint`
+- `CI / test`
+- `CI / security`
+- `CI / contract-integrity`
+- `Unified Smoke Tests / guardrails`
+- `Unified Smoke Tests / smoke`
+- `Unified Smoke Tests / gateway-smoke`
+- `Unified Smoke Tests / transport-parity`
+- `Unified Smoke Tests / contract-integrity`
+
+Operator verification commands:
+```bash
+gh workflow list
+gh run list --limit 20 --json workflowName,displayTitle,status,conclusion,headBranch,event,url
+gh run view <RUN_ID> --json jobs
+python scripts/check_release_gate.py                         # audit-only
+RELEASE_GATE_ENFORCE=1 python scripts/check_release_gate.py # fail on policy drift
+```
+
+CI guardrail:
+- `Unified Smoke Tests / guardrails` enforces release-gate policy via `scripts/check_release_gate.py` with `RELEASE_GATE_ENFORCE=1`.
+- `Unified Smoke Tests / guardrails` also enforces repository hygiene via `scripts/check_repo_hygiene.py` (known debug artifacts deny-list).
+- `Unified Smoke Tests / guardrails` enforces capabilities status truthfulness via `scripts/check_capabilities_truthfulness.py` (health contract + fallback probe invariants).
+- `Unified Smoke Tests / guardrails` enforces audit semantics via `scripts/check_audit_semantics.py` (`created_by/updated_by` invariants at schema/API/write boundaries).
+- `Unified Smoke Tests / guardrails` enforces Obsidian gating/contract semantics via `scripts/check_obsidian_contract.py` (feature-flag + capabilities + manifest subset checks).
+- `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + capabilities truthfulness + audit semantics + Obsidian contract).
+- `Unified Smoke Tests / guardrails` runs lightweight pytest coverage for guardrail runners:
+  - `unified/tests/test_local_guardrails_runner.py`
+  - `unified/tests/test_audit_semantics_guardrail.py`
+  - `unified/tests/test_obsidian_contract_guardrail.py`
+
+Local PR readiness:
+- `python3 scripts/check_pr_readiness.py`
+- or `make pr-readiness`
+- bundle includes:
+  - `check_local_guardrails.py`
+  - guardrail runner unit tests
+  - contract integrity smoke (`test_contract_integrity.py`, `test_capabilities_response_contract.py`)
+
+Branch protection policy (recommended):
+- Require pull request before merging.
+- Require status checks above to pass before merging.
+- Require branches to be up to date before merging.
+- Dismiss stale pull request approvals when new commits are pushed.
+- Include administrators (no bypass in normal mode).
 
 ## Export Policy
 - **Admin callers** (privileged users authenticated via JWT) receive fully unredacted records.
@@ -91,7 +155,7 @@ The idempotency check now includes metadata state as well, so metadata-only upda
 
 ## Known Limitations
 - `tenant_id` is now available as a first-class indexed column and remains mirrored in `metadata_` only for compatibility with older records and tools. New code should treat the column as the source of truth.
-- Telemetry state is now durable across restarts, but the registry is still per-process. Multi-worker uvicorn deployments will report inconsistent live metrics per scrape unless replaced with a shared backend.
+- Telemetry gauges and histograms remain process-local. Counter metrics can now be shared across workers by setting `TELEMETRY_BACKEND=redis`.
 - MCP transport still uses a per-request backend `httpx.AsyncClient`, which is acceptable for current volume but not the best shape for sustained high-throughput gateway traffic.
 - The metrics bridge still uses Python's basic `HTTPServer`, which is sufficient for the current single-scrape local topology but not intended as a hardened multi-client ingress component.
 

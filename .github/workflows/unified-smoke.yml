@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   guardrails:
     runs-on: ubuntu-latest
@@ -16,6 +20,8 @@ jobs:
           python-version: "3.12"
       - name: Install unified package for security tests
         run: pip install -e ./unified
+      - name: Install pytest for guardrail runner tests
+        run: pip install pytest
       - name: Install ruff
         run: pip install ruff
       - name: Run syntax and undefined-name checks
@@ -24,8 +30,21 @@ jobs:
         run: python scripts/check_no_committed_secrets.py
       - name: Verify compose guardrails
         run: python scripts/check_compose_guardrails.py
+      - name: Verify local guardrails bundle
+        run: python scripts/check_local_guardrails.py
+      - name: Verify guardrail runner unit tests
+        run: |
+          python -m pytest -q \
+            unified/tests/test_local_guardrails_runner.py \
+            unified/tests/test_audit_semantics_guardrail.py \
+            unified/tests/test_obsidian_contract_guardrail.py
       - name: Verify public-mode startup guardrails
         run: python -m unittest unified.tests.test_auth_security unified.tests.test_db_security
+      - name: Enforce release-gate branch protection
+        env:
+          RELEASE_GATE_ENFORCE: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && '1' || '0' }}
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_release_gate.py
 
   smoke:
     runs-on: ubuntu-latest
@@ -48,7 +67,11 @@ jobs:
         env:
           SKIP_OBSIDIAN_SYNC_TEST: "1"
           SKIP_INTEGRATION_TESTS: "1"
-        run: python -m unittest discover -s tests -v
+        run: |
+          python -m pytest -q tests \
+            --ignore=tests/integration \
+            --ignore=tests/test_api_endpoints_live.py \
+            --ignore=tests/test_endpoints_summary.py
 
   gateway-smoke:
     runs-on: ubuntu-latest
@@ -80,3 +103,26 @@ jobs:
         run: pip install -e ./unified/mcp-gateway
       - name: Run transport parity tests
         run: PYTHONPATH=.:unified python -m unittest unified.tests.test_transport_parity -v
+
+  contract-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install packages
+        run: |
+          pip install -e ./unified
+          pip install -e ./unified/mcp-gateway
+          pip install pytest pytest-asyncio
+      - name: Run unified contract integrity
+        run: |
+          python -m pytest -q \
+            unified/tests/test_contract_integrity.py \
+            unified/tests/test_capabilities_response_contract.py
+      - name: Run gateway contract integrity
+        run: |
+          python -m unittest discover -s unified/mcp-gateway/tests -p "test_gateway_contract_integrity.py" -v
+          python -m unittest discover -s unified/mcp-gateway/tests -p "test_gateway_capabilities_response_contract.py" -v

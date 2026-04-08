@@ -1,0 +1,14 @@
+{
+  "memory_base": "/api/v1/memory",
+  "paths": {
+    "write": "/write",
+    "write_many": "/write-many",
+    "find": "/find",
+    "get_context": "/get-context",
+    "maintain": "/maintain",
+    "export": "/export",
+    "sync_check": "/sync-check",
+    "bulk_upsert": "/bulk-upsert"
+  }
+}
+

@@ -15,8 +15,8 @@ import structlog
 from .config import get_config
 
 # These will be initialized lazily from config
-_EMBED_TIMEOUT = httpx.Timeout(30.0)
-_EMBED_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
+_EMBED_TIMEOUT = httpx.Timeout(5.0)
+_EMBED_LIMITS = httpx.Limits(max_connections=100, max_keepalive_connections=20)
 _RETRYABLE_STATUS_CODES = {502, 503, 504}
 
 # Ollama nomic-embed-text supports up to 8192 tokens; ~4 chars/token → 6000 char

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections import Counter
 from threading import Lock
 from typing import Any
+
+from .telemetry_counters import build_counter_backend
 
 # Pre-initialize all counters to 0 so Prometheus sees them from the first scrape.
 KNOWN_COUNTERS: tuple[str, ...] = (
@@ -116,27 +117,18 @@ class Histogram:
 class TelemetryRegistry:
     def __init__(self) -> None:
         self._lock = Lock()
-        self._counters: Counter[str] = Counter()
-        # Pre-seed known counters so they appear in /metrics from first scrape.
-        self._counters.update({name: 0 for name in KNOWN_COUNTERS})
+        self._counter_backend = build_counter_backend(KNOWN_COUNTERS)
         self._gauges: dict[str, float] = {}
         self._histograms: dict[str, Histogram] = {}
 
     def incr(self, name: str, value: int = 1) -> None:
-        with self._lock:
-            self._counters[name] += value
+        self._counter_backend.incr(name, value)
 
     def snapshot(self) -> dict[str, int]:
-        with self._lock:
-            return dict(sorted(self._counters.items()))
+        return self._counter_backend.snapshot()
 
     def bulk_load_counters(self, values: dict[str, int]) -> None:
-        with self._lock:
-            for name, val in values.items():
-                # We only load values for known counters to avoid bloat from
-                # old/deleted metrics
-                if name in KNOWN_COUNTERS or name.startswith("http_requests_total_"):
-                    self._counters[name] = val
+        self._counter_backend.bulk_load(values)
 
     def bulk_load_histograms(self, values: dict[str, dict[str, Any]]) -> None:
         with self._lock:
@@ -167,9 +159,8 @@ class TelemetryRegistry:
             }
 
     def reset(self) -> None:
+        self._counter_backend.reset()
         with self._lock:
-            self._counters.clear()
-            self._counters.update({name: 0 for name in KNOWN_COUNTERS})
             self._gauges.clear()
             self._histograms.clear()
 

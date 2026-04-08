@@ -10,8 +10,15 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client(monkeypatch) -> TestClient:
     """Create test client."""
+    from src import config, auth
+    monkeypatch.setenv("PUBLIC_MODE", "false")
+    monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+    config.get_config.cache_clear()
+    import importlib
+    importlib.reload(auth)
+    
     from src.main import app
 
     return TestClient(app, raise_server_exceptions=False)

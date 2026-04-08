@@ -489,24 +489,11 @@ class BidirectionalSyncEngine:
         )
         changes.extend(new_openbrain)
 
-        # New items in Obsidian
+        # Find new items in Obsidian
         new_obsidian = _detect_new_obsidian_files(
             obsidian_files, tracked_paths, memory_map, vault
         )
         changes.extend(new_obsidian)
-
-        # Find new items in Obsidian (files not yet tracked)
-        for file_path in obsidian_files:
-            if file_path not in tracked_paths and file_path not in memory_map:
-                # New file in Obsidian - might need to import
-                change = SyncChange(
-                    memory_id="",
-                    obsidian_path=file_path,
-                    vault=vault,
-                    change_type=ChangeType.CREATED,
-                    source="obsidian",
-                )
-                changes.append(change)
 
         return changes
 

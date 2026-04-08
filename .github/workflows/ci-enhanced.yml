@@ -1,0 +1,363 @@
+name: CI Enhanced (5/5 Quality Gates)
+#
+# This workflow includes all quality gates required for 5/5 system rating:
+# - Linting (Ruff)
+# - Type checking (Mypy)
+# - Security audit (pip-audit, Bandit)
+# - Testing with coverage (pytest-cov)
+# - Secret scanning
+#
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12'
+  UV_VERSION: 'latest'
+
+jobs:
+  # ==========================================
+  # Stage 1: Code Quality (Fast feedback)
+  # ==========================================
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: ${{ env.UV_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        cd unified
+        uv sync --group dev
+        python -m pip install --upgrade pip
+        pip install ruff
+    
+    - name: Lint with Ruff
+      run: |
+        cd unified
+        ruff check src/ --output-format=github
+    
+    - name: Check formatting
+      run: |
+        cd unified
+        ruff format --check src/
+
+  typecheck:
+    name: Type Check (Mypy)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: ${{ env.UV_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        cd unified
+        uv sync --group dev
+        python -m pip install --upgrade pip
+        pip install mypy
+    
+    - name: Type check with mypy
+      run: |
+        cd unified
+        mypy src/ --config-file mypy.ini --show-error-codes
+
+  # ==========================================
+  # Stage 2: Security
+  # ==========================================
+  security-audit:
+    name: Security Audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: ${{ env.UV_VERSION }}
+    
+    - name: Install pip-audit
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-audit
+    
+    - name: Audit dependencies
+      run: |
+        cd unified
+        pip-audit --desc --format=json -r pyproject.toml || true
+        pip-audit --desc -r pyproject.toml
+
+  security-lint:
+    name: Security Lint (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: ${{ env.UV_VERSION }}
+    
+    - name: Install bandit
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit[toml]
+    
+    - name: Run bandit
+      run: |
+        cd unified
+        bandit -r src/ -f json -o bandit-report.json || true
+        bandit -r src/ -ll -ii
+
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Check for committed secrets
+      run: |
+        python scripts/check_no_committed_secrets.py
+
+  # ==========================================
+  # Stage 3: Testing
+  # ==========================================
+  contract-integrity:
+    name: Contract Integrity
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install test dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-asyncio
+        pip install -e ./unified
+        pip install -e ./unified/mcp-gateway
+
+    - name: Run unified contract integrity
+      run: |
+        python -m pytest -q \
+          unified/tests/test_contract_integrity.py \
+          unified/tests/test_capabilities_response_contract.py
+
+    - name: Run gateway contract integrity
+      run: |
+        python -m unittest discover -s unified/mcp-gateway/tests -p "test_gateway_contract_integrity.py" -v
+        python -m unittest discover -s unified/mcp-gateway/tests -p "test_gateway_capabilities_response_contract.py" -v
+
+  test:
+    name: Test with Coverage
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    timeout-minutes: 15
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: openbrain_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: ${{ env.UV_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        cd unified
+        uv sync --group dev
+    
+    - name: Run tests with coverage
+      env:
+        DATABASE_URL: postgresql+asyncpg://postgres@localhost:5432/openbrain_test
+        REDIS_URL: redis://localhost:6379/0
+        DISABLE_SECRET_SCANNING: "1"
+      run: |
+        cd unified
+        uv run pytest tests/ -v \
+          --ignore=tests/integration \
+          --ignore=tests/test_api_endpoints_live.py \
+          --ignore=tests/test_endpoints_summary.py \
+          --cov=src \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          --cov-fail-under=80
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./unified/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # ==========================================
+  # Stage 4: Integration Tests
+  # ==========================================
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    timeout-minutes: 20
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: openbrain_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: ${{ env.UV_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        cd unified
+        uv sync --group dev
+    
+    - name: Run integration tests
+      env:
+        DATABASE_URL: postgresql+asyncpg://postgres@localhost:5432/openbrain_test
+        REDIS_URL: redis://localhost:6379/0
+        DISABLE_SECRET_SCANNING: "1"
+      run: |
+        cd unified
+        uv run pytest tests/integration/ -v --tb=short
+
+  # ==========================================
+  # Stage 5: Build & Publish (Main only)
+  # ==========================================
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [test, security-audit, security-lint]
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: ${{ env.UV_VERSION }}
+    
+    - name: Build package
+      run: |
+        cd unified
+        uv build
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: unified/dist/
+        retention-days: 7
+
+  # ==========================================
+  # Summary
+  # ==========================================
+  quality-gate:
+    name: Quality Gate (5/5)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, security-audit, security-lint, secret-scan, test]
+    if: always()
+    steps:
+    - name: Check all jobs status
+      run: |
+        echo "Lint: ${{ needs.lint.result }}"
+        echo "Type Check: ${{ needs.typecheck.result }}"
+        echo "Security Audit: ${{ needs.security-audit.result }}"
+        echo "Security Lint: ${{ needs.security-lint.result }}"
+        echo "Secret Scan: ${{ needs.secret-scan.result }}"
+        echo "Test: ${{ needs.test.result }}"
+    
+    - name: Quality Gate
+      if: |
+        needs.lint.result == 'success' &&
+        needs.typecheck.result == 'success' &&
+        needs.security-audit.result == 'success' &&
+        needs.security-lint.result == 'success' &&
+        needs.secret-scan.result == 'success' &&
+        needs.test.result == 'success'
+      run: |
+        echo "✅ All quality gates passed! System is 5/5 ready."
+    
+    - name: Quality Gate Failed
+      if: |
+        needs.lint.result != 'success' ||
+        needs.typecheck.result != 'success' ||
+        needs.security-audit.result != 'success' ||
+        needs.security-lint.result != 'success' ||
+        needs.secret-scan.result != 'success' ||
+        needs.test.result != 'success'
+      run: |
+        echo "❌ Quality gate failed. Check individual jobs for details."
+        exit 1

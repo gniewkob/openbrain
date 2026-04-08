@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import types
 import unittest
+from unittest.mock import patch
 
 from fastapi import FastAPI
 
@@ -77,7 +78,10 @@ class AppFactoryTests(unittest.TestCase):
         async def _lifespan(app):
             yield
 
-        app = create_app(public_base_url="https://brain.example.com", lifespan=_lifespan)
+        with patch.dict("os.environ", {"PUBLIC_MODE": "false", "PUBLIC_BASE_URL": ""}):
+            from src import config
+            config.get_config.cache_clear()
+            app = create_app(public_base_url="https://brain.example.com", lifespan=_lifespan)
 
         self.assertEqual(app.title, "OpenBrain Unified Memory Service")
         self.assertEqual(app.version, "2.0.0")

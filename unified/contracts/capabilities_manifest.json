@@ -1,0 +1,18 @@
+{
+  "core_tools": ["search", "get", "store", "update"],
+  "advanced_tools": ["list", "get_context", "delete", "export", "sync_check"],
+  "admin_tools": ["store_bulk", "upsert_bulk", "maintain"],
+  "http_obsidian_tools": ["obsidian_vaults", "obsidian_read_note", "obsidian_sync"],
+  "local_obsidian_tools": [
+    "obsidian_vaults",
+    "obsidian_read_note",
+    "obsidian_sync",
+    "obsidian_write_note",
+    "obsidian_export",
+    "obsidian_collection",
+    "obsidian_bidirectional_sync",
+    "obsidian_sync_status",
+    "obsidian_update_note"
+  ]
+}
+

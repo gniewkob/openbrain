@@ -93,6 +93,25 @@ class _GatewayClient:
             return _FakeResponse(200, {"status": "created", "record": LEGACY_MEMORY})
         if path == "/api/v1/memory/find":
             return _FakeResponse(200, [{"record": LEGACY_MEMORY, "score": 0.9}])
+        if path == "/api/v1/memory/sync-check":
+            return _FakeResponse(
+                200,
+                {"status": "exists", "message": "Memory exists.", "match_key": "mk-1"},
+            )
+        if path == "/api/v1/memory/bulk-upsert":
+            return _FakeResponse(200, {"inserted": [], "updated": [], "skipped": []})
+        if path == "/api/v1/memory/maintain":
+            return _FakeResponse(
+                200,
+                {
+                    "dry_run": True,
+                    "total_active": 0,
+                    "dedup_count": 0,
+                    "owners_normalized": 0,
+                    "links_fixed": 0,
+                    "actions": [],
+                },
+            )
         raise AssertionError(f"Unexpected POST path: {path}")
 
     async def get(self, path: str, params=None):
@@ -133,6 +152,25 @@ class _TransportClient:
             if payload.get("sort") == "updated_at_desc":
                 return _FakeResponse(200, [LEGACY_MEMORY])
             return _FakeResponse(200, [{"record": V1_RECORD, "score": 0.9}])
+        if method == "POST" and path == "/api/v1/memory/sync-check":
+            return _FakeResponse(
+                200,
+                {"status": "exists", "message": "Memory exists.", "match_key": "mk-1"},
+            )
+        if method == "POST" and path == "/api/v1/memory/bulk-upsert":
+            return _FakeResponse(200, {"inserted": [], "updated": [], "skipped": []})
+        if method == "POST" and path == "/api/v1/memory/maintain":
+            return _FakeResponse(
+                200,
+                {
+                    "dry_run": True,
+                    "total_active": 0,
+                    "dedup_count": 0,
+                    "owners_normalized": 0,
+                    "links_fixed": 0,
+                    "actions": [],
+                },
+            )
         if method == "GET" and path == "/api/v1/memory/mem-1":
             return _FakeResponse(200, V1_RECORD)
         if method == "PUT" and path == "/api/memories/mem-1":
@@ -141,7 +179,7 @@ class _TransportClient:
             return _FakeResponse(200, V1_RECORD)
         if method == "GET" and path == "/api/memories":
             return _FakeResponse(200, [LEGACY_MEMORY])
-        if method == "DELETE" and path == "/api/memories/mem-1":
+        if method == "DELETE" and path in ("/api/memories/mem-1", "/api/v1/memory/mem-1"):
             return _FakeResponse(204, None)
         raise AssertionError(f"Unexpected transport request: {method} {path}")
 
@@ -150,6 +188,34 @@ class _TransportClient:
     gateway is None, f"gateway test deps unavailable: {_GATEWAY_IMPORT_ERROR}"
 )
 class TransportParityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_capabilities_parity_for_shared_backend_and_tiers(self) -> None:
+        backend = {
+            "status": "ok",
+            "url": "http://127.0.0.1:7010",
+            "api": "reachable",
+            "db": "ok",
+            "vector_store": "ok",
+            "probe": "readyz",
+        }
+        with (
+            patch("_gateway_src.main._get_backend_status", return_value=backend),
+            patch.object(mcp_transport, "_get_backend_status", return_value=backend),
+            patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=False),
+            patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
+        ):
+            gateway_caps = await gateway.brain_capabilities()
+            transport_caps = await mcp_transport.brain_capabilities()
+
+        self.assertEqual(gateway_caps["backend"], transport_caps["backend"])
+        self.assertEqual(gateway_caps["tier_1_core"]["tools"], transport_caps["tier_1_core"]["tools"])
+        self.assertEqual(gateway_caps["tier_3_admin"]["tools"], transport_caps["tier_3_admin"]["tools"])
+        self.assertEqual(
+            set(gateway_caps["tier_2_advanced"]["tools"]),
+            set(transport_caps["tier_2_advanced"]["tools"]),
+        )
+        self.assertEqual(gateway_caps["obsidian"]["status"], transport_caps["obsidian"]["status"])
+        self.assertEqual(gateway_caps["obsidian"]["tools"], transport_caps["obsidian"]["tools"])
+
     async def test_store_parity_between_stdio_and_http(self) -> None:
         with (
             patch("_gateway_src.main._client", return_value=_GatewayClient()),
@@ -220,6 +286,34 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         ):
             gateway_result = await gateway.brain_delete("mem-1")
             transport_result = await mcp_transport.brain_delete("mem-1")
+        self.assertEqual(transport_result, gateway_result)
+
+    async def test_sync_check_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_sync_check(match_key="mk-1")
+            transport_result = await mcp_transport.brain_sync_check(match_key="mk-1")
+        self.assertEqual(transport_result, gateway_result)
+
+    async def test_upsert_bulk_parity_between_stdio_and_http(self) -> None:
+        payload = [{"match_key": "mk-1", "content": "payload"}]
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_upsert_bulk(payload)
+            transport_result = await mcp_transport.brain_upsert_bulk(payload)
+        self.assertEqual(transport_result, gateway_result)
+
+    async def test_maintain_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_maintain(dry_run=True)
+            transport_result = await mcp_transport.brain_maintain(dry_run=True)
         self.assertEqual(transport_result, gateway_result)
 
 

@@ -1,0 +1,7 @@
+{
+  "max_search_top_k": 100,
+  "max_list_limit": 200,
+  "max_sync_limit": 200,
+  "max_bulk_items": 100
+}
+

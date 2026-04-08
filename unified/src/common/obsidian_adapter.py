@@ -47,6 +47,64 @@ def _compute_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
+def _configured_vault_names_from_env() -> list[str]:
+    """Best-effort discovery of vault names from env configuration."""
+    names: set[str] = set()
+
+    paths_raw = os.environ.get("OBSIDIAN_VAULT_PATHS")
+    if paths_raw:
+        parsed = _parse_vault_paths_mapping(paths_raw)
+        names.update(str(k).strip() for k in parsed.keys() if str(k).strip())
+
+    prefix = "OBSIDIAN_VAULT_"
+    suffix = "_PATH"
+    for key in os.environ:
+        if not (key.startswith(prefix) and key.endswith(suffix)):
+            continue
+        raw_name = key[len(prefix) : -len(suffix)].strip()
+        if not raw_name:
+            continue
+        # OBSIDIAN_VAULT_FOO_BAR_PATH -> "FOO BAR"
+        names.add(raw_name.replace("_", " "))
+
+    return sorted(names)
+
+
+def _parse_vault_paths_mapping(raw: str) -> dict[str, str]:
+    """Parse OBSIDIAN_VAULT_PATHS from JSON or legacy `name:path,name:path` format."""
+    text = raw.strip()
+    if not text:
+        return {}
+
+    # Preferred format: JSON object
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        return {
+            str(k).strip(): str(v).strip()
+            for k, v in parsed.items()
+            if str(k).strip() and str(v).strip()
+        }
+
+    # Legacy format: "Name:/path,Other:/path2" (optionally wrapped in braces)
+    if text.startswith("{") and text.endswith("}"):
+        text = text[1:-1].strip()
+
+    result: dict[str, str] = {}
+    for item in text.split(","):
+        pair = item.strip()
+        if not pair or ":" not in pair:
+            continue
+        name, path = pair.split(":", 1)
+        name = name.strip().strip("'\"")
+        path = path.strip().strip("'\"")
+        if name and path:
+            result[name] = path
+    return result
+
+
 def _clean_cli_output(raw: str) -> str:
     lines: list[str] = []
     for line in raw.splitlines():
@@ -282,8 +340,15 @@ class ObsidianCliAdapter:
         Returns:
             List of vault names
         """
-        raw = await self._run("vaults")
-        return [line.strip() for line in raw.splitlines() if line.strip()]
+        configured = _configured_vault_names_from_env()
+        try:
+            raw = await self._run("vaults")
+            cli_names = [line.strip() for line in raw.splitlines() if line.strip()]
+            return sorted(set(cli_names) | set(configured))
+        except ObsidianCliError:
+            if configured:
+                return configured
+            raise
 
     @staticmethod
     def _validate_vault_path(vault: str, path: str | None = None) -> None:
@@ -300,16 +365,34 @@ class ObsidianCliAdapter:
     ) -> list[str]:
         """
         List markdown files in a vault.
-
-        Args:
-            vault: Vault name
-            folder: Optional subfolder to filter
-            limit: Maximum number of files to return
-
-        Returns:
-            List of file paths
+        Tries direct filesystem listing first, falls back to CLI.
         """
         self._validate_vault_path(vault, folder)
+
+        # Try direct filesystem access
+        vault_root = await self._get_vault_path(vault)
+        if vault_root:
+            base_path = Path(vault_root)
+            if folder:
+                base_path = base_path / folder
+
+            if base_path.exists() and base_path.is_dir():
+                try:
+                    # Recursive search for .md files
+                    paths = []
+                    for p in base_path.rglob("*.md"):
+                        if p.is_file():
+                            # Return path relative to vault root
+                            rel_path = p.relative_to(Path(vault_root))
+                            paths.append(str(rel_path))
+                            if limit and len(paths) >= limit:
+                                break
+                    return paths
+                except Exception:
+                    # Fallback to CLI on error
+                    pass
+
+        # CLI Fallback
         args = ["files", "ext=md", f"vault={vault}"]
         if folder:
             args.append(f"folder={folder}")
@@ -322,15 +405,62 @@ class ObsidianCliAdapter:
     async def read_note(self, vault: str, path: str) -> ObsidianNote:
         """
         Read a note from Obsidian.
-
-        Args:
-            vault: Vault name
-            path: Note path within vault
-
-        Returns:
-            ObsidianNote with content and metadata
+        Tries direct filesystem access first, falls back to CLI.
         """
         self._validate_vault_path(vault, path)
+
+        # Try direct filesystem access
+        vault_root = await self._get_vault_path(vault)
+        if vault_root:
+            full_path = Path(vault_root) / path
+            if full_path.exists() and full_path.is_file():
+                try:
+                    import aiofiles
+
+                    async with aiofiles.open(
+                        full_path, mode="r", encoding="utf-8"
+                    ) as f:
+                        raw_content = await f.read()
+
+                    frontmatter, body = _parse_frontmatter(raw_content)
+                    # For direct read, we only get tags from frontmatter
+                    # Inline tags (#tag) are not parsed yet without CLI
+                    tags = _merge_tags(frontmatter, [])
+                    title = _derive_title(path, frontmatter, body)
+
+                    return ObsidianNote(
+                        vault=vault,
+                        path=path,
+                        title=title,
+                        content=raw_content,
+                        frontmatter=frontmatter,
+                        tags=tags,
+                        file_hash=_compute_hash(raw_content),
+                    )
+                except ImportError:
+                    raw_content = await asyncio.get_running_loop().run_in_executor(
+                        None,
+                        lambda: full_path.read_text(encoding="utf-8"),
+                    )
+
+                    frontmatter, body = _parse_frontmatter(raw_content)
+                    tags = _merge_tags(frontmatter, [])
+                    title = _derive_title(path, frontmatter, body)
+
+                    return ObsidianNote(
+                        vault=vault,
+                        path=path,
+                        title=title,
+                        content=raw_content,
+                        frontmatter=frontmatter,
+                        tags=tags,
+                        file_hash=_compute_hash(raw_content),
+                    )
+                except Exception:
+                    # Fallback to CLI on error
+                    pass
+
+        # CLI Fallback
         content = await self._run("read", f"path={path}", f"vault={vault}")
         tags_raw = await self._run(
             "tags", f"path={path}", "format=json", f"vault={vault}"
@@ -360,6 +490,7 @@ class ObsidianCliAdapter:
                     for line in tags_raw.splitlines()
                     if line.strip()
                 ]
+
         tags = _merge_tags(frontmatter, cli_tags)
         title = _derive_title(path, frontmatter, body)
         return ObsidianNote(
@@ -448,16 +579,13 @@ class ObsidianCliAdapter:
                 _VAULT_PATHS_CACHE[vault] = path
                 return path
 
-            # Try JSON config: OBSIDIAN_VAULT_PATHS
-            paths_json = os.environ.get("OBSIDIAN_VAULT_PATHS")
-            if paths_json:
-                try:
-                    paths_map = json.loads(paths_json)
-                    if isinstance(paths_map, dict) and vault in paths_map:
-                        _VAULT_PATHS_CACHE[vault] = paths_map[vault]
-                        return paths_map[vault]
-                except json.JSONDecodeError:
-                    pass
+            # Try aggregated config: OBSIDIAN_VAULT_PATHS
+            paths_raw = os.environ.get("OBSIDIAN_VAULT_PATHS")
+            if paths_raw:
+                paths_map = _parse_vault_paths_mapping(paths_raw)
+                if vault in paths_map:
+                    _VAULT_PATHS_CACHE[vault] = paths_map[vault]
+                    return paths_map[vault]
 
             return None
 

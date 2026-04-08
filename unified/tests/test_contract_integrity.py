@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from src.capabilities_manifest import load_capabilities_manifest
+from src.capabilities_metadata import load_capabilities_metadata
+from src.http_error_adapter import backend_error_message
+from src.memory_paths import memory_absolute_path
+from src.request_builders import (
+    build_find_list_payload,
+    normalize_updated_by,
+)
+from src.runtime_limits import load_runtime_limits
+
+
+def _contracts_dir() -> Path:
+    return Path(__file__).resolve().parents[1] / "contracts"
+
+
+def test_all_contract_files_are_valid_json() -> None:
+    for path in _contracts_dir().glob("*.json"):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert isinstance(data, dict), f"{path.name} must contain JSON object"
+
+
+def test_capabilities_contract_is_loaded_by_adapter() -> None:
+    manifest = load_capabilities_manifest()
+    raw = json.loads(
+        (_contracts_dir() / "capabilities_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["core_tools"] == raw["core_tools"]
+    assert manifest["advanced_tools"] == raw["advanced_tools"]
+    assert manifest["admin_tools"] == raw["admin_tools"]
+
+
+def test_capabilities_metadata_contract_is_loaded_by_adapter() -> None:
+    metadata = load_capabilities_metadata()
+    raw = json.loads(
+        (_contracts_dir() / "capabilities_metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["api_version"] == raw["api_version"]
+    assert metadata["schema_changelog"] == raw["schema_changelog"]
+
+
+def test_request_contract_defaults_are_applied() -> None:
+    payload = build_find_list_payload(limit=3, filters={})
+    assert payload["query"] is None
+    assert payload["sort"] == "updated_at_desc"
+    assert normalize_updated_by("  ") == "agent"
+
+
+def test_runtime_limits_contract_is_loaded() -> None:
+    limits = load_runtime_limits()
+    raw = json.loads(
+        (_contracts_dir() / "runtime_limits.json").read_text(encoding="utf-8")
+    )
+    assert limits["max_search_top_k"] == raw["max_search_top_k"]
+    assert limits["max_list_limit"] == raw["max_list_limit"]
+    assert limits["max_sync_limit"] == raw["max_sync_limit"]
+    assert limits["max_bulk_items"] == raw["max_bulk_items"]
+
+
+def test_memory_paths_contract_is_loaded() -> None:
+    raw = json.loads((_contracts_dir() / "memory_paths.json").read_text(encoding="utf-8"))
+    assert memory_absolute_path("find") == f'{raw["memory_base"]}{raw["paths"]["find"]}'
+    assert memory_absolute_path("write") == f'{raw["memory_base"]}{raw["paths"]["write"]}'
+
+
+def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
+    monkeypatch.setenv("ENV", "production")
+    msg = backend_error_message(500, {"detail": "secret"})
+    assert "500" in msg
+    assert "secret" not in msg

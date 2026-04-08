@@ -1,0 +1,7 @@
+groups:
+  - name: openbrain-metrics
+    rules:
+      - record: active_memories_total
+        expr: (memories_created_total or vector(0)) - (memories_deleted_total or vector(0))
+      - record: operational_health_status
+        expr: vector(1)

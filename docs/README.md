@@ -32,3 +32,20 @@ OpenBrain supports several explicit write modes to prevent accidental data loss:
 - **Local**: Unauthenticated access on port 7010.
 - **Remote**: Mandatory OIDC (Auth0) authentication when `PUBLIC_MODE=true`.
 - **System**: Internal calls between MCP and REST use `X-Internal-Key`.
+
+## Architecture Decisions
+
+- [ADR-0001: Architecture Baseline and Module Ownership](./adr/ADR-0001-architecture-baseline.md)
+- [ADR-0002: Canonical MCP Transport and Compatibility Posture](./adr/ADR-0002-canonical-mcp-transport.md)
+
+## Iteration Tracking (2026-04-08)
+
+- [Iteration Synthesis](./ITERATION_SYNTHESIS_2026-04-08.md)
+- [Iteration Reports Index](./ITERATION_REPORTS_INDEX_2026-04-08.md)
+- [Cleanup Register](./CLEANUP_REGISTER_2026-04-08.md)
+- [Merge Readiness Snapshot](./MERGE_READINESS_2026-04-08.md)
+
+## Archive
+
+- [Iteration Archive](./archive/iterations/2026-04-08/)
+- [Legacy Docs Archive](./archive/legacy/2026-04-07/README.md)
