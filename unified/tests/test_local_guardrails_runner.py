@@ -35,3 +35,8 @@ def test_local_guardrails_runner_stops_on_first_failure(monkeypatch) -> None:
     monkeypatch.setattr(module, "run_step", _run_step)
     assert module.main() == 2
     assert seen == [module.GUARDRAIL_STEPS[0][0], module.GUARDRAIL_STEPS[1][0]]
+
+
+def test_local_guardrails_includes_monitoring_contract_step() -> None:
+    module = _load_local_guardrails_module()
+    assert ("monitoring contract", "scripts/validate_monitoring_contract.py") in module.GUARDRAIL_STEPS

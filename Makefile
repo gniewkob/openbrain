@@ -6,7 +6,7 @@ UNIFIED_PIP := $(ROOT)/.venv/bin/pip
 GATEWAY_PYTHON := $(ROOT)/unified/mcp-gateway/.venv/bin/python
 GATEWAY_PIP := $(ROOT)/unified/mcp-gateway/.venv/bin/pip
 
-.PHONY: help check-unified-venv check-gateway-venv bootstrap-unified-venv bootstrap-gateway-venv test-unified test-gateway test pr-readiness
+.PHONY: help check-unified-venv check-gateway-venv bootstrap-unified-venv bootstrap-gateway-venv test-unified test-gateway test pr-readiness monitoring-check
 
 help:
 	@echo "Available targets:"
@@ -57,3 +57,6 @@ test: test-unified test-gateway
 
 pr-readiness: check-unified-venv
 	"$(UNIFIED_PYTHON)" scripts/check_pr_readiness.py
+
+monitoring-check: check-unified-venv
+	"$(UNIFIED_PYTHON)" scripts/validate_monitoring_contract.py

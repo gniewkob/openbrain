@@ -126,7 +126,8 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces capabilities status truthfulness via `scripts/check_capabilities_truthfulness.py` (health contract + fallback probe invariants).
 - `Unified Smoke Tests / guardrails` enforces audit semantics via `scripts/check_audit_semantics.py` (`created_by/updated_by` invariants at schema/API/write boundaries).
 - `Unified Smoke Tests / guardrails` enforces Obsidian gating/contract semantics via `scripts/check_obsidian_contract.py` (feature-flag + capabilities + manifest subset checks).
-- `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + capabilities truthfulness + audit semantics + Obsidian contract).
+- `Unified Smoke Tests / guardrails` enforces monitoring dashboard contract via `scripts/validate_monitoring_contract.py` (dashboard metric references must remain inside the declared contract).
+- `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
 - `Unified Smoke Tests / guardrails` runs lightweight pytest coverage for guardrail runners:
   - `unified/tests/test_local_guardrails_runner.py`
   - `unified/tests/test_repo_hygiene_guardrail.py`
@@ -135,6 +136,7 @@ CI guardrail:
   - `unified/tests/test_capabilities_truthfulness_guardrail.py`
   - `unified/tests/test_audit_semantics_guardrail.py`
   - `unified/tests/test_obsidian_contract_guardrail.py`
+  - `unified/tests/test_monitoring_contract_guardrail.py`
 
 Local PR readiness:
 - `python3 scripts/check_pr_readiness.py`
@@ -143,6 +145,10 @@ Local PR readiness:
   - `check_local_guardrails.py`
   - guardrail runner unit tests
   - contract integrity smoke (`test_contract_integrity.py`, `test_capabilities_response_contract.py`)
+
+Local monitoring contract check:
+- `make monitoring-check`
+- optional live-mode validation: `python3 scripts/validate_monitoring_contract.py --check-live --metrics-url http://127.0.0.1:9180/metrics`
 
 Branch protection policy (recommended):
 - Require pull request before merging.
