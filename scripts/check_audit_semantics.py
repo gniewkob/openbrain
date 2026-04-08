@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import sys
+import ast
 from pathlib import Path
 
 
@@ -19,24 +20,87 @@ def _fail(message: str) -> int:
     return 1
 
 
-def _extract_class_block(text: str, class_name: str) -> str:
-    pattern = rf"^class {class_name}\(BaseModel\):\n(?P<body>(?:    .*\n)+)"
-    match = re.search(pattern, text, flags=re.MULTILINE)
-    if not match:
-        raise RuntimeError(f"missing class definition: {class_name}")
-    return match.group("body")
+def _field_names_in_class(text: str, class_name: str) -> set[str]:
+    """Return annotated field names for a class using AST parsing."""
+    tree = ast.parse(text)
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        if node.name != class_name:
+            continue
+        names: set[str] = set()
+        for stmt in node.body:
+            if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                names.add(stmt.target.id)
+            elif isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name):
+                        names.add(target.id)
+        return names
+    raise RuntimeError(f"missing class definition: {class_name}")
+
+
+def _has_patch_actor_override(text: str) -> bool:
+    """Ensure PATCH endpoint binds updated_by to authenticated actor."""
+    tree = ast.parse(text)
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if node.name != "v1_update":
+            continue
+
+        saw_safe_data_override = False
+        uses_safe_data_in_update_call = False
+
+        for stmt in ast.walk(node):
+            if isinstance(stmt, ast.Assign):
+                if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Name):
+                    continue
+                if stmt.targets[0].id != "safe_data":
+                    continue
+                call = stmt.value
+                if not isinstance(call, ast.Call):
+                    continue
+                if not (
+                    isinstance(call.func, ast.Attribute)
+                    and call.func.attr == "model_copy"
+                    and isinstance(call.func.value, ast.Name)
+                    and call.func.value.id == "data"
+                ):
+                    continue
+                for kw in call.keywords:
+                    if kw.arg != "update" or not isinstance(kw.value, ast.Dict):
+                        continue
+                    for key, value in zip(kw.value.keys, kw.value.values):
+                        if (
+                            isinstance(key, ast.Constant)
+                            and key.value == "updated_by"
+                            and isinstance(value, ast.Name)
+                            and value.id == "actor"
+                        ):
+                            saw_safe_data_override = True
+
+            if isinstance(stmt, ast.Call):
+                if not (isinstance(stmt.func, ast.Name) and stmt.func.id == "update_memory"):
+                    continue
+                if len(stmt.args) >= 3 and isinstance(stmt.args[2], ast.Name):
+                    if stmt.args[2].id == "safe_data":
+                        uses_safe_data_in_update_call = True
+
+        return saw_safe_data_override and uses_safe_data_in_update_call
+    return False
 
 
 def _check_schemas() -> list[str]:
     errors: list[str] = []
     text = SCHEMAS.read_text(encoding="utf-8")
     try:
-        write_block = _extract_class_block(text, "MemoryWriteRecord")
+        write_fields = _field_names_in_class(text, "MemoryWriteRecord")
     except RuntimeError as exc:
         return [str(exc)]
-    if "created_by" in write_block:
+    if "created_by" in write_fields:
         errors.append("MemoryWriteRecord must not accept created_by from requests")
-    if "updated_by" in write_block:
+    if "updated_by" in write_fields:
         errors.append("MemoryWriteRecord must not accept updated_by from requests")
     return errors
 
@@ -44,8 +108,7 @@ def _check_schemas() -> list[str]:
 def _check_api_patch_override() -> list[str]:
     errors: list[str] = []
     text = API_V1_MEMORY.read_text(encoding="utf-8")
-    required_snippet = 'safe_data = data.model_copy(update={"updated_by": actor})'
-    if required_snippet not in text:
+    if not _has_patch_actor_override(text):
         errors.append(
             "PATCH endpoint must override request updated_by with authenticated actor"
         )
@@ -55,14 +118,16 @@ def _check_api_patch_override() -> list[str]:
 def _check_write_path_actor_binding() -> list[str]:
     errors: list[str] = []
     text = MEMORY_WRITES.read_text(encoding="utf-8")
-    required_snippets = (
-        "created_by=actor,",
-        '"updated_by": actor,',
-        "created_by=existing.created_by,",
+    required_patterns = (
+        r"created_by\s*=\s*actor",
+        r'"updated_by"\s*:\s*actor',
+        r"created_by\s*=\s*existing\.created_by",
     )
-    for snippet in required_snippets:
-        if snippet not in text:
-            errors.append(f"memory_writes.py missing required audit binding snippet: {snippet}")
+    for pattern in required_patterns:
+        if not re.search(pattern, text):
+            errors.append(
+                f"memory_writes.py missing required audit binding pattern: {pattern}"
+            )
     return errors
 
 
