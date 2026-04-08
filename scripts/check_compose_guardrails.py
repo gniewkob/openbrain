@@ -10,11 +10,7 @@ import sys
 COMPOSE_PATH = Path(__file__).resolve().parents[1] / "docker-compose.unified.yml"
 
 
-def main() -> int:
-    content = COMPOSE_PATH.read_text(encoding="utf-8")
-
-    # Variables must be provided by the environment (e.g. via start_unified.sh)
-    # so shared/public runs cannot silently inherit compose-level credential defaults.
+def find_missing_required_snippets(content: str) -> list[str]:
     required_snippets = [
         'POSTGRES_USER: ${POSTGRES_USER}',
         'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}',
@@ -22,22 +18,32 @@ def main() -> int:
         'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}',
         'postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}',
     ]
+    return [snippet for snippet in required_snippets if snippet not in content]
 
-    missing = [snippet for snippet in required_snippets if snippet not in content]
-    if missing:
-        print("docker-compose.unified.yml is missing expected guardrail snippets:", file=sys.stderr)
-        for snippet in missing:
-            print(f"  - {snippet}", file=sys.stderr)
-        return 1
 
+def find_forbidden_snippets(content: str) -> list[str]:
     forbidden_snippets = [
         'pg_isready -U postgres',
         'postgresql+asyncpg://postgres:postgres',
         ':-postgres',
         ':-admin',
     ]
+    return [snippet for snippet in forbidden_snippets if snippet in content]
 
-    present_forbidden = [snippet for snippet in forbidden_snippets if snippet in content]
+
+def main() -> int:
+    content = COMPOSE_PATH.read_text(encoding="utf-8")
+
+    # Variables must be provided by the environment (e.g. via start_unified.sh)
+    # so shared/public runs cannot silently inherit compose-level credential defaults.
+    missing = find_missing_required_snippets(content)
+    if missing:
+        print("docker-compose.unified.yml is missing expected guardrail snippets:", file=sys.stderr)
+        for snippet in missing:
+            print(f"  - {snippet}", file=sys.stderr)
+        return 1
+
+    present_forbidden = find_forbidden_snippets(content)
     if present_forbidden:
         print("docker-compose.unified.yml still contains hardcoded dev credentials or defaults:", file=sys.stderr)
         for snippet in present_forbidden:
