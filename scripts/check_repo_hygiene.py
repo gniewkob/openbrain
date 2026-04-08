@@ -15,12 +15,16 @@ FORBIDDEN_PATHS = (
 )
 
 
-def main() -> int:
+def find_forbidden_artifacts(root: Path, forbidden_paths: tuple[str, ...]) -> list[str]:
     violations: list[str] = []
-    for rel in FORBIDDEN_PATHS:
-        path = ROOT / rel
-        if path.exists():
+    for rel in forbidden_paths:
+        if (root / rel).exists():
             violations.append(rel)
+    return violations
+
+
+def main() -> int:
+    violations = find_forbidden_artifacts(ROOT, FORBIDDEN_PATHS)
 
     if violations:
         print("Repository hygiene check failed; forbidden artifacts found:", file=sys.stderr)
