@@ -36,8 +36,6 @@ jobs:
       run: |
         cd unified
         uv sync --group dev
-        uv pip install --python .venv/bin/python pytest-cov
-        uv pip install --python .venv/bin/python pytest-cov
         python -m pip install --upgrade pip
         pip install ruff
     
@@ -238,7 +236,7 @@ jobs:
         DISABLE_SECRET_SCANNING: "1"
       run: |
         cd unified
-        uv run pytest tests/ -v \
+        .venv/bin/pytest tests/ -v \
           --ignore=tests/integration \
           --ignore=tests/test_api_endpoints_live.py \
           --ignore=tests/test_endpoints_summary.py \
