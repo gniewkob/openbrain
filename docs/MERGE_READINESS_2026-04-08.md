@@ -49,12 +49,11 @@ Latest local verification (2026-04-08):
 - **Deferred**
   - Controlled live Obsidian E2E (real vault I/O with explicit environment approval).
   - Additional doc consolidation outside current governance stream.
-  - External provider check triage (`GitGuardian Security Checks`) outside repo-side CI logic.
 
 ## Current check posture (latest branch head)
 
 - Internal CI checks: **pass** (`lint`, `test`, `security`, `contract-integrity`, and full `Unified Smoke Tests` set).
-- External check: **fail** (`GitGuardian Security Checks`) — requires provider-side incident triage/allowlisting in GitGuardian dashboard.
+- External check: **pass** (`GitGuardian Security Checks`) after branch history rewrite removing flagged workflow literals from PR commit range.
 
 ## Risks before merge
 
