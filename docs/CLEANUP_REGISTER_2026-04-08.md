@@ -11,6 +11,7 @@ before final merge to keep repository hygiene.
 | `docs/ITERATION_REPORT_2026-04-08_*.md` | Iteration logs | ✅ Archived under `docs/archive/iterations/2026-04-08/` + indexed | High audit value while iterating, high noise as permanent long-term docs | Done (2026-04-08) |
 | `docs/COMPLETION_PLAN_5_5.md`, `docs/QUICK_START_5_5.md`, `docs/ROADMAP_VISUAL_5_5.md` | Plan artifacts | ✅ Archived under `docs/archive/legacy/2026-04-07/` | Potential duplication vs `docs/operating-manual.md` and `docs/architecture.md`; kept for history only | Done (2026-04-08) |
 | `docs/AUDIT_GAP_ANALYSIS_360_2026-04-07.md`, `docs/audit-report-360-2026-04-07.md` | Audit docs | ✅ Archived under `docs/archive/legacy/2026-04-07/` | Reduce doc sprawl and conflicting sources of truth in top-level `docs/` | Done (2026-04-08) |
+| `unified/.controlled-vault/` | Local controlled E2E temp vault | ✅ Removed after live test execution | Temporary test-only filesystem artifact; must not persist in repo tree | Done (2026-04-08) |
 
 ## Keep (not cleanup candidates)
 

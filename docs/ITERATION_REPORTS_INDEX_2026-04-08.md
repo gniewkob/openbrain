@@ -8,7 +8,7 @@ Cleanup tracker:
 - `docs/CLEANUP_REGISTER_2026-04-08.md`
 
 Detailed iteration logs:
-- `docs/archive/iterations/2026-04-08/ITERATION_REPORT_2026-04-08_01.md` ... `ITERATION_REPORT_2026-04-08_53.md`
+- `docs/archive/iterations/2026-04-08/ITERATION_REPORT_2026-04-08_01.md` ... `ITERATION_REPORT_2026-04-08_54.md`
 
 Recommended reading order:
 1. `ITERATION_SYNTHESIS_2026-04-08.md` (current state and decisions)
@@ -30,3 +30,4 @@ Stream mapping (high level):
 - 51: controlled Obsidian E2E roundtrip coverage (write/read/sync), execution remains opt-in by env
 - 52: Obsidian runtime execution hardening (env passthrough + legacy vault-map parsing + backend_unavailable skip semantics)
 - 53: controlled Obsidian live E2E closure (`2 passed`) on isolated container-reachable vault mapping
+- 54: documentation consolidation pass (execution report sync + cleanup register update)
