@@ -49,7 +49,7 @@ Latest local verification (2026-04-08):
   - Obsidian adapter hardening:
     - vault discovery now falls back to configured env vault mappings when CLI is unavailable.
 - **Deferred**
-  - Controlled live Obsidian E2E (real vault I/O with explicit environment approval).
+  - Controlled live Obsidian E2E execution in target environment (roundtrip test coverage exists, but runtime execution still needs explicit environment approval/variables).
   - Additional doc consolidation outside current governance stream.
 
 ## Current check posture (latest branch head)
