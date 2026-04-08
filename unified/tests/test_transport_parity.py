@@ -216,6 +216,55 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gateway_caps["obsidian"]["status"], transport_caps["obsidian"]["status"])
         self.assertEqual(gateway_caps["obsidian"]["tools"], transport_caps["obsidian"]["tools"])
 
+    async def test_capabilities_parity_for_degraded_backend_state(self) -> None:
+        backend = {
+            "status": "degraded",
+            "url": "http://127.0.0.1:7010",
+            "api": "reachable",
+            "db": "degraded",
+            "vector_store": "unknown",
+            "probe": "healthz_fallback",
+            "reason": "/readyz probe failed: timeout",
+        }
+        with (
+            patch("_gateway_src.main._get_backend_status", return_value=backend),
+            patch.object(mcp_transport, "_get_backend_status", return_value=backend),
+            patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=False),
+            patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
+        ):
+            gateway_caps = await gateway.brain_capabilities()
+            transport_caps = await mcp_transport.brain_capabilities()
+
+        self.assertEqual(gateway_caps["backend"], transport_caps["backend"])
+        self.assertEqual(gateway_caps["health"], transport_caps["health"])
+        self.assertEqual(gateway_caps["health"]["overall"], "degraded")
+        self.assertEqual(gateway_caps["health"]["components"]["api"], "healthy")
+        self.assertEqual(gateway_caps["health"]["components"]["db"], "degraded")
+
+    async def test_capabilities_parity_for_unavailable_backend_state(self) -> None:
+        backend = {
+            "status": "unavailable",
+            "url": "http://127.0.0.1:7010",
+            "api": "unreachable",
+            "db": "unknown",
+            "vector_store": "unknown",
+            "probe": "api_health_fallback",
+            "reason": "/readyz probe failed: boom; /healthz probe failed: boom; /api/v1/health probe failed: boom",
+        }
+        with (
+            patch("_gateway_src.main._get_backend_status", return_value=backend),
+            patch.object(mcp_transport, "_get_backend_status", return_value=backend),
+            patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=False),
+            patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
+        ):
+            gateway_caps = await gateway.brain_capabilities()
+            transport_caps = await mcp_transport.brain_capabilities()
+
+        self.assertEqual(gateway_caps["backend"], transport_caps["backend"])
+        self.assertEqual(gateway_caps["health"], transport_caps["health"])
+        self.assertEqual(gateway_caps["health"]["overall"], "unavailable")
+        self.assertEqual(gateway_caps["health"]["components"]["api"], "unavailable")
+
     async def test_store_parity_between_stdio_and_http(self) -> None:
         with (
             patch("_gateway_src.main._client", return_value=_GatewayClient()),
