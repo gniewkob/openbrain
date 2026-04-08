@@ -350,6 +350,8 @@ class ObsidianCliAdapter:
             full_path = Path(vault_root) / path
             if full_path.exists() and full_path.is_file():
                 try:
+                    import aiofiles
+
                     async with aiofiles.open(full_path, mode='r', encoding='utf-8') as f:
                         raw_content = await f.read()
                     
@@ -359,6 +361,25 @@ class ObsidianCliAdapter:
                     tags = _merge_tags(frontmatter, [])
                     title = _derive_title(path, frontmatter, body)
                     
+                    return ObsidianNote(
+                        vault=vault,
+                        path=path,
+                        title=title,
+                        content=raw_content,
+                        frontmatter=frontmatter,
+                        tags=tags,
+                        file_hash=_compute_hash(raw_content),
+                    )
+                except ImportError:
+                    raw_content = await asyncio.get_running_loop().run_in_executor(
+                        None,
+                        lambda: full_path.read_text(encoding="utf-8"),
+                    )
+
+                    frontmatter, body = _parse_frontmatter(raw_content)
+                    tags = _merge_tags(frontmatter, [])
+                    title = _derive_title(path, frontmatter, body)
+
                     return ObsidianNote(
                         vault=vault,
                         path=path,

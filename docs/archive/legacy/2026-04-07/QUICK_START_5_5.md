@@ -97,7 +97,7 @@ chmod +x scripts/backup_postgres.sh
 # Test na dev bazie
 POSTGRES_HOST=localhost \
 POSTGRES_USER=postgres \
-POSTGRES_PASSWORD=your_password \
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
 POSTGRES_DB=openbrain_unified \
 ./scripts/backup_postgres.sh --full
 
@@ -111,7 +111,7 @@ ls -la backups/
 # 1. Dodaj do crontab (codzienny backup o 2:00 AM)
 crontab -e
 # Dodaj linię:
-0 2 * * * cd /path/to/openbrain && POSTGRES_PASSWORD=xxx ./scripts/backup_postgres.sh --full >> /var/log/openbrain-backup.log 2>&1
+0 2 * * * cd /path/to/openbrain && POSTGRES_PASSWORD=$POSTGRES_PASSWORD ./scripts/backup_postgres.sh --full >> /var/log/openbrain-backup.log 2>&1
 
 # 2. Skonfiguruj S3 (opcjonalnie)
 export BACKUP_S3_BUCKET=your-backup-bucket

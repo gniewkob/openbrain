@@ -63,7 +63,11 @@ jobs:
         env:
           SKIP_OBSIDIAN_SYNC_TEST: "1"
           SKIP_INTEGRATION_TESTS: "1"
-        run: python -m unittest discover -s tests -v
+        run: |
+          python -m pytest -q tests \
+            --ignore=tests/integration \
+            --ignore=tests/test_api_endpoints_live.py \
+            --ignore=tests/test_endpoints_summary.py
 
   gateway-smoke:
     runs-on: ubuntu-latest
@@ -108,7 +112,7 @@ jobs:
         run: |
           pip install -e ./unified
           pip install -e ./unified/mcp-gateway
-          pip install pytest
+          pip install pytest pytest-asyncio
       - name: Run unified contract integrity
         run: |
           python -m pytest -q \

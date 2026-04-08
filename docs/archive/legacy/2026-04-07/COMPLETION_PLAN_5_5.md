@@ -247,7 +247,7 @@ dev = [
 ```yaml
     - name: Run tests with coverage
       env:
-        DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/openbrain_test
+        DATABASE_URL: postgresql+asyncpg://[DB_USER]:${DB_PASSWORD}@localhost:5432/openbrain_test
         DISABLE_SECRET_SCANNING: "1"
       run: |
         cd unified
@@ -518,7 +518,7 @@ class DatabaseConfig(BaseSettings):
     
     @property
     def url(self) -> str:
-        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
+        return build_asyncpg_dsn(self.user, self.password, self.host, self.port, self.name)
 
 class AuthConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AUTH_")
