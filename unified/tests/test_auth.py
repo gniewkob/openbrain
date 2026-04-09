@@ -131,6 +131,26 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="redirect loops"):
             config.get_config()
 
+    def test_mcp_health_probe_timeout_from_env(self, monkeypatch):
+        """Test health probe timeout can be configured via MCP env var."""
+        from src import config
+
+        monkeypatch.setenv("MCP_HEALTH_PROBE_TIMEOUT_S", "2.5")
+        config.get_config.cache_clear()
+
+        cfg = config.get_config()
+        assert cfg.mcp.health_probe_timeout == 2.5
+
+    def test_mcp_health_probe_timeout_must_be_positive(self, monkeypatch):
+        """Test non-positive health probe timeout is rejected."""
+        from src import config
+
+        monkeypatch.setenv("MCP_HEALTH_PROBE_TIMEOUT_S", "0")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="MCP_HEALTH_PROBE_TIMEOUT_S"):
+            config.get_config()
+
 
 class TestInternalAPIKey:
     """Test internal API key handling."""

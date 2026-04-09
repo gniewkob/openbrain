@@ -373,6 +373,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         old_brain_url = mcp_transport.BRAIN_URL
         old_backend_timeout = mcp_transport.BACKEND_TIMEOUT
+        old_health_probe_timeout = mcp_transport.HEALTH_PROBE_TIMEOUT
         old_source_system = mcp_transport.MCP_SOURCE_SYSTEM
         old_streamable_path = mcp_transport.STREAMABLE_HTTP_PATH
         old_ngrok_host = mcp_transport._ngrok_host
@@ -381,6 +382,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             mcp=SimpleNamespace(
                 brain_url="http://127.0.0.1:7010",
                 backend_timeout=12.5,
+                health_probe_timeout=2.0,
                 source_system="gateway",
                 streamable_http_path="/events",
             ),
@@ -395,6 +397,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(mcp_transport.BRAIN_URL, "http://127.0.0.1:7010")
         self.assertEqual(mcp_transport.BACKEND_TIMEOUT, 12.5)
+        self.assertEqual(mcp_transport.HEALTH_PROBE_TIMEOUT, 2.0)
         self.assertEqual(mcp_transport.MCP_SOURCE_SYSTEM, "gateway")
         self.assertEqual(mcp_transport.STREAMABLE_HTTP_PATH, "/events")
         self.assertEqual(mcp_transport._ngrok_host, "abc123.ngrok-free.app")
@@ -410,6 +413,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
 
         mcp_transport.BRAIN_URL = old_brain_url
         mcp_transport.BACKEND_TIMEOUT = old_backend_timeout
+        mcp_transport.HEALTH_PROBE_TIMEOUT = old_health_probe_timeout
         mcp_transport.MCP_SOURCE_SYSTEM = old_source_system
         mcp_transport.STREAMABLE_HTTP_PATH = old_streamable_path
         mcp_transport._ngrok_host = old_ngrok_host
