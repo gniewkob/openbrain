@@ -205,7 +205,7 @@ class MCPConfig(BaseSettings):
             raise ValueError("BRAIN_URL must not include path")
         if parsed.query or parsed.fragment:
             raise ValueError("BRAIN_URL must not include query params or fragment")
-        return v
+        return v.rstrip("/")
 
     @field_validator("source_system")
     @classmethod
