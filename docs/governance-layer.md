@@ -275,9 +275,7 @@ These items are known architectural limitations, not current production blockers
 
 - **Export redaction in application code**: The redaction rules in `_export_record` are implemented as application logic. This is acceptable while the policy surface is small, but a multi-tenant or compliance-heavy deployment should move redaction into a dedicated policy layer. Currently: admin and internal service accounts both receive unredacted export data.
 
-- **In-memory telemetry**: `TelemetryRegistry` is a per-process in-memory counter store. Metrics reset on restart and are not shared across uvicorn workers. This is acceptable for single-worker Docker deployments but not for scaled-out environments.
-
-- **Search never returns superseded records**: This is already enforced via `Memory.status == "active"` filters in all search paths. Add an explicit regression test to guard this invariant.
+- **Telemetry backend fallback visibility**: telemetry counters support `memory` and `redis` backends, with safe fallback to `memory` when Redis is unavailable. This is operationally safe, but scaled deployments should monitor and alert on fallback events to avoid silently losing cross-worker aggregation.
 
 ## Bottom Line
 
