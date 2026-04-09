@@ -191,6 +191,26 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="BRAIN_URL"):
             config.get_config()
 
+    def test_mcp_brain_url_rejects_query(self, monkeypatch):
+        """Test backend URL with query string is rejected."""
+        from src import config
+
+        monkeypatch.setenv("BRAIN_URL", "https://openbrain.internal:7010?x=1")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="query"):
+            config.get_config()
+
+    def test_mcp_brain_url_rejects_fragment(self, monkeypatch):
+        """Test backend URL with fragment is rejected."""
+        from src import config
+
+        monkeypatch.setenv("BRAIN_URL", "https://openbrain.internal:7010#frag")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="fragment"):
+            config.get_config()
+
     def test_mcp_source_system_from_env(self, monkeypatch):
         """Test source system can be configured via MCP env var."""
         from src import config
