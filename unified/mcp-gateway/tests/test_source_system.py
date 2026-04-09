@@ -9,6 +9,17 @@ gateway = load_gateway_main()
 
 
 class GatewaySourceSystemTests(unittest.TestCase):
+    def test_normalize_health_probe_timeout_accepts_valid_float(self) -> None:
+        self.assertEqual(gateway._normalize_health_probe_timeout(" 5.0 ", 30.0), 5.0)
+
+    def test_normalize_health_probe_timeout_rejects_over_backend_timeout(self) -> None:
+        with self.assertRaisesRegex(ValueError, "MCP_HEALTH_PROBE_TIMEOUT_S"):
+            gateway._normalize_health_probe_timeout("10", 5.0)
+
+    def test_normalize_health_probe_timeout_rejects_above_cap(self) -> None:
+        with self.assertRaisesRegex(ValueError, "MCP_HEALTH_PROBE_TIMEOUT_S"):
+            gateway._normalize_health_probe_timeout("31", 120.0)
+
     def test_normalize_backend_timeout_accepts_valid_float(self) -> None:
         self.assertEqual(gateway._normalize_backend_timeout(" 30 "), 30.0)
 
