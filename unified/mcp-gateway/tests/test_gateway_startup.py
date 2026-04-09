@@ -4,26 +4,33 @@ from __future__ import annotations
 
 import importlib
 import logging
+import os
 import sys
 import unittest
 
 
 class GatewayStartupTests(unittest.TestCase):
-    def _reload_main(self, key: str) -> None:
-        """Reload gateway main with given INTERNAL_API_KEY."""
-        import os
-
-        old_key = os.environ.get("INTERNAL_API_KEY")
-        os.environ["INTERNAL_API_KEY"] = key
+    def _reload_main_with_env(self, overrides: dict[str, str]) -> None:
+        """Reload gateway main with temporary env overrides."""
+        old_values: dict[str, str | None] = {
+            key: os.environ.get(key) for key in overrides
+        }
+        for key, value in overrides.items():
+            os.environ[key] = value
         try:
             sys.modules.pop("src.main", None)
             importlib.import_module("src.main")
         finally:
-            if old_key is None:
-                os.environ.pop("INTERNAL_API_KEY", None)
-            else:
-                os.environ["INTERNAL_API_KEY"] = old_key
+            for key, old_value in old_values.items():
+                if old_value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = old_value
             sys.modules.pop("src.main", None)
+
+    def _reload_main(self, key: str) -> None:
+        """Reload gateway main with given INTERNAL_API_KEY."""
+        self._reload_main_with_env({"INTERNAL_API_KEY": key})
 
     def test_short_key_emits_warning(self) -> None:
         with self.assertLogs("mcp_gateway", level=logging.WARNING) as cm:
@@ -54,6 +61,43 @@ class GatewayStartupTests(unittest.TestCase):
         except AssertionError:
             # assertLogs raises AssertionError if NO logs at all — that's fine
             pass
+
+    def test_invalid_brain_url_fails_fast(self) -> None:
+        with self.assertRaisesRegex(ValueError, "BRAIN_URL"):
+            self._reload_main_with_env(
+                {
+                    "INTERNAL_API_KEY": "a" * 32,
+                    "BRAIN_URL": "https://openbrain internal:7010",
+                }
+            )
+
+    def test_invalid_backend_timeout_fails_fast(self) -> None:
+        with self.assertRaisesRegex(ValueError, "BACKEND_TIMEOUT_S"):
+            self._reload_main_with_env(
+                {
+                    "INTERNAL_API_KEY": "a" * 32,
+                    "BACKEND_TIMEOUT_S": "0",
+                }
+            )
+
+    def test_probe_timeout_above_backend_fails_fast(self) -> None:
+        with self.assertRaisesRegex(ValueError, "MCP_HEALTH_PROBE_TIMEOUT_S"):
+            self._reload_main_with_env(
+                {
+                    "INTERNAL_API_KEY": "a" * 32,
+                    "BACKEND_TIMEOUT_S": "5",
+                    "MCP_HEALTH_PROBE_TIMEOUT_S": "6",
+                }
+            )
+
+    def test_invalid_source_system_fails_fast(self) -> None:
+        with self.assertRaisesRegex(ValueError, "MCP_SOURCE_SYSTEM"):
+            self._reload_main_with_env(
+                {
+                    "INTERNAL_API_KEY": "a" * 32,
+                    "MCP_SOURCE_SYSTEM": "Bad Value!",
+                }
+            )
 
 
 if __name__ == "__main__":
