@@ -3,7 +3,7 @@ Combined ASGI app — Industrial Grade Wrapper v2.
 
 This wrapper:
 1. Forwards REST API, health, OpenAPI docs, and OAuth discovery to FastAPI (rest_app)
-2. Redirects root (/) to /sse for ChatGPT convenience
+2. Redirects root (/) to configured streamable path for ChatGPT convenience
 3. Forwards everything else to FastMCP (authenticated when public exposure is enabled)
 """
 
@@ -11,13 +11,13 @@ import hmac
 import logging
 
 from .auth import INTERNAL_API_KEY, PUBLIC_EXPOSURE, _oidc
-from .mcp_transport import STREAMABLE_HTTP_PATH, mcp as mcp_server
+from . import mcp_transport
 from .main import app as rest_app
 
 _log = logging.getLogger("openbrain.combined")
 
 # Base FastMCP app
-mcp_app = mcp_server.streamable_http_app()
+mcp_app = mcp_transport.mcp.streamable_http_app()
 
 # Exact paths routed to the FastAPI REST application.
 _REST_EXACT = {
@@ -47,10 +47,11 @@ async def app(scope, receive, send):
 
         # Root redirect to MCP streamable HTTP path (for ChatGPT MCP discovery)
         if path == "/":
-            if STREAMABLE_HTTP_PATH == "/":
+            streamable_http_path = mcp_transport.STREAMABLE_HTTP_PATH
+            if streamable_http_path == "/":
                 _log.error(
                     "invalid_streamable_http_path",
-                    extra={"streamable_http_path": STREAMABLE_HTTP_PATH},
+                    extra={"streamable_http_path": streamable_http_path},
                 )
                 await send(
                     {
@@ -71,7 +72,7 @@ async def app(scope, receive, send):
                 {
                     "type": "http.response.start",
                     "status": 307,
-                    "headers": [(b"location", STREAMABLE_HTTP_PATH.encode("ascii"))],
+                    "headers": [(b"location", streamable_http_path.encode("ascii"))],
                 }
             )
             await send({"type": "http.response.body", "body": b""})

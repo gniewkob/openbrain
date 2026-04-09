@@ -62,7 +62,7 @@ class CombinedTransportContractTests(unittest.IsolatedAsyncioTestCase):
             "client": ("test", 12345),
         }
 
-        with patch.object(combined, "STREAMABLE_HTTP_PATH", "/"):
+        with patch.object(mcp_transport, "STREAMABLE_HTTP_PATH", "/"):
             await combined.app(scope, _receive, _send)
 
         self.assertGreaterEqual(len(events), 2)
@@ -74,6 +74,38 @@ class CombinedTransportContractTests(unittest.IsolatedAsyncioTestCase):
             events[1]["body"],
             b'{"detail":"Invalid MCP streamable transport path configuration"}',
         )
+
+    async def test_root_redirect_reads_streamable_path_from_transport_module(
+        self,
+    ) -> None:
+        events: list[dict] = []
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def _send(event: dict) -> None:
+            events.append(event)
+
+        scope = {
+            "type": "http",
+            "path": "/",
+            "method": "GET",
+            "headers": [],
+            "query_string": b"",
+            "scheme": "http",
+            "http_version": "1.1",
+            "server": ("test", 80),
+            "client": ("test", 12345),
+        }
+
+        with patch.object(mcp_transport, "STREAMABLE_HTTP_PATH", "/events"):
+            await combined.app(scope, _receive, _send)
+
+        self.assertGreaterEqual(len(events), 2)
+        self.assertEqual(events[0]["type"], "http.response.start")
+        self.assertEqual(events[0]["status"], 307)
+        headers = dict(events[0]["headers"])
+        self.assertEqual(headers.get(b"location"), b"/events")
 
 
 if __name__ == "__main__":
