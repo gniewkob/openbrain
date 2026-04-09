@@ -384,6 +384,16 @@ class TestConfigValidation:
         cfg = config.get_config()
         assert cfg.mcp.source_system == "codex_agent-1"
 
+    def test_mcp_source_system_is_normalized(self, monkeypatch):
+        """Test source system is normalized to trimmed lowercase form."""
+        from src import config
+
+        monkeypatch.setenv("SOURCE_SYSTEM", "  CoDeX_Agent-1  ")
+        config.get_config.cache_clear()
+
+        cfg = config.get_config()
+        assert cfg.mcp.source_system == "codex_agent-1"
+
     def test_mcp_source_system_format_validation(self, monkeypatch):
         """Test malformed source system is rejected."""
         from src import config

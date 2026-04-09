@@ -210,9 +210,10 @@ class MCPConfig(BaseSettings):
     @field_validator("source_system")
     @classmethod
     def validate_source_system(cls, v: str) -> str:
-        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", v or ""):
+        value = (v or "").strip().lower()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", value):
             raise ValueError("SOURCE_SYSTEM must match [a-z0-9][a-z0-9_-]{0,31}")
-        return v
+        return value
 
     @model_validator(mode="after")
     def validate_timeout_relationship(self) -> "MCPConfig":
