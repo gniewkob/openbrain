@@ -70,3 +70,13 @@ if ENABLE_HTTP_OBSIDIAN_TOOLS:
         )
         is False
     )
+
+
+def test_obsidian_contract_requires_disabled_reason_snippets() -> None:
+    module = _load_obsidian_contract_module()
+    errors = module._check_disabled_reason_snippets(
+        gateway_text="Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1",
+        http_text="Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport.",
+    )
+    assert any("gateway disabled reason missing snippet" in err for err in errors)
+    assert any("HTTP disabled reason missing snippet" in err for err in errors)
