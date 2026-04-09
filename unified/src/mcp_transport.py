@@ -52,6 +52,7 @@ ENABLE_HTTP_OBSIDIAN_TOOLS: bool = False
 MCP_SOURCE_SYSTEM: str = "other"
 _public_base = ""
 _ngrok_host = ""
+STREAMABLE_HTTP_PATH = "/sse"
 _CAPS = load_capabilities_manifest()
 _CAP_META = load_capabilities_metadata()
 CORE_TOOLS = _CAPS["core_tools"]
@@ -94,7 +95,7 @@ _transport_security = TransportSecuritySettings(
 
 mcp = FastMCP(
     name="OpenBrain",
-    streamable_http_path="/sse",
+    streamable_http_path=STREAMABLE_HTTP_PATH,
     transport_security=_transport_security,
     instructions=(
         "OpenBrain is a unified memory platform with 3 domains: "
