@@ -12,7 +12,7 @@ import math
 import re
 from urllib.parse import urlparse
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -139,7 +139,11 @@ class MCPConfig(BaseSettings):
     brain_url: str = Field(default="http://127.0.0.1:80", alias="BRAIN_URL")
     backend_timeout: float = Field(default=30.0, alias="BACKEND_TIMEOUT_S")
     health_probe_timeout: float = Field(default=5.0, alias="MCP_HEALTH_PROBE_TIMEOUT_S")
-    source_system: str = Field(default="other", alias="SOURCE_SYSTEM")
+    source_system: str = Field(
+        default="other",
+        alias="SOURCE_SYSTEM",
+        validation_alias=AliasChoices("MCP_SOURCE_SYSTEM", "SOURCE_SYSTEM"),
+    )
     streamable_http_path: str = Field(default="/sse")
 
     @field_validator("streamable_http_path")
@@ -215,7 +219,9 @@ class MCPConfig(BaseSettings):
     def validate_source_system(cls, v: str) -> str:
         value = (v or "").strip().lower()
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", value):
-            raise ValueError("SOURCE_SYSTEM must match [a-z0-9][a-z0-9_-]{0,31}")
+            raise ValueError(
+                "MCP_SOURCE_SYSTEM/SOURCE_SYSTEM must match [a-z0-9][a-z0-9_-]{0,31}"
+            )
         return value
 
     @model_validator(mode="after")

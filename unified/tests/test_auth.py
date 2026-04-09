@@ -424,6 +424,28 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="SOURCE_SYSTEM"):
             config.get_config()
 
+    def test_mcp_source_system_alias_from_mcp_env(self, monkeypatch):
+        """Test MCP_SOURCE_SYSTEM is accepted as config alias."""
+        from src import config
+
+        monkeypatch.delenv("SOURCE_SYSTEM", raising=False)
+        monkeypatch.setenv("MCP_SOURCE_SYSTEM", "codex_alias")
+        config.get_config.cache_clear()
+
+        cfg = config.get_config()
+        assert cfg.mcp.source_system == "codex_alias"
+
+    def test_mcp_source_system_prefers_mcp_env_over_source_system(self, monkeypatch):
+        """Test MCP_SOURCE_SYSTEM takes precedence when both env vars are set."""
+        from src import config
+
+        monkeypatch.setenv("SOURCE_SYSTEM", "source_only")
+        monkeypatch.setenv("MCP_SOURCE_SYSTEM", "mcp_wins")
+        config.get_config.cache_clear()
+
+        cfg = config.get_config()
+        assert cfg.mcp.source_system == "mcp_wins"
+
 
 class TestInternalAPIKey:
     """Test internal API key handling."""
