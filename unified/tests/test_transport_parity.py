@@ -81,6 +81,9 @@ class _FakeResponse:
 
 
 class _GatewayClient:
+    def __init__(self) -> None:
+        self.last_patch_payload = None
+
     async def __aenter__(self):
         return self
 
@@ -127,6 +130,7 @@ class _GatewayClient:
         raise AssertionError(f"Unexpected PUT path: {path}")
 
     async def patch(self, path: str, json=None):
+        self.last_patch_payload = json
         if path.startswith("/api/v1/memory/"):
             return _FakeResponse(200, V1_RECORD)
         raise AssertionError(f"Unexpected PATCH path: {path}")
@@ -138,6 +142,9 @@ class _GatewayClient:
 
 
 class _TransportClient:
+    def __init__(self) -> None:
+        self.last_request = None
+
     async def __aenter__(self):
         return self
 
@@ -145,6 +152,7 @@ class _TransportClient:
         return False
 
     async def request(self, method: str, path: str, **kwargs):
+        self.last_request = (method, path, kwargs)
         if method == "POST" and path == "/api/v1/memory/write":
             return _FakeResponse(200, {"status": "created", "record": V1_RECORD})
         if method == "POST" and path == "/api/v1/memory/find":
@@ -338,6 +346,25 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
                 memory_id="mem-1", content="payload", title="Note"
             )
         self.assertEqual(_drop_none(transport_result), _drop_none(gateway_result))
+
+    async def test_update_updated_by_placeholder_parity_between_stdio_and_http(self) -> None:
+        gateway_client = _GatewayClient()
+        transport_client = _TransportClient()
+        with (
+            patch("_gateway_src.main._client", return_value=gateway_client),
+            patch.object(mcp_transport, "_client", return_value=transport_client),
+        ):
+            await gateway.brain_update(
+                memory_id="mem-1", content="payload", updated_by="spoofed-user"
+            )
+            await mcp_transport.brain_update(
+                memory_id="mem-1", content="payload", updated_by="spoofed-user"
+            )
+
+        self.assertEqual(gateway_client.last_patch_payload["updated_by"], "agent")
+        self.assertEqual(
+            transport_client.last_request[2]["json"]["updated_by"], "agent"
+        )
 
     async def test_delete_parity_between_stdio_and_http(self) -> None:
         with (
