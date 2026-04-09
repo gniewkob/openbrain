@@ -116,15 +116,15 @@ Baseline branch in this repository is `master` (`gh repo view`).
 As of 2026-04-08 the branch is protected (verified via `gh api repos/gniewkob/openbrain/branches/master/protection`).
 
 Recommended required checks:
-- `CI / lint`
-- `CI / test`
-- `CI / security`
-- `CI / contract-integrity`
-- `Unified Smoke Tests / guardrails`
-- `Unified Smoke Tests / smoke`
-- `Unified Smoke Tests / gateway-smoke`
-- `Unified Smoke Tests / transport-parity`
-- `Unified Smoke Tests / contract-integrity`
+- `lint`
+- `test`
+- `security`
+- `contract-integrity`
+- `guardrails`
+- `smoke`
+- `gateway-smoke`
+- `transport-parity`
+- `GitGuardian Security Checks`
 
 Operator verification commands:
 ```bash

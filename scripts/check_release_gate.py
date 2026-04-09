@@ -11,15 +11,15 @@ from dataclasses import dataclass
 
 
 REQUIRED_CHECKS = (
-    "CI / lint",
-    "CI / test",
-    "CI / security",
-    "CI / contract-integrity",
-    "Unified Smoke Tests / guardrails",
-    "Unified Smoke Tests / smoke",
-    "Unified Smoke Tests / gateway-smoke",
-    "Unified Smoke Tests / transport-parity",
-    "Unified Smoke Tests / contract-integrity",
+    "lint",
+    "test",
+    "security",
+    "contract-integrity",
+    "guardrails",
+    "smoke",
+    "gateway-smoke",
+    "transport-parity",
+    "GitGuardian Security Checks",
 )
 
 
