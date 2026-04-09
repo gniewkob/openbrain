@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
     ("repository hygiene", "scripts/check_repo_hygiene.py"),
     ("capabilities manifest parity", "scripts/check_capabilities_manifest_parity.py"),
+    ("capabilities metadata parity", "scripts/check_capabilities_metadata_parity.py"),
     ("capabilities truthfulness", "scripts/check_capabilities_truthfulness.py"),
     ("audit semantics", "scripts/check_audit_semantics.py"),
     ("export contract", "scripts/check_export_contract.py"),
