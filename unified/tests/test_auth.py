@@ -251,6 +251,16 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="query"):
             config.get_config()
 
+    def test_mcp_brain_url_rejects_path(self, monkeypatch):
+        """Test backend URL with path segment is rejected."""
+        from src import config
+
+        monkeypatch.setenv("BRAIN_URL", "https://openbrain.internal:7010/api")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="path"):
+            config.get_config()
+
     def test_mcp_brain_url_rejects_fragment(self, monkeypatch):
         """Test backend URL with fragment is rejected."""
         from src import config
