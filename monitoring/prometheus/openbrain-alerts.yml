@@ -28,6 +28,9 @@ groups:
       - record: openbrain_sync_missing_ratio_1h
         expr: increase(sync_missing_total{job="openbrain-unified"}[1h]) / clamp_min(increase(sync_checks_total{job="openbrain-unified"}[1h]), 1)
 
+      - record: openbrain_telemetry_backend_fallback_1h
+        expr: increase(telemetry_counter_backend_fallback_total{job="openbrain-unified"}[1h])
+
   - name: openbrain-alerts
     rules:
       - alert: OpenBrainTargetDown
@@ -79,3 +82,13 @@ groups:
         annotations:
           summary: "OpenBrain zero-hit ratio elevated"
           description: "Search zero-hit ratio exceeded 60% in the last hour with meaningful traffic volume."
+
+      - alert: OpenBrainTelemetryBackendFallbackDetected
+        expr: openbrain_telemetry_backend_fallback_1h > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain telemetry backend fallback detected"
+          description: "Telemetry counter backend fell back to in-memory mode in the last hour; verify Redis connectivity and TELEMETRY_BACKEND configuration."
