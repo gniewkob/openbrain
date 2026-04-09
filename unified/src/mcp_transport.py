@@ -76,6 +76,22 @@ MAX_SYNC_LIMIT: int = _LIMITS["max_sync_limit"]
 MAX_BULK_ITEMS: int = _LIMITS["max_bulk_items"]
 
 
+def _http_obsidian_disabled_reason() -> str:
+    return (
+        "HTTP Obsidian tools are disabled by default. "
+        "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport."
+    )
+
+
+def _http_obsidian_tools_registered() -> bool:
+    required = (
+        "brain_obsidian_vaults",
+        "brain_obsidian_read_note",
+        "brain_obsidian_sync",
+    )
+    return all(callable(globals().get(name)) for name in required)
+
+
 def _init_config():
     """Initialize module-level config from central config."""
     global \
@@ -344,13 +360,10 @@ async def brain_capabilities() -> dict[str, Any]:
     """Check the operational status of the Memory Platform V1."""
     backend = await _get_backend_status()
     tier_2_tools = [*ADVANCED_TOOLS]
-    obsidian_tools = [*HTTP_OBSIDIAN_TOOLS] if ENABLE_HTTP_OBSIDIAN_TOOLS else []
-    obsidian_status = "enabled" if ENABLE_HTTP_OBSIDIAN_TOOLS else "disabled"
-    obsidian_reason = (
-        None
-        if ENABLE_HTTP_OBSIDIAN_TOOLS
-        else "HTTP Obsidian tools are disabled (set ENABLE_HTTP_OBSIDIAN_TOOLS=1)."
-    )
+    obsidian_enabled = ENABLE_HTTP_OBSIDIAN_TOOLS and _http_obsidian_tools_registered()
+    obsidian_tools = [*HTTP_OBSIDIAN_TOOLS] if obsidian_enabled else []
+    obsidian_status = "enabled" if obsidian_enabled else "disabled"
+    obsidian_reason = None if obsidian_enabled else _http_obsidian_disabled_reason()
     if obsidian_tools:
         tier_2_tools.extend(obsidian_tools)
     health = build_capabilities_health(backend, obsidian_status)
