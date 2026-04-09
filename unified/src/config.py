@@ -8,6 +8,7 @@ scattered os.environ.get() calls in other modules.
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -165,6 +166,14 @@ class MCPConfig(BaseSettings):
     def validate_backend_timeout(cls, v: float) -> float:
         if v <= 0:
             raise ValueError("BACKEND_TIMEOUT_S must be > 0")
+        return v
+
+    @field_validator("brain_url")
+    @classmethod
+    def validate_brain_url(cls, v: str) -> str:
+        parsed = urlparse(v)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("BRAIN_URL must be a valid http(s) URL")
         return v
 
 

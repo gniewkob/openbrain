@@ -171,6 +171,26 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="BACKEND_TIMEOUT_S"):
             config.get_config()
 
+    def test_mcp_brain_url_from_env(self, monkeypatch):
+        """Test backend URL can be configured via MCP env var."""
+        from src import config
+
+        monkeypatch.setenv("BRAIN_URL", "https://openbrain.internal:7010")
+        config.get_config.cache_clear()
+
+        cfg = config.get_config()
+        assert cfg.mcp.brain_url == "https://openbrain.internal:7010"
+
+    def test_mcp_brain_url_must_be_http_or_https(self, monkeypatch):
+        """Test malformed backend URL is rejected."""
+        from src import config
+
+        monkeypatch.setenv("BRAIN_URL", "not-a-url")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="BRAIN_URL"):
+            config.get_config()
+
 
 class TestInternalAPIKey:
     """Test internal API key handling."""
