@@ -11,7 +11,7 @@ import hmac
 import logging
 
 from .auth import INTERNAL_API_KEY, PUBLIC_EXPOSURE, _oidc
-from .mcp_transport import mcp as mcp_server
+from .mcp_transport import STREAMABLE_HTTP_PATH, mcp as mcp_server
 from .main import app as rest_app
 
 _log = logging.getLogger("openbrain.combined")
@@ -45,14 +45,14 @@ async def app(scope, receive, send):
             await rest_app(scope, receive, send)
             return
 
-        # Root redirect to /sse (for ChatGPT MCP discovery)
+        # Root redirect to MCP streamable HTTP path (for ChatGPT MCP discovery)
         if path == "/":
             # 307 preserves the POST method
             await send(
                 {
                     "type": "http.response.start",
                     "status": 307,
-                    "headers": [(b"location", b"/sse")],
+                    "headers": [(b"location", STREAMABLE_HTTP_PATH.encode("ascii"))],
                 }
             )
             await send({"type": "http.response.body", "body": b""})
@@ -93,5 +93,5 @@ async def app(scope, receive, send):
             )
             return
 
-    # Default: Forward to FastMCP (handles /sse and all MCP protocol paths)
+    # Default: Forward to FastMCP (handles MCP streamable HTTP and protocol paths)
     await mcp_app(scope, receive, send)
