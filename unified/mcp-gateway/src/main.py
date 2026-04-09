@@ -70,6 +70,8 @@ _gateway_logger = logging.getLogger("mcp_gateway")
 BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://localhost:7010")
 BACKEND_TIMEOUT_RAW: str = os.environ.get("BACKEND_TIMEOUT_S", "30")
 BACKEND_TIMEOUT: float
+HEALTH_PROBE_TIMEOUT_RAW: str = os.environ.get("MCP_HEALTH_PROBE_TIMEOUT_S", "5.0")
+HEALTH_PROBE_TIMEOUT: float
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
 OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"
 MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
@@ -107,6 +109,22 @@ def _normalize_backend_timeout(value: str | None) -> float:
     return normalized
 
 
+def _normalize_health_probe_timeout(value: str | None, backend_timeout: float) -> float:
+    try:
+        normalized = float((value or "").strip())
+    except (TypeError, ValueError) as exc:
+        raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be a valid float") from exc
+    if not math.isfinite(normalized):
+        raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be finite")
+    if normalized <= 0:
+        raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be > 0")
+    if normalized > 30:
+        raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be <= 30")
+    if normalized > backend_timeout:
+        raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be <= BACKEND_TIMEOUT_S")
+    return normalized
+
+
 def _normalize_source_system(value: str | None) -> str:
     normalized = (value or "").strip().lower()
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", normalized):
@@ -116,6 +134,10 @@ def _normalize_source_system(value: str | None) -> str:
 
 BRAIN_URL = _normalize_brain_url(BRAIN_URL)
 BACKEND_TIMEOUT = _normalize_backend_timeout(BACKEND_TIMEOUT_RAW)
+HEALTH_PROBE_TIMEOUT = _normalize_health_probe_timeout(
+    HEALTH_PROBE_TIMEOUT_RAW,
+    BACKEND_TIMEOUT,
+)
 MCP_SOURCE_SYSTEM = _normalize_source_system(MCP_SOURCE_SYSTEM)
 
 if INTERNAL_API_KEY and len(INTERNAL_API_KEY) < _MIN_KEY_LEN:
@@ -135,7 +157,6 @@ _LIMITS = load_runtime_limits()
 MAX_SEARCH_TOP_K: int = _LIMITS["max_search_top_k"]
 MAX_LIST_LIMIT: int = _LIMITS["max_list_limit"]
 MAX_SYNC_LIMIT: int = _LIMITS["max_sync_limit"]
-HEALTH_PROBE_TIMEOUT: float = 5.0
 
 _CAPS = load_capabilities_manifest()
 _CAP_META = load_capabilities_metadata()
