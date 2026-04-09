@@ -263,14 +263,16 @@ async def _request_or_raise(
     **kwargs: Any,
 ) -> httpx.Response:
     try:
-        request_fn = getattr(client, "request", None)
-        if callable(request_fn):
-            response = await request_fn(method, path, **kwargs)
-        else:
-            method_fn = getattr(client, method.lower(), None)
-            if not callable(method_fn):
-                raise ValueError(f"Client does not support method {method}")
+        # Prefer verb-specific methods first to preserve existing test/mocking
+        # patterns, then fall back to generic request().
+        method_fn = getattr(client, method.lower(), None)
+        if callable(method_fn):
             response = await method_fn(path, **kwargs)
+        else:
+            request_fn = getattr(client, "request", None)
+            if not callable(request_fn):
+                raise ValueError(f"Client does not support method {method}")
+            response = await request_fn(method, path, **kwargs)
     except httpx.RequestError as exc:
         raise ValueError(backend_request_failure_message(exc)) from exc
 
