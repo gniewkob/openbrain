@@ -46,7 +46,7 @@ class TestBrainSearchValidation(unittest.TestCase):
 
     def test_search_top_k_over_limit_raises(self):
         with self.assertRaisesRegex(ValueError, "top_k"):
-            _run(_gateway.brain_search(query="test", top_k=101))
+            _run(_gateway.brain_search(query="test", top_k=_gateway.MAX_SEARCH_TOP_K + 1))
 
     def test_search_top_k_boundary_min_passes(self):
         try:
@@ -59,10 +59,10 @@ class TestBrainSearchValidation(unittest.TestCase):
 
     def test_search_top_k_boundary_max_passes(self):
         try:
-            _run(_gateway.brain_search(query="test", top_k=100))
+            _run(_gateway.brain_search(query="test", top_k=_gateway.MAX_SEARCH_TOP_K))
         except ValueError as exc:
             if "top_k" in str(exc):
-                self.fail("top_k=100 should not raise validation ValueError")
+                self.fail("top_k=max should not raise validation ValueError")
         except Exception:
             pass
 
@@ -75,7 +75,7 @@ class TestBrainListValidation(unittest.TestCase):
 
     def test_list_limit_over_max_raises(self):
         with self.assertRaisesRegex(ValueError, "limit"):
-            _run(_gateway.brain_list(limit=201))
+            _run(_gateway.brain_list(limit=_gateway.MAX_LIST_LIMIT + 1))
 
     def test_list_limit_boundary_min_passes(self):
         try:
@@ -88,10 +88,10 @@ class TestBrainListValidation(unittest.TestCase):
 
     def test_list_limit_boundary_max_passes(self):
         try:
-            _run(_gateway.brain_list(limit=200))
+            _run(_gateway.brain_list(limit=_gateway.MAX_LIST_LIMIT))
         except ValueError as exc:
             if "limit" in str(exc) and "must be" in str(exc):
-                self.fail("limit=200 should not raise validation ValueError")
+                self.fail("limit=max should not raise validation ValueError")
         except Exception:
             pass
 
@@ -104,7 +104,7 @@ class TestBrainObsidianSyncValidation(unittest.TestCase):
 
     def test_sync_limit_over_max_raises(self):
         with self.assertRaisesRegex(ValueError, "limit"):
-            _run(_gateway.brain_obsidian_sync(limit=201))
+            _run(_gateway.brain_obsidian_sync(limit=_gateway.MAX_SYNC_LIMIT + 1))
 
 
 @_skip_if_no_gateway
@@ -121,7 +121,9 @@ class TestBrainObsidianCollectionValidation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "max_items"):
             _run(
                 _gateway.brain_obsidian_collection(
-                    query="test", collection_name="col", max_items=201
+                    query="test",
+                    collection_name="col",
+                    max_items=_gateway.MAX_SYNC_LIMIT + 1,
                 )
             )
 
