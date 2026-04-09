@@ -214,7 +214,7 @@ class SQLAlchemyMemoryRepository(MemoryRepository):
                 Memory,
                 (1 - Memory.embedding.cosine_distance(embedding)).label("similarity"),
             )
-            .where(Memory.embedding.isnot(None))
+            .where(Memory.embedding.isnot(None), Memory.status == "active")
             .order_by(Memory.embedding.cosine_distance(embedding))
             .limit(top_k)
         )
@@ -352,6 +352,8 @@ class InMemoryMemoryRepository(MemoryRepository):
 
         for memory in self._storage.values():
             if memory.embedding is None:
+                continue
+            if memory.status != "active":
                 continue
 
             mem_vec = np.array(memory.embedding)
