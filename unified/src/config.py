@@ -151,6 +151,10 @@ class MCPConfig(BaseSettings):
             raise ValueError(
                 "MCP_STREAMABLE_HTTP_PATH must not be '/' to avoid redirect loops"
             )
+        if "?" in value or "#" in value or any(ch.isspace() for ch in value):
+            raise ValueError(
+                "MCP_STREAMABLE_HTTP_PATH must not include query, fragment, or spaces"
+            )
         if len(value) > 1:
             value = value.rstrip("/")
         return value

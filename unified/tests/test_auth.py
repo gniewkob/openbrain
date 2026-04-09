@@ -131,6 +131,36 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="redirect loops"):
             config.get_config()
 
+    def test_mcp_streamable_http_path_rejects_query(self, monkeypatch):
+        """Test streamable path with query is rejected."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/events?x=1")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="query"):
+            config.get_config()
+
+    def test_mcp_streamable_http_path_rejects_fragment(self, monkeypatch):
+        """Test streamable path with fragment is rejected."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/events#frag")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="fragment"):
+            config.get_config()
+
+    def test_mcp_streamable_http_path_rejects_spaces(self, monkeypatch):
+        """Test streamable path with spaces is rejected."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/events path")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="spaces"):
+            config.get_config()
+
     def test_mcp_health_probe_timeout_from_env(self, monkeypatch):
         """Test health probe timeout can be configured via MCP env var."""
         from src import config
