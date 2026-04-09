@@ -62,6 +62,7 @@ Capabilities payload note:
 - request/runtime contracts are strict too: `request_contracts.json` and `runtime_limits.json` must be valid and complete (no silent fallback to baked-in defaults).
 - this strict contract loading is enforced in both transports (HTTP + stdio gateway), so drift is caught early at startup/tests.
 - request contract string fields are canonicalized (`trim`) at load time to keep audit placeholders deterministic (`updated_by_default`).
+- response normalizers canonicalize actor fields (`created_by`, `updated_by`) in transport output for legacy-hit resilience.
 - Legacy transport-specific keys (`obsidian_http`, `obsidian_local`) remain for backward compatibility.
 
 ## Governance Rules
