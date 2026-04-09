@@ -4,22 +4,31 @@ import json
 from pathlib import Path
 from typing import Any
 
-_DEFAULTS = {
-    "find_list_query": None,
-    "find_list_sort": "updated_at_desc",
-    "updated_by_default": "agent",
-}
+def _validate_request_contracts(data: Any) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        raise ValueError("request_contracts must be a JSON object")
+    query = data.get("find_list_query")
+    sort = data.get("find_list_sort")
+    updated_by_default = data.get("updated_by_default")
+    if query is not None:
+        raise ValueError("request_contracts.find_list_query must be null")
+    if not isinstance(sort, str) or not sort.strip():
+        raise ValueError("request_contracts.find_list_sort must be a non-empty string")
+    if not isinstance(updated_by_default, str) or not updated_by_default.strip():
+        raise ValueError(
+            "request_contracts.updated_by_default must be a non-empty string"
+        )
+    return {
+        "find_list_query": None,
+        "find_list_sort": sort,
+        "updated_by_default": updated_by_default,
+    }
 
 
 def _load_request_contracts() -> dict[str, Any]:
     path = Path(__file__).resolve().parents[2] / "contracts" / "request_contracts.json"
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return dict(_DEFAULTS)
-    merged = dict(_DEFAULTS)
-    merged.update({k: data.get(k, v) for k, v in _DEFAULTS.items()})
-    return merged
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return _validate_request_contracts(data)
 
 
 _CONTRACTS = _load_request_contracts()

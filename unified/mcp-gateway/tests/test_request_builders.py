@@ -1,4 +1,5 @@
 import unittest
+import sys
 
 from helpers import load_gateway_main
 
@@ -77,3 +78,15 @@ class GatewayRequestBuildersTests(unittest.TestCase):
             owner="",
             match_key=None,
         )
+
+    def test_validate_request_contracts_rejects_blank_updated_by_default(self) -> None:
+        load_gateway_main()
+        request_builders = sys.modules["_gateway_src.request_builders"]
+        with self.assertRaises(ValueError):
+            request_builders._validate_request_contracts(
+                {
+                    "find_list_query": None,
+                    "find_list_sort": "updated_at_desc",
+                    "updated_by_default": "   ",
+                }
+            )

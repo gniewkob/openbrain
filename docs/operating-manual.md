@@ -60,6 +60,7 @@ Capabilities payload note:
 - `brain_capabilities` metadata contract is strict: `api_version` must follow `MAJOR.MINOR.PATCH` and must be present as a key in `schema_changelog`.
 - capabilities manifest contract is strict: each tool tier list must contain non-empty string names only and must not contain duplicates (no silent fallback defaults).
 - request/runtime contracts are strict too: `request_contracts.json` and `runtime_limits.json` must be valid and complete (no silent fallback to baked-in defaults).
+- this strict contract loading is enforced in both transports (HTTP + stdio gateway), so drift is caught early at startup/tests.
 - Legacy transport-specific keys (`obsidian_http`, `obsidian_local`) remain for backward compatibility.
 
 ## Governance Rules
