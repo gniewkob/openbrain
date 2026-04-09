@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from src.telemetry import get_metrics_snapshot, reset_metrics, incr_metric
+from src.telemetry import TelemetryRegistry, get_metrics_snapshot, incr_metric, reset_metrics
 
 
 class MetricsTests(unittest.IsolatedAsyncioTestCase):
@@ -83,6 +83,25 @@ class MetricsTests(unittest.IsolatedAsyncioTestCase):
         # Check specific counters
         self.assertEqual(snapshot["counters"]["memories_created_total"], 5)
         self.assertEqual(snapshot["counters"]["memories_versioned_total"], 3)
+
+    async def test_telemetry_registry_marks_backend_fallback_counter(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {"TELEMETRY_BACKEND": "redis"},
+            clear=False,
+        ):
+            with patch("src.telemetry_counters.RedisCounterBackend", side_effect=RuntimeError("down")):
+                registry = TelemetryRegistry()
+        snapshot = registry.snapshot()
+        self.assertEqual(snapshot["telemetry_counter_backend_fallback_total"], 1)
+
+    async def test_telemetry_registry_keeps_backend_fallback_counter_zero_without_fallback(
+        self,
+    ) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            registry = TelemetryRegistry()
+        snapshot = registry.snapshot()
+        self.assertEqual(snapshot["telemetry_counter_backend_fallback_total"], 0)
 
 
 if __name__ == "__main__":

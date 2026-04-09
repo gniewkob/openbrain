@@ -3,7 +3,7 @@ from __future__ import annotations
 from threading import Lock
 from typing import Any
 
-from .telemetry_counters import build_counter_backend
+from .telemetry_counters import build_counter_backend_with_meta
 
 # Pre-initialize all counters to 0 so Prometheus sees them from the first scrape.
 KNOWN_COUNTERS: tuple[str, ...] = (
@@ -50,6 +50,7 @@ KNOWN_COUNTERS: tuple[str, ...] = (
     "http_requests_total_500",
     "http_requests_total_502",
     "http_requests_total_503",
+    "telemetry_counter_backend_fallback_total",
 )
 
 # Standard Prometheus buckets for request latency (in seconds)
@@ -117,7 +118,11 @@ class Histogram:
 class TelemetryRegistry:
     def __init__(self) -> None:
         self._lock = Lock()
-        self._counter_backend = build_counter_backend(KNOWN_COUNTERS)
+        self._counter_backend, self._counter_backend_meta = (
+            build_counter_backend_with_meta(KNOWN_COUNTERS)
+        )
+        if self._counter_backend_meta.fallback_reason is not None:
+            self._counter_backend.incr("telemetry_counter_backend_fallback_total", 1)
         self._gauges: dict[str, float] = {}
         self._histograms: dict[str, Histogram] = {}
 
