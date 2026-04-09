@@ -47,6 +47,25 @@ async def app(scope, receive, send):
 
         # Root redirect to MCP streamable HTTP path (for ChatGPT MCP discovery)
         if path == "/":
+            if STREAMABLE_HTTP_PATH == "/":
+                _log.error(
+                    "invalid_streamable_http_path",
+                    extra={"streamable_http_path": STREAMABLE_HTTP_PATH},
+                )
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 503,
+                        "headers": [(b"content-type", b"application/json")],
+                    }
+                )
+                await send(
+                    {
+                        "type": "http.response.body",
+                        "body": b'{"detail":"Invalid MCP streamable transport path configuration"}',
+                    }
+                )
+                return
             # 307 preserves the POST method
             await send(
                 {
