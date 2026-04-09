@@ -144,6 +144,12 @@ class MCPConfig(BaseSettings):
         value = (v or "").strip()
         if not value.startswith("/"):
             raise ValueError("MCP_STREAMABLE_HTTP_PATH must start with '/'")
+        if value == "/":
+            raise ValueError(
+                "MCP_STREAMABLE_HTTP_PATH must not be '/' to avoid redirect loops"
+            )
+        if len(value) > 1:
+            value = value.rstrip("/")
         return value
 
 
