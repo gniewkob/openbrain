@@ -337,6 +337,70 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(legacy.updated_by, "creator")
         self.assertEqual(canonical.updated_by, "creator")
 
+    async def test_to_out_and_to_record_trim_created_by(self) -> None:
+        now = datetime.now(timezone.utc)
+        existing = Memory(
+            id="mem-4",
+            domain=DomainEnum.build,
+            entity_type="Note",
+            content="payload",
+            embedding=None,
+            owner="owner-a",
+            created_by="  creator  ",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=[],
+            relations={},
+            metadata_={"updated_by": "editor", "root_id": "mem-4"},
+            obsidian_ref=None,
+            content_hash="hash",
+            match_key="mk-4",
+            valid_from=None,
+            created_at=now,
+            updated_at=now,
+        )
+
+        legacy = _to_out(existing)
+        canonical = _to_record(existing)
+
+        self.assertEqual(legacy.created_by, "creator")
+        self.assertEqual(canonical.created_by, "creator")
+
+    async def test_to_out_and_to_record_fallback_created_by_to_agent(self) -> None:
+        now = datetime.now(timezone.utc)
+        existing = Memory(
+            id="mem-5",
+            domain=DomainEnum.build,
+            entity_type="Note",
+            content="payload",
+            embedding=None,
+            owner="owner-a",
+            created_by="   ",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=[],
+            relations={},
+            metadata_={"updated_by": "   ", "root_id": "mem-5"},
+            obsidian_ref=None,
+            content_hash="hash",
+            match_key="mk-5",
+            valid_from=None,
+            created_at=now,
+            updated_at=now,
+        )
+
+        legacy = _to_out(existing)
+        canonical = _to_record(existing)
+
+        self.assertEqual(legacy.created_by, "agent")
+        self.assertEqual(canonical.created_by, "agent")
+        self.assertEqual(legacy.updated_by, "agent")
+        self.assertEqual(canonical.updated_by, "agent")
+
 
 if __name__ == "__main__":
     unittest.main()
