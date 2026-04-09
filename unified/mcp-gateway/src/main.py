@@ -51,6 +51,7 @@ from .request_builders import (
     build_find_search_payload,
     build_list_filters,
     build_sync_check_payload,
+    canonical_updated_by,
     normalize_optional_text,
     normalize_updated_by,
     validate_store_inputs,
@@ -500,11 +501,13 @@ async def brain_update(
     Update a memory by ID.
     - Corporate: creates new version (append-only). Old version marked as superseded.
     - Build/Personal: updates in place.
+    - `updated_by` is compatibility-only and not authoritative for audit identity.
     """
+    _ = normalize_updated_by(updated_by)
     # Build patch payload — only include fields explicitly provided
     payload: dict[str, Any] = {
         "content": content,
-        "updated_by": normalize_updated_by(updated_by),
+        "updated_by": canonical_updated_by(),
     }
     if title is not None:
         payload["title"] = title
@@ -668,7 +671,9 @@ async def brain_obsidian_sync(
             if paths
             else await adapter.list_files(vault, folder=folder, limit=limit)
         )
-        notes = await asyncio.gather(*(adapter.read_note(vault, path) for path in resolved_paths))
+        notes = await asyncio.gather(
+            *(adapter.read_note(vault, path) for path in resolved_paths)
+        )
     except ObsidianCliError as e:
         raise ValueError(str(e))
 
@@ -837,7 +842,8 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict:
     """Bulk store memories. Use for archiving or synchronization."""
     async with _client() as c:
         r = await c.post(
-            memory_absolute_path("write_many"), json={"records": items, "write_mode": "upsert"}
+            memory_absolute_path("write_many"),
+            json={"records": items, "write_mode": "upsert"},
         )
         _raise(r)
         return r.json()

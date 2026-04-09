@@ -37,8 +37,9 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             }
         }
 
-        with patch("_gateway_src.main._client") as mock_client, patch.object(
-            gateway, "MCP_SOURCE_SYSTEM", "codex"
+        with (
+            patch("_gateway_src.main._client") as mock_client,
+            patch.object(gateway, "MCP_SOURCE_SYSTEM", "codex"),
         ):
             client = AsyncMock()
             client.__aenter__.return_value = client
@@ -69,7 +70,9 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-    async def test_brain_store_corporate_with_owner_and_match_key_succeeds(self) -> None:
+    async def test_brain_store_corporate_with_owner_and_match_key_succeeds(
+        self,
+    ) -> None:
         gateway = load_gateway_main()
         response = Mock()
         response.is_error = False
@@ -191,7 +194,9 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             json={"query": "test", "limit": 1, "filters": {}},
         )
 
-    async def test_brain_sync_check_calls_api_sync_check_path_with_json_body(self) -> None:
+    async def test_brain_sync_check_calls_api_sync_check_path_with_json_body(
+        self,
+    ) -> None:
         gateway = load_gateway_main()
         response = Mock()
         response.is_error = False
@@ -236,7 +241,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             json=[{"match_key": "mk-1", "content": "x"}],
         )
 
-    async def test_brain_update_trims_updated_by_actor(self) -> None:
+    async def test_brain_update_uses_canonical_updated_by_placeholder(self) -> None:
         gateway = load_gateway_main()
         response = Mock()
         response.is_error = False
@@ -286,7 +291,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
 
         client.patch.assert_awaited_once_with(
             "/api/v1/memory/mem-1",
-            json={"content": "payload", "updated_by": "gateway-user"},
+            json={"content": "payload", "updated_by": "agent"},
         )
 
     async def test_brain_update_empty_updated_by_falls_back_to_agent(self) -> None:
@@ -397,7 +402,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.version, 2)
         client.patch.assert_awaited_once_with(
             "/api/v1/memory/corp-1",
-            json={"content": "policy v2", "updated_by": "admin@example.com"},
+            json={"content": "policy v2", "updated_by": "agent"},
         )
 
 

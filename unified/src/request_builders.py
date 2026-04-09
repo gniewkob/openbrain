@@ -93,3 +93,11 @@ def normalize_updated_by(updated_by: str | None) -> str:
         if actor:
             return actor
     return str(_CONTRACTS["updated_by_default"])
+
+
+def canonical_updated_by() -> str:
+    """Compatibility placeholder for patch payloads.
+
+    API v1 enforces authenticated subject as authoritative audit actor.
+    """
+    return str(_CONTRACTS["updated_by_default"])
