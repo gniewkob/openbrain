@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 
 from src.capabilities_manifest import load_capabilities_manifest
-from src.capabilities_metadata import load_capabilities_metadata
+from src.capabilities_metadata import _validate_metadata, load_capabilities_metadata
 from src.http_error_adapter import backend_error_message
 from src.memory_paths import memory_absolute_path
 from src.request_builders import (
@@ -42,6 +43,26 @@ def test_capabilities_metadata_contract_is_loaded_by_adapter() -> None:
     )
     assert metadata["api_version"] == raw["api_version"]
     assert metadata["schema_changelog"] == raw["schema_changelog"]
+    assert re.fullmatch(r"\d+\.\d+\.\d+", metadata["api_version"])
+    assert metadata["api_version"] in metadata["schema_changelog"]
+
+
+def test_capabilities_metadata_validation_rejects_malformed_version() -> None:
+    bad = {"api_version": "v2", "schema_changelog": {"2.3.0": "ok"}}
+    try:
+        _validate_metadata(bad)
+        assert False, "expected ValueError for malformed api_version"
+    except ValueError as exc:
+        assert "api_version" in str(exc)
+
+
+def test_capabilities_metadata_validation_requires_current_changelog_entry() -> None:
+    bad = {"api_version": "2.3.0", "schema_changelog": {"2.2.0": "old"}}
+    try:
+        _validate_metadata(bad)
+        assert False, "expected ValueError when api_version entry is missing"
+    except ValueError as exc:
+        assert "api_version entry" in str(exc)
 
 
 def test_request_contract_defaults_are_applied() -> None:
