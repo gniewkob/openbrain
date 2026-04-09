@@ -34,6 +34,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 from typing import Any, Literal
 
 import httpx
@@ -71,6 +72,17 @@ OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"
 MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
 
 _MIN_KEY_LEN = 32
+
+
+def _normalize_source_system(value: str | None) -> str:
+    normalized = (value or "").strip().lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", normalized):
+        raise ValueError("MCP_SOURCE_SYSTEM must match [a-z0-9][a-z0-9_-]{0,31}")
+    return normalized
+
+
+MCP_SOURCE_SYSTEM = _normalize_source_system(MCP_SOURCE_SYSTEM)
+
 if INTERNAL_API_KEY and len(INTERNAL_API_KEY) < _MIN_KEY_LEN:
     _gateway_logger.warning(
         "INTERNAL_API_KEY is only %d chars (minimum %d recommended). "
