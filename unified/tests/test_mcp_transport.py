@@ -128,9 +128,17 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
                 async with mcp_transport._client() as c1:
                     self.assertEqual(c1.kwargs["base_url"], "http://127.0.0.1:7010")
 
-            with patch.object(mcp_transport, "BRAIN_URL", "http://127.0.0.1:7020"):
+            with (
+                patch.object(mcp_transport, "BRAIN_URL", "http://127.0.0.1:7020"),
+                patch.object(mcp_transport.log, "info") as log_info,
+            ):
                 async with mcp_transport._client() as c2:
                     self.assertEqual(c2.kwargs["base_url"], "http://127.0.0.1:7020")
+                log_info.assert_any_call(
+                    "mcp_client_refreshed_due_to_config_drift",
+                    old_base_url="http://127.0.0.1:7010",
+                    new_base_url="http://127.0.0.1:7020",
+                )
 
         self.assertEqual(len(created_clients), 2)
         self.assertTrue(created_clients[0].closed)

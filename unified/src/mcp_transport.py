@@ -151,10 +151,16 @@ class _SharedClient:
         global _http_client, _http_client_config_key
         current_key = _current_http_client_config_key()
         if _http_client is not None and _http_client_config_key != current_key:
+            old_key = _http_client_config_key
             try:
                 await _http_client.aclose()
             except Exception as exc:  # pragma: no cover - defensive logging path
                 log.warning("mcp_client_close_failed", error=str(exc))
+            log.info(
+                "mcp_client_refreshed_due_to_config_drift",
+                old_base_url=(old_key[0] if old_key else None),
+                new_base_url=current_key[0],
+            )
             _http_client = None
             _http_client_config_key = None
 
