@@ -46,7 +46,7 @@ from pydantic import BaseModel
 from .capabilities_health import build_capabilities_health
 from .capabilities_manifest import load_capabilities_manifest
 from .capabilities_metadata import load_capabilities_metadata
-from .http_error_adapter import backend_error_message
+from .http_error_adapter import backend_error_message, backend_request_failure_message
 from .memory_paths import memory_absolute_path, memory_item_absolute_path
 from .obsidian_cli import ObsidianCliAdapter, ObsidianCliError, note_to_write_payload
 from .request_builders import (
@@ -254,6 +254,33 @@ def _raise(r: httpx.Response) -> None:
         raise ValueError(backend_error_message(r.status_code, detail))
 
 
+async def _request_or_raise(
+    client: httpx.AsyncClient,
+    method: str,
+    path: str,
+    *,
+    allow_statuses: set[int] | None = None,
+    **kwargs: Any,
+) -> httpx.Response:
+    try:
+        request_fn = getattr(client, "request", None)
+        if callable(request_fn):
+            response = await request_fn(method, path, **kwargs)
+        else:
+            method_fn = getattr(client, method.lower(), None)
+            if not callable(method_fn):
+                raise ValueError(f"Client does not support method {method}")
+            response = await method_fn(path, **kwargs)
+    except httpx.RequestError as exc:
+        raise ValueError(backend_request_failure_message(exc)) from exc
+
+    if response.is_error and (
+        allow_statuses is None or response.status_code not in allow_statuses
+    ):
+        _raise(response)
+    return response
+
+
 def _obsidian_local_tools_enabled() -> bool:
     return os.environ.get(OBSIDIAN_LOCAL_TOOLS_ENV, "").strip().lower() in {
         "1",
@@ -441,7 +468,9 @@ async def brain_store(
     )
 
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             memory_absolute_path("write"),
             json={
                 "record": {
@@ -461,7 +490,6 @@ async def brain_store(
                 "write_mode": "upsert",
             },
         )
-        _raise(r)
         return BrainMemory(**r.json()["record"])
 
 
@@ -469,10 +497,11 @@ async def brain_store(
 async def brain_get(memory_id: str) -> BrainMemory:
     """Retrieve a specific memory by its ID."""
     async with _client() as c:
-        r = await c.get(memory_item_absolute_path(memory_id))
+        r = await _request_or_raise(
+            c, "GET", memory_item_absolute_path(memory_id), allow_statuses={404}
+        )
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
-        _raise(r)
         return BrainMemory(**r.json())
 
 
@@ -505,11 +534,12 @@ async def brain_list(
     payload = build_find_list_payload(limit=limit, filters=filters)
 
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             memory_absolute_path("find"),
             json=payload,
         )
-        _raise(r)
         return normalize_find_hits_to_records(r.json())
 
 
@@ -517,11 +547,12 @@ async def brain_list(
 async def brain_get_context(query: str, domain: str | None = None) -> dict:
     """Synthesize a grounding pack for the current conversation topic."""
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             memory_absolute_path("get_context"),
             json={"query": query, "domain": domain, "max_items": 10},
         )
-        _raise(r)
         return r.json()
 
 
@@ -548,11 +579,12 @@ async def brain_search(
     payload = build_find_search_payload(query=query, limit=top_k, filters=filters)
 
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             memory_absolute_path("find"),
             json=payload,
         )
-        _raise(r)
         return normalize_find_hits_to_scored_memories(r.json())
 
 
@@ -597,13 +629,15 @@ async def brain_update(
         payload["obsidian_ref"] = obsidian_ref
 
     async with _client() as c:
-        r = await c.patch(
+        r = await _request_or_raise(
+            c,
+            "PATCH",
             memory_item_absolute_path(memory_id),
+            allow_statuses={404},
             json=payload,
         )
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
-        _raise(r)
         return BrainMemory(**r.json())
 
 
@@ -614,14 +648,15 @@ async def brain_delete(memory_id: str) -> dict:
     Corporate memories cannot be deleted (returns 403).
     """
     async with _client() as c:
-        r = await c.delete(memory_item_absolute_path(memory_id))
+        r = await _request_or_raise(
+            c, "DELETE", memory_item_absolute_path(memory_id), allow_statuses={403, 404}
+        )
         if r.status_code == 404:
             raise ValueError(f"Memory not found: {memory_id}")
         if r.status_code == 403:
             raise ValueError(
                 "Cannot delete corporate memories. Use deprecation instead."
             )
-        _raise(r)
         return {"deleted": True, "id": memory_id}
 
 
@@ -637,7 +672,9 @@ async def brain_maintain(
     Always run with dry_run=True first to preview changes.
     """
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             memory_absolute_path("maintain"),
             json={
                 "dry_run": dry_run,
@@ -647,7 +684,6 @@ async def brain_maintain(
                 "fix_superseded_links": fix_superseded_links,
             },
         )
-        _raise(r)
         return r.json()
 
 
@@ -658,8 +694,9 @@ async def brain_export(ids: list[str]) -> list[dict]:
     Restricted-sensitivity content is redacted automatically.
     """
     async with _client() as c:
-        r = await c.post(memory_absolute_path("export"), json={"ids": ids})
-        _raise(r)
+        r = await _request_or_raise(
+            c, "POST", memory_absolute_path("export"), json={"ids": ids}
+        )
         return r.json()
 
 
@@ -682,8 +719,9 @@ async def brain_sync_check(
         file_hash=file_hash,
     )
     async with _client() as c:
-        r = await c.post(memory_absolute_path("sync_check"), json=payload)
-        _raise(r)
+        r = await _request_or_raise(
+            c, "POST", memory_absolute_path("sync_check"), json=payload
+        )
         return r.json()
 
 
@@ -763,8 +801,9 @@ async def brain_obsidian_sync(
         "write_mode": "upsert",
     }
     async with _client() as c:
-        r = await c.post(memory_absolute_path("write_many"), json=payload)
-        _raise(r)
+        r = await _request_or_raise(
+            c, "POST", memory_absolute_path("write_many"), json=payload
+        )
         result = r.json()
         return {
             "vault": vault,
@@ -812,7 +851,9 @@ async def brain_obsidian_write_note(
         fm["title"] = title
 
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             "/api/v1/obsidian/write-note",
             json={
                 "vault": vault,
@@ -822,7 +863,6 @@ async def brain_obsidian_write_note(
                 "overwrite": overwrite,
             },
         )
-        _raise(r)
         return r.json()
 
 
@@ -849,7 +889,9 @@ async def brain_obsidian_export(
     _require_obsidian_local_tools_enabled()
 
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             "/api/v1/obsidian/export",
             json={
                 "vault": vault,
@@ -860,7 +902,6 @@ async def brain_obsidian_export(
                 "max_items": max_items,
             },
         )
-        _raise(r)
         return r.json()
 
 
@@ -893,7 +934,9 @@ async def brain_obsidian_collection(
     _require_obsidian_local_tools_enabled()
 
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             "/api/v1/obsidian/collection",
             json={
                 "query": query,
@@ -905,7 +948,6 @@ async def brain_obsidian_collection(
                 "group_by": group_by,
             },
         )
-        _raise(r)
         return r.json()
 
 
@@ -913,11 +955,12 @@ async def brain_obsidian_collection(
 async def brain_store_bulk(items: list[dict[str, Any]]) -> dict:
     """Bulk store memories. Use for archiving or synchronization."""
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             memory_absolute_path("write_many"),
             json={"records": items, "write_mode": "upsert"},
         )
-        _raise(r)
         return r.json()
 
 
@@ -925,8 +968,9 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict:
 async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict:
     """Idempotent bulk synchronization using match_key."""
     async with _client() as c:
-        r = await c.post(memory_absolute_path("bulk_upsert"), json=items)
-        _raise(r)
+        r = await _request_or_raise(
+            c, "POST", memory_absolute_path("bulk_upsert"), json=items
+        )
         return r.json()
 
 
@@ -952,7 +996,9 @@ async def brain_obsidian_bidirectional_sync(
     _require_obsidian_local_tools_enabled()
 
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             "/api/v1/obsidian/bidirectional-sync",
             json={
                 "vault": vault,
@@ -960,7 +1006,6 @@ async def brain_obsidian_bidirectional_sync(
                 "dry_run": dry_run,
             },
         )
-        _raise(r)
         return r.json()
 
 
@@ -974,8 +1019,7 @@ async def brain_obsidian_sync_status() -> dict:
     _require_obsidian_local_tools_enabled()
 
     async with _client() as c:
-        r = await c.get("/api/v1/obsidian/sync-status")
-        _raise(r)
+        r = await _request_or_raise(c, "GET", "/api/v1/obsidian/sync-status")
         return r.json()
 
 
@@ -1000,7 +1044,9 @@ async def brain_obsidian_update_note(
     _require_obsidian_local_tools_enabled()
 
     async with _client() as c:
-        r = await c.post(
+        r = await _request_or_raise(
+            c,
+            "POST",
             "/api/v1/obsidian/update-note",
             json={
                 "vault": vault,
@@ -1010,7 +1056,6 @@ async def brain_obsidian_update_note(
                 "tags": tags,
             },
         )
-        _raise(r)
         return r.json()
 
 

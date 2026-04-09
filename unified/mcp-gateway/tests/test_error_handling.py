@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import unittest
 
@@ -67,6 +68,21 @@ class RaiseProductionModeTests(unittest.TestCase):
         )
         gateway._raise(response)  # must not raise
 
+    def test_request_error_in_production_is_masked(self) -> None:
+        gateway = load_gateway_main()
+        with self.assertRaises(ValueError) as ctx:
+            asyncio.run(
+                gateway._request_or_raise(
+                    _FailingClient(),
+                    "GET",
+                    "http://backend/api/v1/memory/x",
+                )
+            )
+
+        msg = str(ctx.exception)
+        self.assertIn("Backend request failed", msg)
+        self.assertNotIn("connect timeout", msg)
+
 
 class RaiseDevelopmentModeTests(unittest.TestCase):
     """In dev mode, errors include the actual response body for debugging."""
@@ -103,3 +119,26 @@ class RaiseDevelopmentModeTests(unittest.TestCase):
         msg = str(ctx.exception)
         self.assertIn("503", msg)
         self.assertIn("Service Unavailable", msg)
+
+    def test_request_error_in_dev_includes_detail(self) -> None:
+        gateway = load_gateway_main()
+        with self.assertRaises(ValueError) as ctx:
+            asyncio.run(
+                gateway._request_or_raise(
+                    _FailingClient(),
+                    "GET",
+                    "http://backend/api/v1/memory/x",
+                )
+            )
+
+        msg = str(ctx.exception)
+        self.assertIn("Backend request failed", msg)
+        self.assertIn("connect timeout", msg)
+
+
+class _FailingClient:
+    async def request(self, method: str, path: str, **kwargs):
+        raise httpx.ConnectError(
+            "connect timeout",
+            request=httpx.Request(method, path),
+        )
