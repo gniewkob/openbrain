@@ -77,3 +77,11 @@ def test_local_guardrails_includes_request_runtime_parity_step() -> None:
         "request/runtime parity",
         "scripts/check_request_runtime_parity.py",
     ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_response_normalizers_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "response normalizers parity",
+        "scripts/check_response_normalizers_parity.py",
+    ) in module.GUARDRAIL_STEPS
