@@ -198,6 +198,12 @@ class MCPConfig(BaseSettings):
             raise ValueError("SOURCE_SYSTEM must match [a-z0-9][a-z0-9_-]{0,31}")
         return v
 
+    @model_validator(mode="after")
+    def validate_timeout_relationship(self) -> "MCPConfig":
+        if self.health_probe_timeout > self.backend_timeout:
+            raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be <= BACKEND_TIMEOUT_S")
+        return self
+
 
 class AppConfig(BaseSettings):
     """Main application configuration.
