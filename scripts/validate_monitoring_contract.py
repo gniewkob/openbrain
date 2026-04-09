@@ -56,18 +56,42 @@ def load_dashboard_exprs(path: Path) -> list[tuple[str, str]]:
 def load_alert_rule_exprs(path: Path) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     current_rule = "<unnamed-rule>"
-    for line in path.read_text(encoding="utf-8").splitlines():
+    lines = path.read_text(encoding="utf-8").splitlines()
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx]
         stripped = line.strip()
         if stripped.startswith("- alert:"):
             current_rule = stripped.split(":", 1)[1].strip() or "<unnamed-alert>"
+            idx += 1
             continue
-        if stripped.startswith("- record:"):
+        elif stripped.startswith("- record:"):
             current_rule = stripped.split(":", 1)[1].strip() or "<unnamed-record>"
+            idx += 1
             continue
-        if stripped.startswith("expr:"):
+        elif stripped.startswith("expr:"):
             expr = stripped.split(":", 1)[1].strip()
+            expr_indent = len(line) - len(line.lstrip(" "))
+            if expr in {"|", ">"}:
+                block_lines: list[str] = []
+                idx += 1
+                while idx < len(lines):
+                    block_line = lines[idx]
+                    if not block_line.strip():
+                        idx += 1
+                        continue
+                    block_indent = len(block_line) - len(block_line.lstrip(" "))
+                    if block_indent <= expr_indent:
+                        break
+                    block_lines.append(block_line.strip())
+                    idx += 1
+                expr = " ".join(block_lines).strip()
+            else:
+                idx += 1
             if expr:
                 out.append((current_rule, expr))
+            continue
+        idx += 1
     return out
 
 
