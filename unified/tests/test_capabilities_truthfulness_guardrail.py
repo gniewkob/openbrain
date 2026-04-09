@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 import sys
 
@@ -61,3 +62,52 @@ async def _get_backend_status():
     assert any("healthz_fallback" in err for err in errors)
     assert any("/healthz" in err for err in errors)
     assert any("readyz_status_code" in err for err in errors)
+
+
+def test_capabilities_truthfulness_metadata_check_uses_dynamic_api_version(
+    tmp_path,
+) -> None:
+    module = _load_capabilities_truthfulness_module()
+    metadata_path = tmp_path / "capabilities_metadata.json"
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "api_version": "2.4.0",
+                "schema_changelog": {
+                    "2.4.0": "Added another health validation note",
+                    "2.3.0": "Added health.overall in capabilities payload",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    original = module.METADATA
+    module.METADATA = metadata_path
+    try:
+        assert module._check_metadata() == []
+    finally:
+        module.METADATA = original
+
+
+def test_capabilities_truthfulness_metadata_check_requires_health_entry(tmp_path) -> None:
+    module = _load_capabilities_truthfulness_module()
+    metadata_path = tmp_path / "capabilities_metadata.json"
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "api_version": "2.4.0",
+                "schema_changelog": {
+                    "2.4.0": "Introduced routing tweaks",
+                    "2.3.0": "Initial public contract",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    original = module.METADATA
+    module.METADATA = metadata_path
+    try:
+        errors = module._check_metadata()
+    finally:
+        module.METADATA = original
+    assert any("health semantics entry" in err for err in errors)
