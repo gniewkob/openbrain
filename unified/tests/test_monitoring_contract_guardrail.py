@@ -114,6 +114,50 @@ def test_load_alert_rule_exprs_supports_multiline_expr_block(tmp_path: Path) -> 
     assert "sync_checks_total" in expr
 
 
+def test_validate_monitoring_contract_forbids_vector_zero_in_alert_rule(
+    tmp_path: Path,
+) -> None:
+    module = _load_monitoring_contract_module()
+    alert_rules_path = tmp_path / "alerts.yml"
+    alert_rules_path.write_text(
+        "\n".join(
+            [
+                "groups:",
+                "  - name: test",
+                "    rules:",
+                "      - alert: ZeroVectorAlert",
+                "        expr: vector(0) + http_requests_total_200",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    contract = {"required_metrics": ["http_requests_total_200"], "dashboard_files": []}
+    errors, _, _ = module.validate_monitoring_contract(
+        contract,
+        [],
+        [alert_rules_path],
+        forbid_vector_zero=True,
+        check_live_metrics=False,
+        metrics_url="http://127.0.0.1:9180/metrics",
+    )
+    assert any("Forbidden vector(0) in rule" in err for err in errors)
+
+
+def test_validate_monitoring_contract_flags_missing_alert_rule_file(tmp_path: Path) -> None:
+    module = _load_monitoring_contract_module()
+    missing_alert_path = tmp_path / "missing-alerts.yml"
+    contract = {"required_metrics": ["http_requests_total_200"], "dashboard_files": []}
+    errors, _, _ = module.validate_monitoring_contract(
+        contract,
+        [],
+        [missing_alert_path],
+        forbid_vector_zero=False,
+        check_live_metrics=False,
+        metrics_url="http://127.0.0.1:9180/metrics",
+    )
+    assert any("Missing alert rule file" in err for err in errors)
+
+
 def test_main_succeeds_without_live_metrics_check(monkeypatch) -> None:
     module = _load_monitoring_contract_module()
     monkeypatch.setattr(module, "validate_monitoring_contract", lambda *_args, **_kwargs: ([], {"a"}, set()))
