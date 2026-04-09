@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from src import mcp_transport
@@ -245,6 +246,32 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["custom_fields"], {"priority": "high"})
         self.assertEqual(result["root_id"], "mem-1")
         self.assertEqual(result["updated_by"], "internal")
+
+    async def test_init_config_parses_public_base_hostname_for_transport_security(self) -> None:
+        fake_cfg = SimpleNamespace(
+            mcp=SimpleNamespace(
+                brain_url="http://127.0.0.1:7010",
+                backend_timeout=12.5,
+                source_system="gateway",
+            ),
+            auth=SimpleNamespace(
+                internal_api_key="k" * 40,
+                public_base_url="https://abc123.ngrok-free.app/consent",
+            ),
+        )
+
+        with patch("src.config.get_config", return_value=fake_cfg):
+            mcp_transport._init_config()
+
+        self.assertEqual(mcp_transport.BRAIN_URL, "http://127.0.0.1:7010")
+        self.assertEqual(mcp_transport.BACKEND_TIMEOUT, 12.5)
+        self.assertEqual(mcp_transport.MCP_SOURCE_SYSTEM, "gateway")
+        self.assertEqual(mcp_transport._ngrok_host, "abc123.ngrok-free.app")
+
+        transport_security = mcp_transport._build_transport_security(mcp_transport._ngrok_host)
+        self.assertIn("abc123.ngrok-free.app", transport_security.allowed_hosts)
+        self.assertIn("abc123.ngrok-free.app:*", transport_security.allowed_hosts)
+        self.assertIn("https://abc123.ngrok-free.app", transport_security.allowed_origins)
 
     async def test_brain_search_normalizes_v1_hits_to_memory_shape(self) -> None:
         response = _FakeResponse(

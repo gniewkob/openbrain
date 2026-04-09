@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import functools
 from typing import Any, Literal, Optional
+from urllib.parse import urlparse
 
 import httpx
 import structlog
@@ -78,20 +79,24 @@ def _init_config():
     INTERNAL_API_KEY = config.auth.internal_api_key
     MCP_SOURCE_SYSTEM = config.mcp.source_system
     _public_base = config.auth.public_base_url
-    _ngrok_host = (
-        _public_base.replace("https://", "").replace("http://", "")
-        if _public_base
-        else ""
+    if _public_base:
+        parsed = urlparse(_public_base if "://" in _public_base else f"https://{_public_base}")
+        _ngrok_host = parsed.hostname or ""
+    else:
+        _ngrok_host = ""
+
+def _build_transport_security(ngrok_host: str) -> TransportSecuritySettings:
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"]
+        + ([f"{ngrok_host}:*", ngrok_host] if ngrok_host else []),
+        allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"]
+        + ([f"https://{ngrok_host}"] if ngrok_host else []),
     )
 
 
-_transport_security = TransportSecuritySettings(
-    enable_dns_rebinding_protection=True,
-    allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"]
-    + ([f"{_ngrok_host}:*", _ngrok_host] if _ngrok_host else []),
-    allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"]
-    + ([f"https://{_ngrok_host}"] if _ngrok_host else []),
-)
+_init_config()
+_transport_security = _build_transport_security(_ngrok_host)
 
 mcp = FastMCP(
     name="OpenBrain",
