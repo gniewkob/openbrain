@@ -183,6 +183,8 @@ class MCPConfig(BaseSettings):
         parsed = urlparse(v)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("BRAIN_URL must be a valid http(s) URL")
+        if parsed.path not in {"", "/"}:
+            raise ValueError("BRAIN_URL must not include path")
         if parsed.query or parsed.fragment:
             raise ValueError("BRAIN_URL must not include query params or fragment")
         return v
