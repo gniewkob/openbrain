@@ -137,13 +137,24 @@ def _client() -> "_SharedClient":
 
 
 _http_client: httpx.AsyncClient | None = None
+_http_client_config_key: tuple[str, float, str] | None = None
+
+
+def _current_http_client_config_key() -> tuple[str, float, str]:
+    return (BRAIN_URL, BACKEND_TIMEOUT, INTERNAL_API_KEY)
 
 
 class _SharedClient:
     """Context-manager wrapper that reuses a single AsyncClient connection pool."""
 
     async def __aenter__(self) -> httpx.AsyncClient:
-        global _http_client
+        global _http_client, _http_client_config_key
+        current_key = _current_http_client_config_key()
+        if _http_client is not None and _http_client_config_key != current_key:
+            await _http_client.aclose()
+            _http_client = None
+            _http_client_config_key = None
+
         if _http_client is None:
             headers: dict[str, str] = {}
             if INTERNAL_API_KEY:
@@ -153,6 +164,7 @@ class _SharedClient:
                 timeout=BACKEND_TIMEOUT,
                 headers=headers,
             )
+            _http_client_config_key = current_key
         return _http_client
 
     async def __aexit__(self, exc_type, exc, tb) -> bool:

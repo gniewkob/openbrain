@@ -89,6 +89,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
                 return _FakeResponse(200, payload={"status": "ok"})
 
         mcp_transport._http_client = None
+        mcp_transport._http_client_config_key = None
         with patch.object(mcp_transport.httpx, "AsyncClient", _CtorClient):
             async with mcp_transport._client() as c1:
                 self.assertIsNotNone(c1)
@@ -97,6 +98,45 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(created_clients), 1)
         mcp_transport._http_client = None
+        mcp_transport._http_client_config_key = None
+
+    async def test_client_recreates_when_runtime_config_changes(self) -> None:
+        created_clients: list[object] = []
+
+        class _CtorClient:
+            def __init__(self, **kwargs) -> None:
+                self.kwargs = kwargs
+                self.closed = False
+                created_clients.append(self)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def request(self, method: str, path: str, **kwargs):
+                return _FakeResponse(200, payload={"status": "ok"})
+
+            async def aclose(self) -> None:
+                self.closed = True
+
+        mcp_transport._http_client = None
+        mcp_transport._http_client_config_key = None
+        with patch.object(mcp_transport.httpx, "AsyncClient", _CtorClient):
+            with patch.object(mcp_transport, "BRAIN_URL", "http://127.0.0.1:7010"):
+                async with mcp_transport._client() as c1:
+                    self.assertEqual(c1.kwargs["base_url"], "http://127.0.0.1:7010")
+
+            with patch.object(mcp_transport, "BRAIN_URL", "http://127.0.0.1:7020"):
+                async with mcp_transport._client() as c2:
+                    self.assertEqual(c2.kwargs["base_url"], "http://127.0.0.1:7020")
+
+        self.assertEqual(len(created_clients), 2)
+        self.assertTrue(created_clients[0].closed)
+        self.assertIsNot(created_clients[0], created_clients[1])
+        mcp_transport._http_client = None
+        mcp_transport._http_client_config_key = None
 
     async def test_brain_capabilities_hide_http_obsidian_tools_when_disabled(
         self,
