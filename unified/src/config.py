@@ -196,7 +196,10 @@ class MCPConfig(BaseSettings):
     @field_validator("brain_url")
     @classmethod
     def validate_brain_url(cls, v: str) -> str:
-        parsed = urlparse(v)
+        value = (v or "").strip()
+        if any(ch.isspace() for ch in value):
+            raise ValueError("BRAIN_URL must not include whitespace")
+        parsed = urlparse(value)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("BRAIN_URL must be a valid http(s) URL")
         if parsed.username is not None or parsed.password is not None:
@@ -205,7 +208,7 @@ class MCPConfig(BaseSettings):
             raise ValueError("BRAIN_URL must not include path")
         if parsed.query or parsed.fragment:
             raise ValueError("BRAIN_URL must not include query params or fragment")
-        return v.rstrip("/")
+        return value.rstrip("/")
 
     @field_validator("source_system")
     @classmethod

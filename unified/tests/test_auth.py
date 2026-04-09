@@ -324,6 +324,16 @@ class TestConfigValidation:
         cfg = config.get_config()
         assert cfg.mcp.brain_url == "https://openbrain.internal:7010"
 
+    def test_mcp_brain_url_normalizes_surrounding_whitespace(self, monkeypatch):
+        """Test backend URL trims leading/trailing whitespace."""
+        from src import config
+
+        monkeypatch.setenv("BRAIN_URL", "  https://openbrain.internal:7010/  ")
+        config.get_config.cache_clear()
+
+        cfg = config.get_config()
+        assert cfg.mcp.brain_url == "https://openbrain.internal:7010"
+
     def test_mcp_brain_url_must_be_http_or_https(self, monkeypatch):
         """Test malformed backend URL is rejected."""
         from src import config
@@ -372,6 +382,16 @@ class TestConfigValidation:
         config.get_config.cache_clear()
 
         with pytest.raises(ValueError, match="fragment"):
+            config.get_config()
+
+    def test_mcp_brain_url_rejects_internal_whitespace(self, monkeypatch):
+        """Test backend URL with internal whitespace is rejected."""
+        from src import config
+
+        monkeypatch.setenv("BRAIN_URL", "https://openbrain internal:7010")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="whitespace"):
             config.get_config()
 
     def test_mcp_source_system_from_env(self, monkeypatch):
