@@ -111,6 +111,26 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="streamable_http_path"):
             config.get_config()
 
+    def test_mcp_streamable_http_path_normalizes_trailing_slash(self, monkeypatch):
+        """Test streamable HTTP path strips trailing slash for consistency."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/events/")
+        config.get_config.cache_clear()
+
+        cfg = config.get_config()
+        assert cfg.mcp.streamable_http_path == "/events"
+
+    def test_mcp_streamable_http_path_rejects_root_path(self, monkeypatch):
+        """Test root path is rejected to prevent redirect loops."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="redirect loops"):
+            config.get_config()
+
 
 class TestInternalAPIKey:
     """Test internal API key handling."""
