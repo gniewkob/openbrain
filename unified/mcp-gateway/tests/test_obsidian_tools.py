@@ -396,6 +396,34 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         for tool in result["obsidian_local"]["tools"]:
             self.assertIn(tool, result["tier_2_advanced"]["tools"])
 
+    async def test_brain_capabilities_keep_obsidian_disabled_when_tools_not_registered(
+        self,
+    ) -> None:
+        gateway = load_gateway_main()
+
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main._local_obsidian_tools_registered", return_value=False),
+            patch(
+                "_gateway_src.main._get_backend_status",
+                AsyncMock(
+                    return_value={
+                        "status": "ok",
+                        "api": "reachable",
+                        "db": "ok",
+                        "vector_store": "ok",
+                        "probe": "readyz",
+                    }
+                ),
+            ),
+        ):
+            result = await gateway.brain_capabilities()
+
+        self.assertEqual(result["obsidian"]["status"], "disabled")
+        self.assertEqual(result["obsidian"]["tools"], [])
+        self.assertEqual(result["obsidian_local"]["status"], "disabled")
+        self.assertEqual(result["obsidian_local"]["tools"], [])
+
     async def test_brain_capabilities_marks_reachable_backend_as_degraded_when_readyz_is_503(self) -> None:
         gateway = load_gateway_main()
 

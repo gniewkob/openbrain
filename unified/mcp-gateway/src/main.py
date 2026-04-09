@@ -292,6 +292,10 @@ def _obsidian_local_tools_enabled() -> bool:
     }
 
 
+def _local_obsidian_tools_registered() -> bool:
+    return all(callable(globals().get(f"brain_{tool}")) for tool in OBSIDIAN_LOCAL_TOOLS)
+
+
 def _obsidian_local_tools_disabled_reason() -> str:
     return (
         "Local Obsidian tools are disabled by default. "
@@ -388,7 +392,7 @@ async def _get_backend_status() -> dict:
 @mcp.tool()
 async def brain_capabilities() -> dict:
     """Check the operational status of the Memory Platform V1."""
-    obsidian_enabled = _obsidian_local_tools_enabled()
+    obsidian_enabled = _obsidian_local_tools_enabled() and _local_obsidian_tools_registered()
     backend = await _get_backend_status()
     tier_2_tools = [*ADVANCED_TOOLS]
     obsidian_tools = [*OBSIDIAN_LOCAL_TOOLS] if obsidian_enabled else []
