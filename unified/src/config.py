@@ -136,6 +136,15 @@ class MCPConfig(BaseSettings):
     brain_url: str = Field(default="http://127.0.0.1:80", alias="BRAIN_URL")
     backend_timeout: float = Field(default=30.0, alias="BACKEND_TIMEOUT_S")
     source_system: str = Field(default="other", alias="SOURCE_SYSTEM")
+    streamable_http_path: str = Field(default="/sse")
+
+    @field_validator("streamable_http_path")
+    @classmethod
+    def validate_streamable_http_path(cls, v: str) -> str:
+        value = (v or "").strip()
+        if not value.startswith("/"):
+            raise ValueError("MCP_STREAMABLE_HTTP_PATH must start with '/'")
+        return value
 
 
 class AppConfig(BaseSettings):
