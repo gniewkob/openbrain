@@ -22,6 +22,7 @@ The "Industrial Wrapper" in `combined.py` provides stable ASGI routing:
 3. **Root Redirect (307)**: Root path `/` requests are automatically redirected to the configured streamable transport path (default: `/sse`, override: `MCP_STREAMABLE_HTTP_PATH`). The 307 status code ensures that the `POST` method and JSON-RPC payload are preserved. `MCP_STREAMABLE_HTTP_PATH` must start with `/` and cannot be exactly `/` (guardrail against redirect loops).
 4. **Internal Auth**: MCP communicates with the internal REST API using the `X-Internal-Key` header, bypassing OIDC/Auth0 for system processes. The comparison uses `hmac.compare_digest` to prevent timing-based key guessing. In `PUBLIC_MODE=true`, this key must be explicitly configured and must not use the dev default.
 5. **Health Probe Timeout**: transport readiness fallback probes use `MCP_HEALTH_PROBE_TIMEOUT_S` (default `5.0`) for `/readyz`, `/healthz`, and `/api/v1/health`.
+6. **Backend Timeout Validation**: MCP backend timeout (`BACKEND_TIMEOUT_S`) must be strictly positive; invalid values fail fast at config load.
 
 ## Security Hardening (v2.3)
 The following security improvements were applied:

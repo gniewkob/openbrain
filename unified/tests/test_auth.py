@@ -151,6 +151,26 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="MCP_HEALTH_PROBE_TIMEOUT_S"):
             config.get_config()
 
+    def test_mcp_backend_timeout_from_env(self, monkeypatch):
+        """Test backend timeout can be configured via MCP env var."""
+        from src import config
+
+        monkeypatch.setenv("BACKEND_TIMEOUT_S", "15.0")
+        config.get_config.cache_clear()
+
+        cfg = config.get_config()
+        assert cfg.mcp.backend_timeout == 15.0
+
+    def test_mcp_backend_timeout_must_be_positive(self, monkeypatch):
+        """Test non-positive backend timeout is rejected."""
+        from src import config
+
+        monkeypatch.setenv("BACKEND_TIMEOUT_S", "0")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="BACKEND_TIMEOUT_S"):
+            config.get_config()
+
 
 class TestInternalAPIKey:
     """Test internal API key handling."""

@@ -160,6 +160,13 @@ class MCPConfig(BaseSettings):
             raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be > 0")
         return v
 
+    @field_validator("backend_timeout")
+    @classmethod
+    def validate_backend_timeout(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("BACKEND_TIMEOUT_S must be > 0")
+        return v
+
 
 class AppConfig(BaseSettings):
     """Main application configuration.
