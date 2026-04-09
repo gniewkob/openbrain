@@ -8,6 +8,7 @@ scattered os.environ.get() calls in other modules.
 from __future__ import annotations
 
 from functools import lru_cache
+import re
 from urllib.parse import urlparse
 
 from pydantic import Field, field_validator, model_validator
@@ -174,6 +175,13 @@ class MCPConfig(BaseSettings):
         parsed = urlparse(v)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("BRAIN_URL must be a valid http(s) URL")
+        return v
+
+    @field_validator("source_system")
+    @classmethod
+    def validate_source_system(cls, v: str) -> str:
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", v or ""):
+            raise ValueError("SOURCE_SYSTEM must match [a-z0-9][a-z0-9_-]{0,31}")
         return v
 
 
