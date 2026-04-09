@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 import re
+from unittest.mock import AsyncMock, patch
 
 from src.capabilities_manifest import _validate_manifest, load_capabilities_manifest
 from src.capabilities_metadata import _validate_metadata, load_capabilities_metadata
@@ -182,3 +184,29 @@ def test_capabilities_tools_map_to_real_http_transport_functions() -> None:
             assert callable(fn), (
                 f"brain_{tool} must exist when ENABLE_HTTP_OBSIDIAN_TOOLS=true"
             )
+
+
+def test_http_obsidian_capabilities_follow_runtime_registration_state() -> None:
+    manifest = load_capabilities_manifest()
+    expected_enabled = (
+        mcp_transport.ENABLE_HTTP_OBSIDIAN_TOOLS
+        and mcp_transport._http_obsidian_tools_registered()
+    )
+    backend = {
+        "status": "ok",
+        "api": "reachable",
+        "db": "ok",
+        "vector_store": "ok",
+        "probe": "readyz",
+    }
+    with patch.object(
+        mcp_transport, "_get_backend_status", AsyncMock(return_value=backend)
+    ):
+        caps = asyncio.run(mcp_transport.brain_capabilities())
+
+    if expected_enabled:
+        assert caps["obsidian_http"]["status"] == "enabled"
+        assert caps["obsidian_http"]["tools"] == manifest["http_obsidian_tools"]
+    else:
+        assert caps["obsidian_http"]["status"] == "disabled"
+        assert caps["obsidian_http"]["tools"] == []
