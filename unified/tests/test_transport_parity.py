@@ -403,6 +403,30 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             transport_result = await mcp_transport.brain_maintain(dry_run=True)
         self.assertEqual(transport_result, gateway_result)
 
+    async def test_actor_normalization_parity_between_stdio_and_http(self) -> None:
+        hits = [
+            {
+                "record": {
+                    "id": "mem-actor",
+                    "domain": "build",
+                    "created_by": "  creator  ",
+                    "updated_by": "   ",
+                },
+                "score": 1.0,
+            }
+        ]
+        gateway_records = gateway.normalize_find_hits_to_records(hits)
+        transport_records = mcp_transport.normalize_find_hits_to_records(hits)
+        self.assertEqual(gateway_records, transport_records)
+        self.assertEqual(gateway_records[0]["created_by"], "creator")
+        self.assertEqual(gateway_records[0]["updated_by"], "creator")
+
+        gateway_scored = gateway.normalize_find_hits_to_scored_memories(hits)
+        transport_scored = mcp_transport.normalize_find_hits_to_scored_memories(hits)
+        self.assertEqual(gateway_scored, transport_scored)
+        self.assertEqual(gateway_scored[0]["memory"]["created_by"], "creator")
+        self.assertEqual(gateway_scored[0]["memory"]["updated_by"], "creator")
+
 
 if __name__ == "__main__":
     unittest.main()
