@@ -90,3 +90,16 @@ class GatewayRequestBuildersTests(unittest.TestCase):
                     "updated_by_default": "   ",
                 }
             )
+
+    def test_validate_request_contracts_trims_string_fields(self) -> None:
+        load_gateway_main()
+        request_builders = sys.modules["_gateway_src.request_builders"]
+        normalized = request_builders._validate_request_contracts(
+            {
+                "find_list_query": None,
+                "find_list_sort": "  updated_at_desc  ",
+                "updated_by_default": "  agent  ",
+            }
+        )
+        self.assertEqual(normalized["find_list_sort"], "updated_at_desc")
+        self.assertEqual(normalized["updated_by_default"], "agent")

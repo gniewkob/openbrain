@@ -116,6 +116,17 @@ def test_request_contract_validation_rejects_invalid_updated_by_default() -> Non
         assert "updated_by_default" in str(exc)
 
 
+def test_request_contract_validation_trims_string_fields() -> None:
+    raw = {
+        "find_list_query": None,
+        "find_list_sort": "  updated_at_desc  ",
+        "updated_by_default": "  agent  ",
+    }
+    normalized = _validate_request_contracts(raw)
+    assert normalized["find_list_sort"] == "updated_at_desc"
+    assert normalized["updated_by_default"] == "agent"
+
+
 def test_runtime_limits_contract_is_loaded() -> None:
     limits = load_runtime_limits()
     raw = json.loads(

@@ -19,10 +19,12 @@ def _validate_request_contracts(data: Any) -> dict[str, Any]:
         raise ValueError(
             "request_contracts.updated_by_default must be a non-empty string"
         )
+    normalized_sort = sort.strip()
+    normalized_updated_by_default = updated_by_default.strip()
     return {
         "find_list_query": None,
-        "find_list_sort": sort,
-        "updated_by_default": updated_by_default,
+        "find_list_sort": normalized_sort,
+        "updated_by_default": normalized_updated_by_default,
     }
 
 
