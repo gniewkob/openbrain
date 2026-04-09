@@ -95,6 +95,14 @@ def normalize_updated_by(updated_by: str | None) -> str:
     return str(_CONTRACTS["updated_by_default"])
 
 
+def canonical_updated_by() -> str:
+    """Compatibility placeholder for patch payloads.
+
+    API v1 enforces authenticated subject as authoritative audit actor.
+    """
+    return str(_CONTRACTS["updated_by_default"])
+
+
 def normalize_optional_text(value: str | None) -> str | None:
     if value is None:
         return None

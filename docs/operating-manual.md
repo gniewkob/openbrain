@@ -63,6 +63,8 @@ Capabilities payload note:
 - `search` and `get_context` should represent active truth, not superseded history.
 - For `PATCH /api/v1/memory/{id}`, authenticated subject is authoritative audit actor.
   Request-level `updated_by` is accepted for compatibility but overridden at API boundary.
+- Gateway and streamable transport send a canonical `updated_by="agent"` placeholder
+  to avoid spoofed-client actor semantics in request payloads.
 
 ## V1 API Reference (Canonical Endpoints)
 

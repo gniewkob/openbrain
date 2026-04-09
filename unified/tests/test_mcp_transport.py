@@ -83,7 +83,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(created_clients), 1)
         mcp_transport._http_client = None
 
-    async def test_brain_capabilities_hide_http_obsidian_tools_when_disabled(self) -> None:
+    async def test_brain_capabilities_hide_http_obsidian_tools_when_disabled(
+        self,
+    ) -> None:
         with (
             patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
             patch.object(
@@ -109,13 +111,17 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["obsidian"]["mode"], "http")
         self.assertEqual(result["obsidian"]["status"], "disabled")
         self.assertEqual(result["obsidian"]["tools"], [])
-        self.assertEqual(result["obsidian"]["reason"], result["obsidian_http"]["reason"])
+        self.assertEqual(
+            result["obsidian"]["reason"], result["obsidian_http"]["reason"]
+        )
         self.assertEqual(result["obsidian_http"]["status"], "disabled")
         self.assertEqual(result["obsidian_http"]["tools"], [])
         self.assertIn("disabled", result["obsidian_http"]["reason"])
         self.assertNotIn("obsidian_vaults", result["tier_2_advanced"]["tools"])
 
-    async def test_brain_capabilities_include_http_obsidian_tools_when_enabled(self) -> None:
+    async def test_brain_capabilities_include_http_obsidian_tools_when_enabled(
+        self,
+    ) -> None:
         with (
             patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", True),
             patch.object(
@@ -247,7 +253,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["root_id"], "mem-1")
         self.assertEqual(result["updated_by"], "internal")
 
-    async def test_init_config_parses_public_base_hostname_for_transport_security(self) -> None:
+    async def test_init_config_parses_public_base_hostname_for_transport_security(
+        self,
+    ) -> None:
         fake_cfg = SimpleNamespace(
             mcp=SimpleNamespace(
                 brain_url="http://127.0.0.1:7010",
@@ -268,10 +276,14 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mcp_transport.MCP_SOURCE_SYSTEM, "gateway")
         self.assertEqual(mcp_transport._ngrok_host, "abc123.ngrok-free.app")
 
-        transport_security = mcp_transport._build_transport_security(mcp_transport._ngrok_host)
+        transport_security = mcp_transport._build_transport_security(
+            mcp_transport._ngrok_host
+        )
         self.assertIn("abc123.ngrok-free.app", transport_security.allowed_hosts)
         self.assertIn("abc123.ngrok-free.app:*", transport_security.allowed_hosts)
-        self.assertIn("https://abc123.ngrok-free.app", transport_security.allowed_origins)
+        self.assertIn(
+            "https://abc123.ngrok-free.app", transport_security.allowed_origins
+        )
 
     async def test_brain_search_normalizes_v1_hits_to_memory_shape(self) -> None:
         response = _FakeResponse(
@@ -377,7 +389,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-    async def test_brain_update_allows_updated_by_override(self) -> None:
+    async def test_brain_update_uses_canonical_updated_by_placeholder(self) -> None:
         response = _FakeResponse(200, payload={"id": "mem-1"})
         fake_client = _FakeClient(response)
         with patch.object(mcp_transport, "_client", return_value=fake_client):
@@ -388,7 +400,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(
             fake_client.last_request[2]["json"]["updated_by"],
-            "gateway-user",
+            "agent",
         )
 
     async def test_brain_update_empty_updated_by_falls_back_to_agent(self) -> None:
@@ -558,7 +570,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             "_client",
             side_effect=[
                 _ProbeClient({"/readyz": RuntimeError("timeout")}),
-                _ProbeClient({"/healthz": _FakeResponse(200, payload={"status": "ok"})}),
+                _ProbeClient(
+                    {"/healthz": _FakeResponse(200, payload={"status": "ok"})}
+                ),
             ],
         ):
             result = await mcp_transport._get_backend_status()
@@ -568,7 +582,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["api"], "reachable")
         self.assertIn("/readyz probe failed", result["reason"])
 
-    async def test_get_backend_status_reports_unavailable_when_both_probes_fail(self) -> None:
+    async def test_get_backend_status_reports_unavailable_when_both_probes_fail(
+        self,
+    ) -> None:
         with patch.object(
             mcp_transport,
             "_client",
@@ -587,14 +603,18 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("healthz down", result["reason"])
         self.assertIn("api health down", result["reason"])
 
-    async def test_get_backend_status_uses_api_health_when_readyz_and_healthz_fail(self) -> None:
+    async def test_get_backend_status_uses_api_health_when_readyz_and_healthz_fail(
+        self,
+    ) -> None:
         with patch.object(
             mcp_transport,
             "_client",
             side_effect=[
                 _ProbeClient({"/readyz": RuntimeError("readyz timeout")}),
                 _ProbeClient({"/healthz": RuntimeError("healthz timeout")}),
-                _ProbeClient({"/api/v1/health": _FakeResponse(200, payload={"status": "ok"})}),
+                _ProbeClient(
+                    {"/api/v1/health": _FakeResponse(200, payload={"status": "ok"})}
+                ),
             ],
         ):
             result = await mcp_transport._get_backend_status()

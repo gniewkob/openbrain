@@ -23,6 +23,10 @@ class GatewayRequestBuildersTests(unittest.TestCase):
         self.assertEqual(gateway.normalize_updated_by("   "), "agent")
         self.assertEqual(gateway.normalize_updated_by(None), "agent")
 
+    def test_canonical_updated_by(self) -> None:
+        gateway = load_gateway_main()
+        self.assertEqual(gateway.canonical_updated_by(), "agent")
+
     def test_build_find_search_payload(self) -> None:
         gateway = load_gateway_main()
         payload = gateway.build_find_search_payload(

@@ -31,6 +31,7 @@ from .request_builders import (
     build_find_search_payload,
     build_list_filters,
     build_sync_check_payload,
+    canonical_updated_by,
     normalize_updated_by,
 )
 from .response_normalizers import (
@@ -439,14 +440,16 @@ async def brain_update(
     """Update an existing memory.
 
     Corporate records are versioned automatically (append-only).
+    The `updated_by` argument is accepted for backwards compatibility only.
+    Audit actor identity is enforced server-side from authenticated subject.
     """
-    actor = normalize_updated_by(updated_by)
+    _ = normalize_updated_by(updated_by)
     return await _safe_req(
         "PATCH",
         memory_item_path(memory_id),
         json={
             "content": content,
-            "updated_by": actor,
+            "updated_by": canonical_updated_by(),
             "title": title,
             "owner": owner,
             "tenant_id": tenant_id,

@@ -5,6 +5,7 @@ from src.request_builders import (
     build_find_list_payload,
     build_list_filters,
     build_sync_check_payload,
+    canonical_updated_by,
     normalize_updated_by,
 )
 
@@ -39,6 +40,10 @@ def test_normalize_updated_by_trims_and_falls_back() -> None:
     assert normalize_updated_by("  alice  ") == "alice"
     assert normalize_updated_by("   ") == "agent"
     assert normalize_updated_by(None) == "agent"
+
+
+def test_canonical_updated_by_is_default_actor_placeholder() -> None:
+    assert canonical_updated_by() == "agent"
 
 
 def test_build_find_search_payload() -> None:
