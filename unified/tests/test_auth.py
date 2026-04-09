@@ -151,6 +151,16 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="MCP_HEALTH_PROBE_TIMEOUT_S"):
             config.get_config()
 
+    def test_mcp_health_probe_timeout_has_upper_bound(self, monkeypatch):
+        """Test excessively high health probe timeout is rejected."""
+        from src import config
+
+        monkeypatch.setenv("MCP_HEALTH_PROBE_TIMEOUT_S", "31")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="MCP_HEALTH_PROBE_TIMEOUT_S"):
+            config.get_config()
+
     def test_mcp_backend_timeout_from_env(self, monkeypatch):
         """Test backend timeout can be configured via MCP env var."""
         from src import config
@@ -166,6 +176,16 @@ class TestConfigValidation:
         from src import config
 
         monkeypatch.setenv("BACKEND_TIMEOUT_S", "0")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="BACKEND_TIMEOUT_S"):
+            config.get_config()
+
+    def test_mcp_backend_timeout_has_upper_bound(self, monkeypatch):
+        """Test excessively high backend timeout is rejected."""
+        from src import config
+
+        monkeypatch.setenv("BACKEND_TIMEOUT_S", "121")
         config.get_config.cache_clear()
 
         with pytest.raises(ValueError, match="BACKEND_TIMEOUT_S"):
