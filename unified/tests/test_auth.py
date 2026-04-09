@@ -181,6 +181,16 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="double slashes"):
             config.get_config()
 
+    def test_mcp_streamable_http_path_has_length_limit(self, monkeypatch):
+        """Test streamable path length upper bound is enforced."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/" + ("a" * 129))
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="128"):
+            config.get_config()
+
     def test_mcp_health_probe_timeout_from_env(self, monkeypatch):
         """Test health probe timeout can be configured via MCP env var."""
         from src import config

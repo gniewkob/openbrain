@@ -160,6 +160,8 @@ class MCPConfig(BaseSettings):
             raise ValueError(
                 "MCP_STREAMABLE_HTTP_PATH must not include backslashes or double slashes"
             )
+        if len(value) > 128:
+            raise ValueError("MCP_STREAMABLE_HTTP_PATH must be <= 128 characters")
         if len(value) > 1:
             value = value.rstrip("/")
         return value
