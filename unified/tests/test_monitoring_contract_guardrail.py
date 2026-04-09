@@ -48,13 +48,44 @@ def test_validate_monitoring_contract_flags_unexpected_metric(tmp_path: Path) ->
     errors, referenced, live = module.validate_monitoring_contract(
         contract,
         [dashboard_path],
+        [],
         forbid_vector_zero=False,
         check_live_metrics=False,
         metrics_url="http://127.0.0.1:9180/metrics",
     )
-    assert any("Dashboard references metrics not in contract" in err for err in errors)
+    assert any("Monitoring expressions reference metrics not in contract" in err for err in errors)
     assert "mystery_metric_total" in referenced
     assert live == set()
+
+
+def test_validate_monitoring_contract_flags_unexpected_metric_from_alert_rule(
+    tmp_path: Path,
+) -> None:
+    module = _load_monitoring_contract_module()
+    alert_rules_path = tmp_path / "alerts.yml"
+    alert_rules_path.write_text(
+        "\n".join(
+            [
+                "groups:",
+                "  - name: test",
+                "    rules:",
+                "      - alert: TestAlert",
+                "        expr: mystery_alert_metric_total > 0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    contract = {"required_metrics": ["http_requests_total_200"], "dashboard_files": []}
+    errors, referenced, _ = module.validate_monitoring_contract(
+        contract,
+        [],
+        [alert_rules_path],
+        forbid_vector_zero=False,
+        check_live_metrics=False,
+        metrics_url="http://127.0.0.1:9180/metrics",
+    )
+    assert any("Monitoring expressions reference metrics not in contract" in err for err in errors)
+    assert "mystery_alert_metric_total" in referenced
 
 
 def test_main_succeeds_without_live_metrics_check(monkeypatch) -> None:

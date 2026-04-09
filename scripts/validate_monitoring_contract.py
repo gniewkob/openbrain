@@ -53,6 +53,24 @@ def load_dashboard_exprs(path: Path) -> list[tuple[str, str]]:
     return out
 
 
+def load_alert_rule_exprs(path: Path) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    current_rule = "<unnamed-rule>"
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- alert:"):
+            current_rule = stripped.split(":", 1)[1].strip() or "<unnamed-alert>"
+            continue
+        if stripped.startswith("- record:"):
+            current_rule = stripped.split(":", 1)[1].strip() or "<unnamed-record>"
+            continue
+        if stripped.startswith("expr:"):
+            expr = stripped.split(":", 1)[1].strip()
+            if expr:
+                out.append((current_rule, expr))
+    return out
+
+
 def extract_metric_tokens(expr: str) -> set[str]:
     expr_wo_strings = QUOTED_STRING_RE.sub("", expr)
     symbols = set(PROMQL_SYMBOL_RE.findall(expr_wo_strings))
@@ -94,6 +112,7 @@ def fetch_metric_names(url: str) -> set[str]:
 def validate_monitoring_contract(
     contract: dict,
     dashboard_paths: list[Path],
+    alert_rule_paths: list[Path],
     *,
     forbid_vector_zero: bool,
     check_live_metrics: bool,
@@ -112,9 +131,21 @@ def validate_monitoring_contract(
                 errors.append(f"Forbidden vector(0) in panel '{title}': {expr}")
             referenced_metrics |= extract_metric_tokens(expr)
 
+    for alert_rule_path in alert_rule_paths:
+        if not alert_rule_path.exists():
+            errors.append(f"Missing alert rule file: {alert_rule_path}")
+            continue
+        for rule_name, expr in load_alert_rule_exprs(alert_rule_path):
+            if forbid_vector_zero and "vector(0)" in expr:
+                errors.append(f"Forbidden vector(0) in rule '{rule_name}': {expr}")
+            referenced_metrics |= extract_metric_tokens(expr)
+
     unexpected = sorted(m for m in referenced_metrics if not metric_is_allowed(m, required_metrics))
     if unexpected:
-        errors.append("Dashboard references metrics not in contract: " + ", ".join(unexpected))
+        errors.append(
+            "Monitoring expressions reference metrics not in contract: "
+            + ", ".join(unexpected)
+        )
 
     live_metrics: set[str] = set()
     if check_live_metrics:
@@ -146,10 +177,12 @@ def main() -> int:
     contract_path = (root / args.contract).resolve()
     contract = load_contract(contract_path)
     dashboard_paths = [root / rel for rel in contract.get("dashboard_files", [])]
+    alert_rule_paths = [root / rel for rel in contract.get("alert_rule_files", [])]
 
     errors, referenced_metrics, live_metrics = validate_monitoring_contract(
         contract,
         dashboard_paths,
+        alert_rule_paths,
         forbid_vector_zero=not args.allow_vector_zero,
         check_live_metrics=args.check_live,
         metrics_url=args.metrics_url,
@@ -163,7 +196,7 @@ def main() -> int:
 
     print("MONITORING CONTRACT CHECK: OK")
     print(f"- required metrics: {len(contract.get('required_metrics', []))}")
-    print(f"- referenced dashboard metrics: {len(referenced_metrics)}")
+    print(f"- referenced monitoring metrics: {len(referenced_metrics)}")
     if args.check_live:
         print(f"- live /metrics names: {len(live_metrics)}")
     return 0

@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "service": "openbrain-unified",
   "required_metrics": [
     "active_memories_build_total",
@@ -29,16 +29,29 @@
     "memories_updated_total",
     "memories_versioned_total",
     "operational_health_status",
+    "openbrain_http_5xx_rate_5m",
+    "openbrain_http_5xx_ratio_5m",
+    "openbrain_http_requests_rate_5m",
+    "openbrain_policy_skip_ratio_1h",
+    "openbrain_search_zero_hit_ratio_1h",
+    "openbrain_telemetry_backend_fallback_1h",
+    "openbrain_up",
     "policy_skip_dedup_total",
     "policy_skip_delete_total",
     "policy_skip_owner_normalization_total",
     "policy_skip_per_maintain_run_ratio",
     "policy_skip_total",
+    "search_zero_hit_total",
     "search_requests_total",
+    "sync_checks_total",
+    "sync_missing_total",
     "telemetry_counter_backend_fallback_total",
     "up"
   ],
   "dashboard_files": [
     "monitoring/grafana/dashboards/openbrain/openbrain-overview.json"
+  ],
+  "alert_rule_files": [
+    "monitoring/prometheus/openbrain-alerts.yml"
   ]
 }
