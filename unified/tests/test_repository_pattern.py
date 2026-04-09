@@ -216,6 +216,60 @@ class TestInMemoryMemoryRepository(unittest.TestCase):
         self.assertIsNotNone(retrieved)
         self.assertEqual(retrieved.content, "Seeded memory")
 
+    def test_search_by_embedding_filters_non_active_records(self) -> None:
+        active = Memory(
+            id="mem_1",
+            content="Active memory",
+            domain="build",
+            entity_type="Test",
+            match_key="active-key",
+            status="active",
+            embedding=[1.0, 0.0],
+        )
+        superseded = Memory(
+            id="mem_2",
+            content="Superseded memory",
+            domain="build",
+            entity_type="Test",
+            match_key="superseded-key",
+            status="superseded",
+            embedding=[1.0, 0.0],
+        )
+        self.repo.seed([active, superseded])
+
+        results = asyncio.run(
+            self.repo.search_by_embedding([1.0, 0.0], top_k=5, threshold=0.0)
+        )
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0][0].id, "mem_1")
+
+
+class TestSQLAlchemyMemoryRepositorySearchPolicy(unittest.IsolatedAsyncioTestCase):
+    async def test_search_by_embedding_filters_to_active_records_only(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
+        from src.repositories import SQLAlchemyMemoryRepository
+
+        captured_stmt = None
+
+        async def execute(stmt):
+            nonlocal captured_stmt
+            captured_stmt = stmt
+            return SimpleNamespace(all=lambda: [])
+
+        session = AsyncMock()
+        session.execute.side_effect = execute
+        repo = SQLAlchemyMemoryRepository(session)
+
+        await repo.search_by_embedding([1.0, 0.0], top_k=3)
+
+        self.assertIsNotNone(captured_stmt)
+        stmt_text = str(captured_stmt)
+        self.assertIn("memories.status", stmt_text)
+        self.assertIn("= :status_1", stmt_text)
+
 
 class TestRepositoryFactory(unittest.TestCase):
     """Tests for repository factory function."""
