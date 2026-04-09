@@ -69,6 +69,11 @@ CORE_TOOLS = _CAPS["core_tools"]
 ADVANCED_TOOLS = _CAPS["advanced_tools"]
 ADMIN_TOOLS = _CAPS["admin_tools"]
 HTTP_OBSIDIAN_TOOLS = _CAPS["http_obsidian_tools"]
+_LIMITS = load_runtime_limits()
+MAX_SEARCH_TOP_K: int = _LIMITS["max_search_top_k"]
+MAX_LIST_LIMIT: int = _LIMITS["max_list_limit"]
+MAX_SYNC_LIMIT: int = _LIMITS["max_sync_limit"]
+MAX_BULK_ITEMS: int = _LIMITS["max_bulk_items"]
 
 
 def _init_config():
@@ -392,6 +397,8 @@ async def brain_search(
     Optionally filter by domain (corporate|build|personal), entity_type, owner,
     sensitivity.
     """
+    if not 1 <= top_k <= MAX_SEARCH_TOP_K:
+        raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
     filters = build_list_filters(
         domain=domain,
         entity_type=entity_type,
@@ -515,6 +522,8 @@ async def brain_list(
     status options: active | superseded (default: active only)
     domain options: corporate | build | personal
     """
+    if not 1 <= limit <= MAX_LIST_LIMIT:
+        raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
     filters = build_list_filters(
         domain=domain,
         entity_type=entity_type,
@@ -603,6 +612,8 @@ if ENABLE_HTTP_OBSIDIAN_TOOLS:
         One-way sync from an Obsidian vault into OpenBrain using deterministic
         match keys. Use paths for explicit notes or folder for a bounded folder sync.
         """
+        if not 1 <= limit <= MAX_SYNC_LIMIT:
+            raise ValueError(f"limit must be 1–{MAX_SYNC_LIMIT}, got {limit}")
         payload = {
             "vault": vault,
             "paths": paths or [],
@@ -620,11 +631,6 @@ if ENABLE_HTTP_OBSIDIAN_TOOLS:
 # ===========================================================================
 
 
-# Maximum batch size for bulk operations to prevent OOM
-_LIMITS = load_runtime_limits()
-_MAX_BATCH_SIZE = _LIMITS["max_bulk_items"]
-
-
 @mcp.tool()
 @mcp_tool_guard
 async def brain_store_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
@@ -634,9 +640,9 @@ async def brain_store_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
     Args:
         items: List of memory records (max 100 per batch)
     """
-    if len(items) > _MAX_BATCH_SIZE:
+    if len(items) > MAX_BULK_ITEMS:
         raise ValueError(
-            f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. "
+            f"Batch size exceeds maximum of {MAX_BULK_ITEMS} items. "
             "Split into multiple calls."
         )
     if not items:
@@ -654,9 +660,9 @@ async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
     Args:
         items: List of memory records (max 100 per batch)
     """
-    if len(items) > _MAX_BATCH_SIZE:
+    if len(items) > MAX_BULK_ITEMS:
         raise ValueError(
-            f"Batch size exceeds maximum of {_MAX_BATCH_SIZE} items. "
+            f"Batch size exceeds maximum of {MAX_BULK_ITEMS} items. "
             "Split into multiple calls."
         )
     if not items:
