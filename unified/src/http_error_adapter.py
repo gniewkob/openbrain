@@ -50,3 +50,10 @@ def backend_error_message(status_code: int, detail: Any) -> str:
     else:
         detail_text = str(detail)
     return f"Backend {status_code}: {detail_text}"
+
+
+def backend_request_failure_message(error: Exception) -> str:
+    is_production = os.environ.get("ENV", "development").lower() == "production"
+    if is_production:
+        return "Backend request failed: upstream unavailable"
+    return f"Backend request failed: {error}"

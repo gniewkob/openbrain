@@ -20,7 +20,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from .capabilities_health import build_capabilities_health
 from .capabilities_manifest import load_capabilities_manifest
 from .capabilities_metadata import load_capabilities_metadata
-from .http_error_adapter import backend_error_message
+from .http_error_adapter import backend_error_message, backend_request_failure_message
 from .memory_paths import (
     memory_item_absolute_path,
     memory_item_path,
@@ -232,7 +232,16 @@ async def _safe_req(method: str, path: str, **kwargs) -> dict[str, Any]:
                 "mcp_v1_request", method=method, path=full_path, payload=_safe_payload
             )
 
-        r = await c.request(method, full_path, **kwargs)
+        try:
+            r = await c.request(method, full_path, **kwargs)
+        except httpx.RequestError as exc:
+            log.error(
+                "mcp_v1_request_error",
+                method=method,
+                path=full_path,
+                error=str(exc),
+            )
+            raise ValueError(backend_request_failure_message(exc)) from exc
         if r.is_error:
             try:
                 detail = r.json()
