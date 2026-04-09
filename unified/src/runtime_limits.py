@@ -10,6 +10,8 @@ _DEFAULTS = {
     "max_sync_limit": 200,
     "max_bulk_items": 100,
 }
+
+
 def _validate_runtime_limits(data: Any) -> dict[str, int]:
     if not isinstance(data, dict):
         raise ValueError("runtime_limits must be a JSON object")

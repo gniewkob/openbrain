@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+
 def _validate_request_contracts(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("request_contracts must be a JSON object")
