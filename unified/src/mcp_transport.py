@@ -80,10 +80,13 @@ def _init_config():
     MCP_SOURCE_SYSTEM = config.mcp.source_system
     _public_base = config.auth.public_base_url
     if _public_base:
-        parsed = urlparse(_public_base if "://" in _public_base else f"https://{_public_base}")
+        parsed = urlparse(
+            _public_base if "://" in _public_base else f"https://{_public_base}"
+        )
         _ngrok_host = parsed.hostname or ""
     else:
         _ngrok_host = ""
+
 
 def _build_transport_security(ngrok_host: str) -> TransportSecuritySettings:
     return TransportSecuritySettings(
