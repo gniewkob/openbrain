@@ -61,3 +61,11 @@ def test_local_guardrails_includes_capabilities_metadata_parity_step() -> None:
         "capabilities metadata parity",
         "scripts/check_capabilities_metadata_parity.py",
     ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_request_runtime_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "request/runtime parity",
+        "scripts/check_request_runtime_parity.py",
+    ) in module.GUARDRAIL_STEPS
