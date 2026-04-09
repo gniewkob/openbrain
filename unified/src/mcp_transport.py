@@ -77,6 +77,7 @@ def _init_config():
         BRAIN_URL, \
         BACKEND_TIMEOUT, \
         INTERNAL_API_KEY, \
+        STREAMABLE_HTTP_PATH, \
         MCP_SOURCE_SYSTEM, \
         _public_base, \
         _ngrok_host
@@ -86,6 +87,7 @@ def _init_config():
     BRAIN_URL = config.mcp.brain_url
     BACKEND_TIMEOUT = config.mcp.backend_timeout
     INTERNAL_API_KEY = config.auth.internal_api_key
+    STREAMABLE_HTTP_PATH = config.mcp.streamable_http_path
     MCP_SOURCE_SYSTEM = config.mcp.source_system
     _public_base = config.auth.public_base_url
     if _public_base:

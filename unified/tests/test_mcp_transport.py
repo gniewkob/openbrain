@@ -371,11 +371,18 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     async def test_init_config_parses_public_base_hostname_for_transport_security(
         self,
     ) -> None:
+        old_brain_url = mcp_transport.BRAIN_URL
+        old_backend_timeout = mcp_transport.BACKEND_TIMEOUT
+        old_source_system = mcp_transport.MCP_SOURCE_SYSTEM
+        old_streamable_path = mcp_transport.STREAMABLE_HTTP_PATH
+        old_ngrok_host = mcp_transport._ngrok_host
+
         fake_cfg = SimpleNamespace(
             mcp=SimpleNamespace(
                 brain_url="http://127.0.0.1:7010",
                 backend_timeout=12.5,
                 source_system="gateway",
+                streamable_http_path="/events",
             ),
             auth=SimpleNamespace(
                 internal_api_key="k" * 40,
@@ -389,6 +396,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mcp_transport.BRAIN_URL, "http://127.0.0.1:7010")
         self.assertEqual(mcp_transport.BACKEND_TIMEOUT, 12.5)
         self.assertEqual(mcp_transport.MCP_SOURCE_SYSTEM, "gateway")
+        self.assertEqual(mcp_transport.STREAMABLE_HTTP_PATH, "/events")
         self.assertEqual(mcp_transport._ngrok_host, "abc123.ngrok-free.app")
 
         transport_security = mcp_transport._build_transport_security(
@@ -399,6 +407,12 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(
             "https://abc123.ngrok-free.app", transport_security.allowed_origins
         )
+
+        mcp_transport.BRAIN_URL = old_brain_url
+        mcp_transport.BACKEND_TIMEOUT = old_backend_timeout
+        mcp_transport.MCP_SOURCE_SYSTEM = old_source_system
+        mcp_transport.STREAMABLE_HTTP_PATH = old_streamable_path
+        mcp_transport._ngrok_host = old_ngrok_host
 
     async def test_brain_search_normalizes_v1_hits_to_memory_shape(self) -> None:
         response = _FakeResponse(
