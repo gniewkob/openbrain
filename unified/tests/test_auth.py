@@ -221,6 +221,19 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="BACKEND_TIMEOUT_S"):
             config.get_config()
 
+    def test_mcp_health_probe_timeout_must_not_exceed_backend_timeout(
+        self, monkeypatch
+    ):
+        """Test probe timeout cannot exceed backend timeout."""
+        from src import config
+
+        monkeypatch.setenv("MCP_HEALTH_PROBE_TIMEOUT_S", "20")
+        monkeypatch.setenv("BACKEND_TIMEOUT_S", "10")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="MCP_HEALTH_PROBE_TIMEOUT_S"):
+            config.get_config()
+
     def test_mcp_brain_url_from_env(self, monkeypatch):
         """Test backend URL can be configured via MCP env var."""
         from src import config
