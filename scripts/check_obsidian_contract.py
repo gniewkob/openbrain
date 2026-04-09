@@ -100,6 +100,38 @@ def _check_gateway_gating() -> list[str]:
     return errors
 
 
+def _check_disabled_reason_snippets(
+    gateway_text: str | None = None, http_text: str | None = None
+) -> list[str]:
+    errors: list[str] = []
+    gateway_text = (
+        gateway_text
+        if gateway_text is not None
+        else GATEWAY_MAIN.read_text(encoding="utf-8")
+    )
+    http_text = (
+        http_text if http_text is not None else HTTP_TRANSPORT.read_text(encoding="utf-8")
+    )
+
+    gateway_snippets = (
+        "Local Obsidian tools are disabled by default.",
+        "trusted local stdio gateway",
+        "Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1",
+    )
+    for snippet in gateway_snippets:
+        if snippet not in gateway_text:
+            errors.append(f"gateway disabled reason missing snippet: {snippet}")
+
+    http_snippets = (
+        "HTTP Obsidian tools are disabled by default.",
+        "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport.",
+    )
+    for snippet in http_snippets:
+        if snippet not in http_text:
+            errors.append(f"HTTP disabled reason missing snippet: {snippet}")
+    return errors
+
+
 def _check_http_transport_contract() -> list[str]:
     errors: list[str] = []
     text = HTTP_TRANSPORT.read_text(encoding="utf-8")
@@ -127,6 +159,7 @@ def main() -> int:
     errors: list[str] = []
     errors.extend(_check_manifest())
     errors.extend(_check_gateway_gating())
+    errors.extend(_check_disabled_reason_snippets())
     errors.extend(_check_http_transport_contract())
     if errors:
         for err in errors:
