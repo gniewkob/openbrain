@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from src import mcp_transport
+from src import schemas
 from src.runtime_limits import load_runtime_limits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,13 @@ def test_runtime_limits_match_transport_constants() -> None:
     assert mcp_transport.MAX_LIST_LIMIT == limits["max_list_limit"]
     assert mcp_transport.MAX_SYNC_LIMIT == limits["max_sync_limit"]
     assert mcp_transport.MAX_BULK_ITEMS == limits["max_bulk_items"]
+
+
+def test_runtime_limits_match_schema_constants() -> None:
+    limits = load_runtime_limits()
+    assert schemas.MAX_SYNC_LIMIT == limits["max_sync_limit"]
+    assert schemas.MAX_BULK_RECORDS == limits["max_bulk_items"]
+    assert schemas.MAX_EXPORT_IDS == limits["max_bulk_items"]
 
 
 def test_runtime_limits_match_gateway_constants_when_available() -> None:
