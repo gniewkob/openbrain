@@ -28,7 +28,15 @@ def test_capabilities_truthfulness_ast_helpers() -> None:
 
     src_ok = """
 async def _get_backend_status():
-    return {"probe": "api_health_fallback", "path": "/api/v1/health"}
+    return {
+        "probe": "readyz",
+        "readyz_status_code": 200,
+        "primary_path": "/readyz",
+        "secondary_probe": "healthz_fallback",
+        "secondary_path": "/healthz",
+        "fallback_probe": "api_health_fallback",
+        "fallback_path": "/api/v1/health",
+    }
 
 async def brain_capabilities():
     health = {"overall": "healthy"}
@@ -45,8 +53,11 @@ async def brain_capabilities():
 
     src_missing_fallback = """
 async def _get_backend_status():
-    return {"probe": "readyz"}
+    return {"probe": "readyz", "primary_path": "/readyz"}
 """
     errors = module._check_health_probe_fallback_semantics(src_missing_fallback, "x")
     assert any("api_health_fallback" in err for err in errors)
     assert any("/api/v1/health" in err for err in errors)
+    assert any("healthz_fallback" in err for err in errors)
+    assert any("/healthz" in err for err in errors)
+    assert any("readyz_status_code" in err for err in errors)

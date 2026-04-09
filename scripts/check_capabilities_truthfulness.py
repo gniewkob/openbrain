@@ -101,10 +101,20 @@ def _check_health_probe_fallback_semantics(text: str, label: str) -> list[str]:
     constants = {
         node.value for node in ast.walk(fn) if isinstance(node, ast.Constant) and isinstance(node.value, str)
     }
+    if "/readyz" not in constants:
+        errors.append(f"{label} must probe /readyz as primary readiness endpoint")
+    if "readyz" not in constants:
+        errors.append(f"{label} must include readyz probe marker")
+    if "/healthz" not in constants:
+        errors.append(f"{label} must probe /healthz as fallback endpoint")
+    if "healthz_fallback" not in constants:
+        errors.append(f"{label} must include healthz_fallback probe marker")
     if "/api/v1/health" not in constants:
         errors.append(f"{label} must probe /api/v1/health before reporting unavailable")
     if "api_health_fallback" not in constants:
         errors.append(f"{label} must include api_health_fallback probe marker")
+    if "readyz_status_code" not in constants:
+        errors.append(f"{label} must include readyz_status_code in backend probe payload")
     return errors
 
 
