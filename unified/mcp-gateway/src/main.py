@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import os
 import re
 from typing import Any, Literal
@@ -67,7 +68,8 @@ from .runtime_limits import load_runtime_limits
 _gateway_logger = logging.getLogger("mcp_gateway")
 
 BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://localhost:7010")
-BACKEND_TIMEOUT: float = float(os.environ.get("BACKEND_TIMEOUT_S", "30"))
+BACKEND_TIMEOUT_RAW: str = os.environ.get("BACKEND_TIMEOUT_S", "30")
+BACKEND_TIMEOUT: float
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
 OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"
 MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
@@ -91,6 +93,20 @@ def _normalize_brain_url(value: str | None) -> str:
     return normalized.rstrip("/")
 
 
+def _normalize_backend_timeout(value: str | None) -> float:
+    try:
+        normalized = float((value or "").strip())
+    except (TypeError, ValueError) as exc:
+        raise ValueError("BACKEND_TIMEOUT_S must be a valid float") from exc
+    if not math.isfinite(normalized):
+        raise ValueError("BACKEND_TIMEOUT_S must be finite")
+    if normalized <= 0:
+        raise ValueError("BACKEND_TIMEOUT_S must be > 0")
+    if normalized > 120:
+        raise ValueError("BACKEND_TIMEOUT_S must be <= 120")
+    return normalized
+
+
 def _normalize_source_system(value: str | None) -> str:
     normalized = (value or "").strip().lower()
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", normalized):
@@ -99,6 +115,7 @@ def _normalize_source_system(value: str | None) -> str:
 
 
 BRAIN_URL = _normalize_brain_url(BRAIN_URL)
+BACKEND_TIMEOUT = _normalize_backend_timeout(BACKEND_TIMEOUT_RAW)
 MCP_SOURCE_SYSTEM = _normalize_source_system(MCP_SOURCE_SYSTEM)
 
 if INTERNAL_API_KEY and len(INTERNAL_API_KEY) < _MIN_KEY_LEN:
