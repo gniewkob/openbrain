@@ -120,6 +120,17 @@ STATUS_SUPERSEDED = "superseded"
 STATUS_DUPLICATE = "duplicate"
 
 
+def _resolve_updated_by(memory: Memory) -> str:
+    meta = memory.metadata_ or {}
+    candidate = meta.get("updated_by")
+    if isinstance(candidate, str) and candidate.strip():
+        return candidate.strip()
+    created_by = getattr(memory, "created_by", None)
+    if isinstance(created_by, str) and created_by.strip():
+        return created_by.strip()
+    return "agent"
+
+
 def _to_record(m: Memory) -> MemoryRecord:
     meta = m.metadata_ or {}
     source = meta.get("source", {})
@@ -152,7 +163,7 @@ def _to_record(m: Memory) -> MemoryRecord:
         created_at=m.created_at,
         updated_at=m.updated_at,
         created_by=m.created_by,
-        updated_by=meta.get("updated_by") or m.created_by,
+        updated_by=_resolve_updated_by(m),
     )
 
 
@@ -182,7 +193,7 @@ def _to_out(m: Memory) -> MemoryOut:
         created_at=m.created_at,
         updated_at=m.updated_at,
         created_by=m.created_by,
-        updated_by=meta.get("updated_by") or m.created_by,
+        updated_by=_resolve_updated_by(m),
     )
 
 

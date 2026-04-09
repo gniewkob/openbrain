@@ -275,6 +275,68 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(legacy.updated_by, "editor")
         self.assertEqual(canonical.updated_by, "editor")
 
+    async def test_to_out_and_to_record_trim_updated_by_metadata(self) -> None:
+        now = datetime.now(timezone.utc)
+        existing = Memory(
+            id="mem-2",
+            domain=DomainEnum.build,
+            entity_type="Note",
+            content="payload",
+            embedding=None,
+            owner="owner-a",
+            created_by="creator",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=[],
+            relations={},
+            metadata_={"updated_by": "  editor  ", "root_id": "mem-2"},
+            obsidian_ref=None,
+            content_hash="hash",
+            match_key="mk-2",
+            valid_from=None,
+            created_at=now,
+            updated_at=now,
+        )
+
+        legacy = _to_out(existing)
+        canonical = _to_record(existing)
+
+        self.assertEqual(legacy.updated_by, "editor")
+        self.assertEqual(canonical.updated_by, "editor")
+
+    async def test_to_out_and_to_record_fallback_updated_by_to_created_by(self) -> None:
+        now = datetime.now(timezone.utc)
+        existing = Memory(
+            id="mem-3",
+            domain=DomainEnum.build,
+            entity_type="Note",
+            content="payload",
+            embedding=None,
+            owner="owner-a",
+            created_by="  creator  ",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=[],
+            relations={},
+            metadata_={"updated_by": "   ", "root_id": "mem-3"},
+            obsidian_ref=None,
+            content_hash="hash",
+            match_key="mk-3",
+            valid_from=None,
+            created_at=now,
+            updated_at=now,
+        )
+
+        legacy = _to_out(existing)
+        canonical = _to_record(existing)
+
+        self.assertEqual(legacy.updated_by, "creator")
+        self.assertEqual(canonical.updated_by, "creator")
+
 
 if __name__ == "__main__":
     unittest.main()

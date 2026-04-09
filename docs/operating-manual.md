@@ -74,6 +74,7 @@ Capabilities payload note:
   Request-level `updated_by` is accepted for compatibility but overridden at API boundary.
 - Gateway and streamable transport send a canonical `updated_by="agent"` placeholder
   to avoid spoofed-client actor semantics in request payloads.
+- Read-model normalization trims `updated_by` from metadata and falls back to `created_by` (then `"agent"`) for deterministic audit display on legacy records.
 
 ## V1 API Reference (Canonical Endpoints)
 
