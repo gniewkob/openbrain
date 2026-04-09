@@ -14,6 +14,7 @@ from enum import Enum
 from typing import Annotated, Any, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
+from src.runtime_limits import load_runtime_limits
 
 MAX_ENTITY_TYPE_LEN = 64
 MAX_TITLE_LEN = 256
@@ -27,9 +28,10 @@ MAX_QUERY_LEN = 2_000
 MAX_PATH_LEN = 1_024
 MAX_FILTER_LIMIT = 50
 MAX_CONTEXT_ITEMS = 20
-MAX_SYNC_LIMIT = 100
-MAX_BULK_RECORDS = 100
-MAX_EXPORT_IDS = 100
+_RUNTIME_LIMITS = load_runtime_limits()
+MAX_SYNC_LIMIT = _RUNTIME_LIMITS["max_sync_limit"]
+MAX_BULK_RECORDS = _RUNTIME_LIMITS["max_bulk_items"]
+MAX_EXPORT_IDS = _RUNTIME_LIMITS["max_bulk_items"]
 MAX_POLICY_REWRITES = 100
 
 EntityTypeStr = Annotated[str, Field(max_length=MAX_ENTITY_TYPE_LEN)]
