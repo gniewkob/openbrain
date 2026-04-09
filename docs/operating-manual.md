@@ -140,6 +140,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` also enforces repository hygiene via `scripts/check_repo_hygiene.py` (known debug artifacts deny-list).
 - `Unified Smoke Tests / guardrails` enforces capabilities status truthfulness via `scripts/check_capabilities_truthfulness.py` (health contract + fallback probe invariants).
 - `Unified Smoke Tests / guardrails` enforces audit semantics via `scripts/check_audit_semantics.py` (`created_by/updated_by` invariants at schema/API/write boundaries).
+- `Unified Smoke Tests / guardrails` enforces export redaction contract semantics via `scripts/check_export_contract.py` (`EXPORT_POLICY` coverage + restricted fallback + required redactions).
 - `Unified Smoke Tests / guardrails` enforces Obsidian gating/contract semantics via `scripts/check_obsidian_contract.py` (feature-flag + capabilities + manifest subset checks).
 - `Unified Smoke Tests / guardrails` enforces monitoring contract via `scripts/validate_monitoring_contract.py` (dashboard + alert-rule metric references must remain inside the declared contract).
 - `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
@@ -150,6 +151,7 @@ CI guardrail:
   - `unified/tests/test_secret_scan_guardrail.py`
   - `unified/tests/test_capabilities_truthfulness_guardrail.py`
   - `unified/tests/test_audit_semantics_guardrail.py`
+  - `unified/tests/test_export_contract_guardrail.py`
   - `unified/tests/test_obsidian_contract_guardrail.py`
   - `unified/tests/test_monitoring_contract_guardrail.py`
 
