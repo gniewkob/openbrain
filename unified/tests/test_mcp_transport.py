@@ -244,6 +244,10 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result["obsidian_http"]["status"], "disabled")
         self.assertEqual(result["obsidian_http"]["tools"], [])
+        self.assertIn(
+            "ENABLE_HTTP_OBSIDIAN_TOOLS=1", result["obsidian_http"]["reason"]
+        )
+        self.assertIn("before starting transport", result["obsidian_http"]["reason"])
         self.assertIn("disabled", result["obsidian_http"]["reason"])
         self.assertNotIn("obsidian_vaults", result["tier_2_advanced"]["tools"])
 
@@ -252,6 +256,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         with (
             patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", True),
+            patch.object(mcp_transport, "_http_obsidian_tools_registered", return_value=True),
             patch.object(
                 mcp_transport,
                 "_get_backend_status",
@@ -284,6 +289,32 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result["obsidian_http"]["reason"])
         for tool in result["obsidian_http"]["tools"]:
             self.assertIn(tool, result["tier_2_advanced"]["tools"])
+
+    async def test_brain_capabilities_keep_obsidian_disabled_when_tools_not_registered(
+        self,
+    ) -> None:
+        with (
+            patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", True),
+            patch.object(mcp_transport, "_http_obsidian_tools_registered", return_value=False),
+            patch.object(
+                mcp_transport,
+                "_get_backend_status",
+                AsyncMock(
+                    return_value={
+                        "status": "ok",
+                        "api": "reachable",
+                        "db": "ok",
+                        "vector_store": "ok",
+                        "probe": "readyz",
+                    }
+                ),
+            ),
+        ):
+            result = await mcp_transport.brain_capabilities()
+
+        self.assertEqual(result["obsidian"]["status"], "disabled")
+        self.assertEqual(result["obsidian"]["tools"], [])
+        self.assertIsNotNone(result["obsidian"]["reason"])
 
     async def test_safe_req_raises_on_http_error(self) -> None:
         response = _FakeResponse(404, payload={"detail": "Memory not found"})
