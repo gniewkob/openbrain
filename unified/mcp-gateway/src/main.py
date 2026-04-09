@@ -74,7 +74,11 @@ HEALTH_PROBE_TIMEOUT_RAW: str = os.environ.get("MCP_HEALTH_PROBE_TIMEOUT_S", "5.
 HEALTH_PROBE_TIMEOUT: float
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
 OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"
-MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
+MCP_SOURCE_SYSTEM_RAW: str = os.environ.get(
+    "MCP_SOURCE_SYSTEM",
+    os.environ.get("SOURCE_SYSTEM", "other"),
+)
+MCP_SOURCE_SYSTEM: str
 
 _MIN_KEY_LEN = 32
 
@@ -138,7 +142,7 @@ HEALTH_PROBE_TIMEOUT = _normalize_health_probe_timeout(
     HEALTH_PROBE_TIMEOUT_RAW,
     BACKEND_TIMEOUT,
 )
-MCP_SOURCE_SYSTEM = _normalize_source_system(MCP_SOURCE_SYSTEM)
+MCP_SOURCE_SYSTEM = _normalize_source_system(MCP_SOURCE_SYSTEM_RAW)
 
 if INTERNAL_API_KEY and len(INTERNAL_API_KEY) < _MIN_KEY_LEN:
     _gateway_logger.warning(
