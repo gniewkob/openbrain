@@ -215,6 +215,17 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             transport_caps = await mcp_transport.brain_capabilities()
 
         self.assertEqual(gateway_caps["backend"], transport_caps["backend"])
+        self.assertEqual(gateway_caps["api_version"], transport_caps["api_version"])
+        self.assertEqual(
+            gateway_caps["schema_changelog"], transport_caps["schema_changelog"]
+        )
+        self.assertEqual(gateway_caps["health"], transport_caps["health"])
+        self.assertEqual(gateway_caps["health"]["overall"], "healthy")
+        self.assertEqual(gateway_caps["health"]["components"]["api"], "healthy")
+        self.assertEqual(gateway_caps["health"]["components"]["db"], "healthy")
+        self.assertEqual(
+            gateway_caps["health"]["components"]["vector_store"], "healthy"
+        )
         self.assertEqual(gateway_caps["tier_1_core"]["tools"], transport_caps["tier_1_core"]["tools"])
         self.assertEqual(gateway_caps["tier_3_admin"]["tools"], transport_caps["tier_3_admin"]["tools"])
         self.assertEqual(
