@@ -10,7 +10,7 @@ import unittest
 
 
 class GatewayStartupTests(unittest.TestCase):
-    def _reload_main_with_env(self, overrides: dict[str, str]) -> None:
+    def _reload_main_with_env(self, overrides: dict[str, str]):
         """Reload gateway main with temporary env overrides."""
         old_values: dict[str, str | None] = {
             key: os.environ.get(key) for key in overrides
@@ -19,7 +19,7 @@ class GatewayStartupTests(unittest.TestCase):
             os.environ[key] = value
         try:
             sys.modules.pop("src.main", None)
-            importlib.import_module("src.main")
+            return importlib.import_module("src.main")
         finally:
             for key, old_value in old_values.items():
                 if old_value is None:
@@ -98,6 +98,25 @@ class GatewayStartupTests(unittest.TestCase):
                     "MCP_SOURCE_SYSTEM": "Bad Value!",
                 }
             )
+
+    def test_source_system_alias_is_accepted(self) -> None:
+        module = self._reload_main_with_env(
+            {
+                "INTERNAL_API_KEY": "a" * 32,
+                "SOURCE_SYSTEM": "  CoDeX_Agent-1  ",
+            }
+        )
+        self.assertEqual(module.MCP_SOURCE_SYSTEM, "codex_agent-1")
+
+    def test_mcp_source_system_takes_precedence_over_source_system(self) -> None:
+        module = self._reload_main_with_env(
+            {
+                "INTERNAL_API_KEY": "a" * 32,
+                "SOURCE_SYSTEM": "source-only",
+                "MCP_SOURCE_SYSTEM": "mcp-wins",
+            }
+        )
+        self.assertEqual(module.MCP_SOURCE_SYSTEM, "mcp-wins")
 
 
 if __name__ == "__main__":
