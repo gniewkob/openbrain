@@ -138,6 +138,58 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         mcp_transport._http_client = None
         mcp_transport._http_client_config_key = None
 
+    async def test_client_recreate_survives_close_error(self) -> None:
+        created_clients: list[object] = []
+
+        class _CtorClient:
+            def __init__(self, **kwargs) -> None:
+                self.kwargs = kwargs
+                created_clients.append(self)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def request(self, method: str, path: str, **kwargs):
+                return _FakeResponse(200, payload={"status": "ok"})
+
+            async def aclose(self) -> None:
+                return None
+
+        class _FailingCloseClient(_CtorClient):
+            async def aclose(self) -> None:
+                raise RuntimeError("close failed")
+
+        mcp_transport._http_client = None
+        mcp_transport._http_client_config_key = None
+        with patch.object(mcp_transport.httpx, "AsyncClient", _CtorClient):
+            with patch.object(mcp_transport, "BRAIN_URL", "http://127.0.0.1:7010"):
+                async with mcp_transport._client():
+                    pass
+
+        # Inject failing previous client + old config key.
+        mcp_transport._http_client = _FailingCloseClient(
+            base_url="http://127.0.0.1:7010"
+        )
+        mcp_transport._http_client_config_key = (
+            "http://127.0.0.1:7010",
+            mcp_transport.BACKEND_TIMEOUT,
+            mcp_transport.INTERNAL_API_KEY,
+        )
+        with (
+            patch.object(mcp_transport.httpx, "AsyncClient", _CtorClient),
+            patch.object(mcp_transport, "BRAIN_URL", "http://127.0.0.1:7020"),
+            patch.object(mcp_transport.log, "warning") as log_warning,
+        ):
+            async with mcp_transport._client() as c2:
+                self.assertEqual(c2.kwargs["base_url"], "http://127.0.0.1:7020")
+            log_warning.assert_called_once()
+
+        mcp_transport._http_client = None
+        mcp_transport._http_client_config_key = None
+
     async def test_brain_capabilities_hide_http_obsidian_tools_when_disabled(
         self,
     ) -> None:

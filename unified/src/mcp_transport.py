@@ -151,7 +151,10 @@ class _SharedClient:
         global _http_client, _http_client_config_key
         current_key = _current_http_client_config_key()
         if _http_client is not None and _http_client_config_key != current_key:
-            await _http_client.aclose()
+            try:
+                await _http_client.aclose()
+            except Exception as exc:  # pragma: no cover - defensive logging path
+                log.warning("mcp_client_close_failed", error=str(exc))
             _http_client = None
             _http_client_config_key = None
 
