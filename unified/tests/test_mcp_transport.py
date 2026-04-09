@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -56,6 +57,20 @@ class _ProbeClient:
 
 
 class McpTransportTests(unittest.IsolatedAsyncioTestCase):
+    async def test_env_bool_uses_default_when_env_missing(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(mcp_transport._env_bool("ENABLE_HTTP_OBSIDIAN_TOOLS"))
+            self.assertTrue(
+                mcp_transport._env_bool("ENABLE_HTTP_OBSIDIAN_TOOLS", default=True)
+            )
+
+    async def test_env_bool_accepts_true_like_values(self) -> None:
+        for value in ("1", "true", "TRUE", "yes", "on"):
+            with patch.dict(
+                os.environ, {"ENABLE_HTTP_OBSIDIAN_TOOLS": value}, clear=True
+            ):
+                self.assertTrue(mcp_transport._env_bool("ENABLE_HTTP_OBSIDIAN_TOOLS"))
+
     async def test_client_reuses_shared_async_client_instance(self) -> None:
         created_clients: list[object] = []
 
