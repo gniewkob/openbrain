@@ -181,9 +181,7 @@ class MCPConfig(BaseSettings):
     @classmethod
     def validate_source_system(cls, v: str) -> str:
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", v or ""):
-            raise ValueError(
-                "SOURCE_SYSTEM must match [a-z0-9][a-z0-9_-]{0,31}"
-            )
+            raise ValueError("SOURCE_SYSTEM must match [a-z0-9][a-z0-9_-]{0,31}")
         return v
 
 
