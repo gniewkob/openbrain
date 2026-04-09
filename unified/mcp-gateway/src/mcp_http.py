@@ -24,6 +24,7 @@ import os
 import secrets
 import time
 from urllib.parse import urlencode
+from urllib.parse import urlparse
 
 import redis.asyncio as aioredis
 from mcp.server.auth.provider import (
@@ -60,9 +61,8 @@ from fastmcp.server.auth.auth import OAuthProvider
 # Re-use the shared FastMCP instance with all brain_* tools
 from .main import mcp
 
-BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://localhost:7010")
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
-PUBLIC_BASE_URL: str = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
+PUBLIC_BASE_URL_RAW: str = os.environ.get("PUBLIC_BASE_URL", "")
 REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6379/1")
 
 ACCESS_TOKEN_TTL = 30 * 24 * 3600  # 30 days for personal use
@@ -74,6 +74,35 @@ _PFX_PENDING = "mcp:pending:"
 _PFX_CODE = "mcp:code:"
 _PFX_AT = "mcp:at:"
 _PFX_RT = "mcp:rt:"
+
+
+def _normalize_public_base_url(value: str | None) -> str:
+    normalized = (value or "").strip().rstrip("/")
+    if any(ch.isspace() for ch in normalized):
+        raise ValueError("PUBLIC_BASE_URL must not include whitespace")
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("PUBLIC_BASE_URL must be a valid http(s) URL")
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme == "http" and host not in {"localhost", "127.0.0.1", "::1"}:
+        raise ValueError(
+            "PUBLIC_BASE_URL must use https outside localhost development"
+        )
+    if parsed.path not in {"", "/"}:
+        raise ValueError("PUBLIC_BASE_URL must not include path")
+    if parsed.query or parsed.fragment:
+        raise ValueError("PUBLIC_BASE_URL must not include query params or fragment")
+    return normalized
+
+
+def _normalize_mcp_http_port(value: str | None) -> int:
+    try:
+        port = int((value or "").strip())
+    except (TypeError, ValueError) as exc:
+        raise ValueError("MCP_HTTP_PORT must be an integer") from exc
+    if port < 1 or port > 65535:
+        raise ValueError("MCP_HTTP_PORT must be in range 1..65535")
+    return port
 
 
 def _dumps(obj) -> str:
@@ -101,6 +130,7 @@ class SimpleKeyOAuthProvider(OAuthProvider):
             ),
             revocation_options=RevocationOptions(enabled=True),
         )
+        self._base_url = base_url
         self._r = redis
 
     # ── Client registry ───────────────────────────────────────────────────────
@@ -141,7 +171,7 @@ class SimpleKeyOAuthProvider(OAuthProvider):
         await self._r.setex(
             f"{_PFX_PENDING}{pending_id}", AUTH_CODE_TTL, json.dumps(payload)
         )
-        return f"{PUBLIC_BASE_URL}/consent?pending_id={pending_id}"
+        return f"{self._base_url}/consent?pending_id={pending_id}"
 
     # ── Consent page ──────────────────────────────────────────────────────────
 
@@ -360,7 +390,7 @@ def _consent_html(*, client_id: str, pending_id: str, error: str) -> str:
 
 
 def main() -> None:
-    if not PUBLIC_BASE_URL:
+    if not PUBLIC_BASE_URL_RAW.strip():
         raise SystemExit(
             "PUBLIC_BASE_URL is required for HTTP transport. "
             "Set it to the public URL of this server "
@@ -369,8 +399,11 @@ def main() -> None:
     if not INTERNAL_API_KEY:
         raise SystemExit("INTERNAL_API_KEY is required for HTTP transport.")
 
+    public_base_url = _normalize_public_base_url(PUBLIC_BASE_URL_RAW)
+    port = _normalize_mcp_http_port(os.environ.get("MCP_HTTP_PORT", "7011"))
+
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
-    auth = SimpleKeyOAuthProvider(base_url=PUBLIC_BASE_URL, redis=redis)
+    auth = SimpleKeyOAuthProvider(base_url=public_base_url, redis=redis)
 
     # Register /consent as a custom route on the FastMCP instance
     @mcp.custom_route("/consent", methods=["GET", "POST"])
@@ -383,7 +416,7 @@ def main() -> None:
 
     @mcp.custom_route("/.well-known/openid-configuration", methods=["GET"])
     async def oidc_discovery(request: Request) -> JSONResponse:
-        base = PUBLIC_BASE_URL
+        base = public_base_url
         return JSONResponse(
             {
                 "issuer": base,
@@ -403,7 +436,6 @@ def main() -> None:
 
     mcp.auth = auth
 
-    port = int(os.environ.get("MCP_HTTP_PORT", "7011"))
     # path="/" so that:
     #   - MCP endpoint is at the root (ChatGPT probes POST /)
     #   - /.well-known/oauth-protected-resource has no path suffix
