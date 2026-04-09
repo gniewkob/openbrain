@@ -201,9 +201,7 @@ class MCPConfig(BaseSettings):
     @model_validator(mode="after")
     def validate_timeout_relationship(self) -> "MCPConfig":
         if self.health_probe_timeout > self.backend_timeout:
-            raise ValueError(
-                "MCP_HEALTH_PROBE_TIMEOUT_S must be <= BACKEND_TIMEOUT_S"
-            )
+            raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be <= BACKEND_TIMEOUT_S")
         return self
 
 
