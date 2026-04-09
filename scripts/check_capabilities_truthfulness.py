@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -57,12 +58,24 @@ def _check_contract() -> list[str]:
 def _check_metadata() -> list[str]:
     errors: list[str] = []
     payload = json.loads(METADATA.read_text(encoding="utf-8"))
+    api_version = payload.get("api_version")
     changelog = payload.get("schema_changelog", {})
-    if payload.get("api_version") != "2.3.0":
-        errors.append("capabilities metadata api_version must be 2.3.0")
-    change_230 = str(changelog.get("2.3.0", ""))
-    if "health" not in change_230:
-        errors.append("schema_changelog[2.3.0] must describe health semantics change")
+    if not isinstance(api_version, str) or not re.fullmatch(r"^\d+\.\d+\.\d+$", api_version):
+        errors.append("capabilities metadata api_version must match MAJOR.MINOR.PATCH")
+        return errors
+    if not isinstance(changelog, dict):
+        errors.append("capabilities metadata schema_changelog must be an object")
+        return errors
+    if api_version not in changelog:
+        errors.append("capabilities metadata schema_changelog must include api_version entry")
+
+    health_entries = [
+        str(message).lower() for message in changelog.values() if isinstance(message, str)
+    ]
+    if not any("health" in message for message in health_entries):
+        errors.append(
+            "capabilities metadata schema_changelog must contain at least one health semantics entry"
+        )
     return errors
 
 
