@@ -48,6 +48,17 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
     async def test_brain_obsidian_vaults_requires_explicit_opt_in(self) -> None:
         await self._assert_opt_in_required("brain_obsidian_vaults")
 
+    async def test_disabled_reason_is_consistent_between_capabilities_and_runtime_guard(
+        self,
+    ) -> None:
+        gateway = load_gateway_main()
+        with patch.dict("os.environ", {}, clear=False):
+            caps = await gateway.brain_capabilities()
+            with self.assertRaises(ValueError) as ctx:
+                await gateway.brain_obsidian_vaults()
+
+        self.assertEqual(caps["obsidian"]["reason"], str(ctx.exception))
+
     async def test_all_local_obsidian_tools_require_explicit_opt_in(self) -> None:
         await self._assert_opt_in_required(
             "brain_obsidian_write_note",
@@ -352,6 +363,8 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["obsidian"]["tools"], [])
         self.assertEqual(result["health"]["components"]["obsidian"], "disabled")
         self.assertEqual(result["obsidian"]["reason"], result["obsidian_local"]["reason"])
+        self.assertIn("ENABLE_LOCAL_OBSIDIAN_TOOLS=1", result["obsidian"]["reason"])
+        self.assertIn("trusted local stdio gateway", result["obsidian"]["reason"])
         self.assertNotIn("obsidian_vaults", result["tier_2_advanced"]["tools"])
         self.assertEqual(result["obsidian_local"]["tools"], [])
 

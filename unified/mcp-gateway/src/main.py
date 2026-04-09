@@ -292,13 +292,17 @@ def _obsidian_local_tools_enabled() -> bool:
     }
 
 
-def _require_obsidian_local_tools_enabled() -> None:
-    if _obsidian_local_tools_enabled():
-        return
-    raise ValueError(
+def _obsidian_local_tools_disabled_reason() -> str:
+    return (
         "Local Obsidian tools are disabled by default. "
         f"Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1 only on a trusted local stdio gateway."
     )
+
+
+def _require_obsidian_local_tools_enabled() -> None:
+    if _obsidian_local_tools_enabled():
+        return
+    raise ValueError(_obsidian_local_tools_disabled_reason())
 
 
 # ---------------------------------------------------------------------------
@@ -389,9 +393,7 @@ async def brain_capabilities() -> dict:
     tier_2_tools = [*ADVANCED_TOOLS]
     obsidian_tools = [*OBSIDIAN_LOCAL_TOOLS] if obsidian_enabled else []
     obsidian_status = "enabled" if obsidian_enabled else "disabled"
-    obsidian_reason = (
-        None if obsidian_enabled else f"Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1 to enable"
-    )
+    obsidian_reason = None if obsidian_enabled else _obsidian_local_tools_disabled_reason()
     if obsidian_tools:
         tier_2_tools.extend(obsidian_tools)
     health = build_capabilities_health(backend, obsidian_status)
