@@ -275,7 +275,7 @@ These items are known architectural limitations, not current production blockers
 
 - **Export redaction in application code**: The redaction rules in `_export_record` are implemented as application logic. This is acceptable while the policy surface is small, but a multi-tenant or compliance-heavy deployment should move redaction into a dedicated policy layer. Currently: admin and internal service accounts both receive unredacted export data.
 
-- **Telemetry backend fallback visibility**: telemetry counters support `memory` and `redis` backends, with safe fallback to `memory` when Redis is unavailable. This is operationally safe, but scaled deployments should monitor and alert on fallback events to avoid silently losing cross-worker aggregation.
+- **Telemetry fallback alert tuning**: fallback visibility is now instrumented via `telemetry_counter_backend_fallback_total` and alerted in Prometheus. Remaining work is operational tuning of thresholds/durations per environment to reduce false positives during controlled restarts.
 
 ## Bottom Line
 

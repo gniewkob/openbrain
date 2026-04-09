@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "service": "openbrain-unified",
   "required_metrics": [
     "active_memories_build_total",
@@ -35,6 +35,7 @@
     "policy_skip_per_maintain_run_ratio",
     "policy_skip_total",
     "search_requests_total",
+    "telemetry_counter_backend_fallback_total",
     "up"
   ],
   "dashboard_files": [
