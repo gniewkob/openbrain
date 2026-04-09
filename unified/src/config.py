@@ -135,6 +135,7 @@ class MCPConfig(BaseSettings):
 
     brain_url: str = Field(default="http://127.0.0.1:80", alias="BRAIN_URL")
     backend_timeout: float = Field(default=30.0, alias="BACKEND_TIMEOUT_S")
+    health_probe_timeout: float = Field(default=5.0, alias="MCP_HEALTH_PROBE_TIMEOUT_S")
     source_system: str = Field(default="other", alias="SOURCE_SYSTEM")
     streamable_http_path: str = Field(default="/sse")
 
@@ -151,6 +152,13 @@ class MCPConfig(BaseSettings):
         if len(value) > 1:
             value = value.rstrip("/")
         return value
+
+    @field_validator("health_probe_timeout")
+    @classmethod
+    def validate_health_probe_timeout(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be > 0")
+        return v
 
 
 class AppConfig(BaseSettings):

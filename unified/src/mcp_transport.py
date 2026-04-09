@@ -76,6 +76,7 @@ def _init_config():
     global \
         BRAIN_URL, \
         BACKEND_TIMEOUT, \
+        HEALTH_PROBE_TIMEOUT, \
         INTERNAL_API_KEY, \
         STREAMABLE_HTTP_PATH, \
         MCP_SOURCE_SYSTEM, \
@@ -86,6 +87,7 @@ def _init_config():
     config = get_config()
     BRAIN_URL = config.mcp.brain_url
     BACKEND_TIMEOUT = config.mcp.backend_timeout
+    HEALTH_PROBE_TIMEOUT = config.mcp.health_probe_timeout
     INTERNAL_API_KEY = config.auth.internal_api_key
     STREAMABLE_HTTP_PATH = config.mcp.streamable_http_path
     MCP_SOURCE_SYSTEM = config.mcp.source_system
