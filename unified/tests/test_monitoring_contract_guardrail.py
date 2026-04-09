@@ -88,6 +88,32 @@ def test_validate_monitoring_contract_flags_unexpected_metric_from_alert_rule(
     assert "mystery_alert_metric_total" in referenced
 
 
+def test_load_alert_rule_exprs_supports_multiline_expr_block(tmp_path: Path) -> None:
+    module = _load_monitoring_contract_module()
+    alert_rules_path = tmp_path / "alerts.yml"
+    alert_rules_path.write_text(
+        "\n".join(
+            [
+                "groups:",
+                "  - name: test",
+                "    rules:",
+                "      - alert: ComplexAlert",
+                "        expr: |",
+                "          increase(search_requests_total{job=\"openbrain-unified\"}[1h])",
+                "          / clamp_min(increase(sync_checks_total{job=\"openbrain-unified\"}[1h]), 1)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    exprs = module.load_alert_rule_exprs(alert_rules_path)
+    assert len(exprs) == 1
+    rule_name, expr = exprs[0]
+    assert rule_name == "ComplexAlert"
+    assert "search_requests_total" in expr
+    assert "sync_checks_total" in expr
+
+
 def test_main_succeeds_without_live_metrics_check(monkeypatch) -> None:
     module = _load_monitoring_contract_module()
     monkeypatch.setattr(module, "validate_monitoring_contract", lambda *_args, **_kwargs: ([], {"a"}, set()))
