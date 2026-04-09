@@ -9,10 +9,11 @@ from src.capabilities_metadata import _validate_metadata, load_capabilities_meta
 from src.http_error_adapter import backend_error_message
 from src.memory_paths import memory_absolute_path
 from src.request_builders import (
+    _validate_request_contracts,
     build_find_list_payload,
     normalize_updated_by,
 )
-from src.runtime_limits import load_runtime_limits
+from src.runtime_limits import _validate_runtime_limits, load_runtime_limits
 from src import mcp_transport
 
 
@@ -102,6 +103,19 @@ def test_request_contract_defaults_are_applied() -> None:
     assert normalize_updated_by("  ") == "agent"
 
 
+def test_request_contract_validation_rejects_invalid_updated_by_default() -> None:
+    bad = {
+        "find_list_query": None,
+        "find_list_sort": "updated_at_desc",
+        "updated_by_default": "   ",
+    }
+    try:
+        _validate_request_contracts(bad)
+        assert False, "expected ValueError for blank updated_by_default"
+    except ValueError as exc:
+        assert "updated_by_default" in str(exc)
+
+
 def test_runtime_limits_contract_is_loaded() -> None:
     limits = load_runtime_limits()
     raw = json.loads(
@@ -111,6 +125,20 @@ def test_runtime_limits_contract_is_loaded() -> None:
     assert limits["max_list_limit"] == raw["max_list_limit"]
     assert limits["max_sync_limit"] == raw["max_sync_limit"]
     assert limits["max_bulk_items"] == raw["max_bulk_items"]
+
+
+def test_runtime_limits_validation_rejects_non_positive_values() -> None:
+    bad = {
+        "max_search_top_k": 100,
+        "max_list_limit": 0,
+        "max_sync_limit": 200,
+        "max_bulk_items": 100,
+    }
+    try:
+        _validate_runtime_limits(bad)
+        assert False, "expected ValueError for non-positive runtime limit"
+    except ValueError as exc:
+        assert "max_list_limit" in str(exc)
 
 
 def test_memory_paths_contract_is_loaded() -> None:
