@@ -8,6 +8,7 @@ scattered os.environ.get() calls in other modules.
 from __future__ import annotations
 
 from functools import lru_cache
+import math
 import re
 from urllib.parse import urlparse
 
@@ -166,6 +167,8 @@ class MCPConfig(BaseSettings):
     @field_validator("health_probe_timeout")
     @classmethod
     def validate_health_probe_timeout(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be finite")
         if v <= 0:
             raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be > 0")
         if v > 30:
@@ -175,6 +178,8 @@ class MCPConfig(BaseSettings):
     @field_validator("backend_timeout")
     @classmethod
     def validate_backend_timeout(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("BACKEND_TIMEOUT_S must be finite")
         if v <= 0:
             raise ValueError("BACKEND_TIMEOUT_S must be > 0")
         if v > 120:
