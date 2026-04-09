@@ -191,6 +191,26 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="128"):
             config.get_config()
 
+    def test_mcp_streamable_http_path_rejects_dot_segment(self, monkeypatch):
+        """Test streamable path with dot segment is rejected."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/events/./stream")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="\\'.\\'"):
+            config.get_config()
+
+    def test_mcp_streamable_http_path_rejects_dotdot_segment(self, monkeypatch):
+        """Test streamable path with dotdot segment is rejected."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/events/../stream")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="\\.\\..*segments"):
+            config.get_config()
+
     def test_mcp_health_probe_timeout_from_env(self, monkeypatch):
         """Test health probe timeout can be configured via MCP env var."""
         from src import config
