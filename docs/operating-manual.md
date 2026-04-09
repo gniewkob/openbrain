@@ -29,6 +29,7 @@ The following security improvements were applied:
 - **MCP source tagging**: `brain_store` tags records with `MCP_SOURCE_SYSTEM` (env var, default `other`). Override in your env to identify the calling agent (e.g., `claude`, `codex`, `chatgpt`).
 - **Per-record authorization for `export` and `sync-check`**: both flows now reuse record-level access gates; unauthorized lookups are masked as `404` for `sync-check`.
 - **Local Obsidian opt-in**: `brain_obsidian_*` tools in the local stdio gateway require `ENABLE_LOCAL_OBSIDIAN_TOOLS=1` and are no longer exposed by default.
+- **HTTP transport Obsidian opt-in**: streamable HTTP transport exposes `brain_obsidian_*` only when `ENABLE_HTTP_OBSIDIAN_TOOLS=1` at process start.
 - **Default-local ingress posture**: `ngrok` lives in the Compose `public` profile and starts only with `ENABLE_NGROK=1`.
 - **Request bounds**: canonical and legacy schemas now cap `top_k`, `limit`, `max_items`, bulk sizes, export IDs, and key string lengths to reduce accidental expensive requests.
 - **Access denial telemetry**: Prometheus counters now expose `access_denied_total` and reason-specific breakdowns for `admin`, `domain`, `owner`, and `tenant`.

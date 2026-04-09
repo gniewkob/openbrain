@@ -43,6 +43,14 @@ from .runtime_limits import load_runtime_limits
 
 log = structlog.get_logger()
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # Config will be imported lazily to avoid circular imports
 # BRAIN_URL is read from env at module level so importlib.reload picks up changes.
 # _init_config() overrides these with the pydantic-settings config object when called.
@@ -50,7 +58,7 @@ BRAIN_URL: str = os.environ.get("BRAIN_URL", "http://127.0.0.1:80")
 BACKEND_TIMEOUT: float = 30.0
 HEALTH_PROBE_TIMEOUT: float = 5.0
 INTERNAL_API_KEY: str = ""
-ENABLE_HTTP_OBSIDIAN_TOOLS: bool = False
+ENABLE_HTTP_OBSIDIAN_TOOLS: bool = _env_bool("ENABLE_HTTP_OBSIDIAN_TOOLS", False)
 MCP_SOURCE_SYSTEM: str = "other"
 _public_base = ""
 _ngrok_host = ""
@@ -302,7 +310,7 @@ async def brain_capabilities() -> dict[str, Any]:
     obsidian_reason = (
         None
         if ENABLE_HTTP_OBSIDIAN_TOOLS
-        else "HTTP Obsidian tools are disabled in this gateway build."
+        else "HTTP Obsidian tools are disabled (set ENABLE_HTTP_OBSIDIAN_TOOLS=1)."
     )
     if obsidian_tools:
         tier_2_tools.extend(obsidian_tools)
