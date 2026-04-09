@@ -130,6 +130,7 @@ class SimpleKeyOAuthProvider(OAuthProvider):
             ),
             revocation_options=RevocationOptions(enabled=True),
         )
+        self._base_url = base_url
         self._r = redis
 
     # ── Client registry ───────────────────────────────────────────────────────
@@ -170,7 +171,7 @@ class SimpleKeyOAuthProvider(OAuthProvider):
         await self._r.setex(
             f"{_PFX_PENDING}{pending_id}", AUTH_CODE_TTL, json.dumps(payload)
         )
-        return f"{PUBLIC_BASE_URL}/consent?pending_id={pending_id}"
+        return f"{self._base_url}/consent?pending_id={pending_id}"
 
     # ── Consent page ──────────────────────────────────────────────────────────
 
