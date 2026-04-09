@@ -5,6 +5,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import httpx
+
 from src import mcp_transport
 
 
@@ -54,6 +56,17 @@ class _ProbeClient:
         if isinstance(result, Exception):
             raise result
         return result
+
+
+class _ErrorClient:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def request(self, method: str, path: str, **kwargs):
+        raise httpx.ConnectError("connect timeout", request=httpx.Request(method, path))
 
 
 class McpTransportTests(unittest.IsolatedAsyncioTestCase):
@@ -283,6 +296,11 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(mcp_transport, "_client", return_value=_FakeClient(response)):
             result = await mcp_transport._safe_req("DELETE", "/api/memories/x")
         self.assertEqual(result, {"status": "success"})
+
+    async def test_safe_req_normalizes_request_errors(self) -> None:
+        with patch.object(mcp_transport, "_client", return_value=_ErrorClient()):
+            with self.assertRaisesRegex(ValueError, "Backend request failed"):
+                await mcp_transport._safe_req("GET", "/api/memories/missing")
 
     async def test_safe_req_redacts_content_in_logged_payload(self) -> None:
         response = _FakeResponse(200, payload={"status": "ok"})
