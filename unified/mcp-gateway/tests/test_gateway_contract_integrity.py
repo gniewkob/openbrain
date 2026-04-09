@@ -1,6 +1,8 @@
+import asyncio
 import json
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 from helpers import load_gateway_main
 
@@ -75,3 +77,40 @@ class GatewayContractIntegrityTests(unittest.TestCase):
                 callable(fn),
                 f"brain_{tool} must be implemented by gateway runtime",
             )
+
+    def test_gateway_obsidian_capabilities_follow_runtime_registration_state(self) -> None:
+        gateway = load_gateway_main()
+        caps_manifest = json.loads(
+            (self._contracts_dir() / "capabilities_manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        backend = {
+            "status": "ok",
+            "api": "reachable",
+            "db": "ok",
+            "vector_store": "ok",
+            "probe": "readyz",
+        }
+
+        with (
+            patch("_gateway_src.main._get_backend_status", AsyncMock(return_value=backend)),
+            patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=True),
+            patch("_gateway_src.main._local_obsidian_tools_registered", return_value=True),
+        ):
+            enabled_caps = asyncio.run(gateway.brain_capabilities())
+
+        self.assertEqual(enabled_caps["obsidian_local"]["status"], "enabled")
+        self.assertEqual(
+            enabled_caps["obsidian_local"]["tools"], caps_manifest["local_obsidian_tools"]
+        )
+
+        with (
+            patch("_gateway_src.main._get_backend_status", AsyncMock(return_value=backend)),
+            patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=True),
+            patch("_gateway_src.main._local_obsidian_tools_registered", return_value=False),
+        ):
+            disabled_caps = asyncio.run(gateway.brain_capabilities())
+
+        self.assertEqual(disabled_caps["obsidian_local"]["status"], "disabled")
+        self.assertEqual(disabled_caps["obsidian_local"]["tools"], [])
