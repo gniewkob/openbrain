@@ -3,6 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 
+def _normalize_actor(value: Any, fallback: str) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return fallback
+
+
 def to_legacy_memory_shape(record: dict[str, Any]) -> dict[str, Any]:
     keys = (
         "id",
@@ -29,7 +35,13 @@ def to_legacy_memory_shape(record: dict[str, Any]) -> dict[str, Any]:
         "created_by",
         "updated_by",
     )
-    return {key: record.get(key) for key in keys}
+    normalized = {key: record.get(key) for key in keys}
+    normalized_created_by = _normalize_actor(normalized.get("created_by"), "agent")
+    normalized["created_by"] = normalized_created_by
+    normalized["updated_by"] = _normalize_actor(
+        normalized.get("updated_by"), normalized_created_by
+    )
+    return normalized
 
 
 def normalize_find_hits_to_records(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
