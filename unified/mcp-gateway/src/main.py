@@ -36,6 +36,7 @@ import logging
 import os
 import re
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import httpx
 from fastmcp import FastMCP
@@ -74,6 +75,22 @@ MCP_SOURCE_SYSTEM: str = os.environ.get("MCP_SOURCE_SYSTEM", "other")
 _MIN_KEY_LEN = 32
 
 
+def _normalize_brain_url(value: str | None) -> str:
+    normalized = (value or "").strip()
+    if any(ch.isspace() for ch in normalized):
+        raise ValueError("BRAIN_URL must not include whitespace")
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("BRAIN_URL must be a valid http(s) URL")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("BRAIN_URL must not include credentials")
+    if parsed.path not in {"", "/"}:
+        raise ValueError("BRAIN_URL must not include path")
+    if parsed.query or parsed.fragment:
+        raise ValueError("BRAIN_URL must not include query params or fragment")
+    return normalized.rstrip("/")
+
+
 def _normalize_source_system(value: str | None) -> str:
     normalized = (value or "").strip().lower()
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", normalized):
@@ -81,6 +98,7 @@ def _normalize_source_system(value: str | None) -> str:
     return normalized
 
 
+BRAIN_URL = _normalize_brain_url(BRAIN_URL)
 MCP_SOURCE_SYSTEM = _normalize_source_system(MCP_SOURCE_SYSTEM)
 
 if INTERNAL_API_KEY and len(INTERNAL_API_KEY) < _MIN_KEY_LEN:
