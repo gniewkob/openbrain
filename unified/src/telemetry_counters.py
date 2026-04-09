@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
+from dataclasses import dataclass
 from threading import Lock
 from typing import Protocol
 
@@ -11,6 +12,13 @@ class CounterBackend(Protocol):
     def snapshot(self) -> dict[str, int]: ...
     def bulk_load(self, values: dict[str, int]) -> None: ...
     def reset(self) -> None: ...
+
+
+@dataclass(frozen=True)
+class CounterBackendBuildMeta:
+    requested_backend: str
+    selected_backend: str
+    fallback_reason: str | None = None
 
 
 class InMemoryCounterBackend:
@@ -106,20 +114,43 @@ class RedisCounterBackend:
 
 
 def build_counter_backend(known_counters: tuple[str, ...]) -> CounterBackend:
-    backend = os.getenv("TELEMETRY_BACKEND", "memory").strip().lower()
-    if backend != "redis":
-        return InMemoryCounterBackend(known_counters)
+    backend, _ = build_counter_backend_with_meta(known_counters)
+    return backend
+
+
+def build_counter_backend_with_meta(
+    known_counters: tuple[str, ...],
+) -> tuple[CounterBackend, CounterBackendBuildMeta]:
+    requested_backend = os.getenv("TELEMETRY_BACKEND", "memory").strip().lower()
+    if requested_backend != "redis":
+        return InMemoryCounterBackend(known_counters), CounterBackendBuildMeta(
+            requested_backend=requested_backend,
+            selected_backend="memory",
+            fallback_reason=None,
+        )
 
     redis_url = (
         os.getenv("TELEMETRY_REDIS_URL") or os.getenv("REDIS_URL") or ""
     ).strip()
     if not redis_url:
-        return InMemoryCounterBackend(known_counters)
+        return InMemoryCounterBackend(known_counters), CounterBackendBuildMeta(
+            requested_backend=requested_backend,
+            selected_backend="memory",
+            fallback_reason="redis_url_missing",
+        )
 
     try:
         return RedisCounterBackend(
             redis_url=redis_url,
             known_counters=known_counters,
+        ), CounterBackendBuildMeta(
+            requested_backend=requested_backend,
+            selected_backend="redis",
+            fallback_reason=None,
         )
-    except Exception:
-        return InMemoryCounterBackend(known_counters)
+    except Exception as exc:
+        return InMemoryCounterBackend(known_counters), CounterBackendBuildMeta(
+            requested_backend=requested_backend,
+            selected_backend="memory",
+            fallback_reason=f"redis_unavailable:{exc.__class__.__name__}",
+        )
