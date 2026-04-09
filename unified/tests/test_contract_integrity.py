@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import re
 
-from src.capabilities_manifest import load_capabilities_manifest
+from src.capabilities_manifest import _validate_manifest, load_capabilities_manifest
 from src.capabilities_metadata import _validate_metadata, load_capabilities_metadata
 from src.http_error_adapter import backend_error_message
 from src.memory_paths import memory_absolute_path
@@ -34,6 +34,36 @@ def test_capabilities_contract_is_loaded_by_adapter() -> None:
     assert manifest["core_tools"] == raw["core_tools"]
     assert manifest["advanced_tools"] == raw["advanced_tools"]
     assert manifest["admin_tools"] == raw["admin_tools"]
+
+
+def test_capabilities_manifest_validation_rejects_duplicates() -> None:
+    bad = {
+        "core_tools": ["search", "search"],
+        "advanced_tools": ["list"],
+        "admin_tools": ["maintain"],
+        "http_obsidian_tools": ["obsidian_vaults"],
+        "local_obsidian_tools": ["obsidian_vaults"],
+    }
+    try:
+        _validate_manifest(bad)
+        assert False, "expected ValueError for duplicate capability names"
+    except ValueError as exc:
+        assert "duplicates" in str(exc)
+
+
+def test_capabilities_manifest_validation_requires_string_lists() -> None:
+    bad = {
+        "core_tools": ["search", ""],
+        "advanced_tools": ["list"],
+        "admin_tools": ["maintain"],
+        "http_obsidian_tools": ["obsidian_vaults"],
+        "local_obsidian_tools": ["obsidian_vaults"],
+    }
+    try:
+        _validate_manifest(bad)
+        assert False, "expected ValueError for blank capability names"
+    except ValueError as exc:
+        assert "non-empty string list" in str(exc)
 
 
 def test_capabilities_metadata_contract_is_loaded_by_adapter() -> None:

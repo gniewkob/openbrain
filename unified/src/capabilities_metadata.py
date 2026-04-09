@@ -12,7 +12,9 @@ def _validate_metadata(data: dict[str, Any]) -> dict[str, Any]:
     api_version = data.get("api_version")
     changelog = data.get("schema_changelog")
     if not isinstance(api_version, str) or not _SEMVER.fullmatch(api_version):
-        raise ValueError("capabilities_metadata.api_version must match MAJOR.MINOR.PATCH")
+        raise ValueError(
+            "capabilities_metadata.api_version must match MAJOR.MINOR.PATCH"
+        )
     if not isinstance(changelog, dict):
         raise ValueError("capabilities_metadata.schema_changelog must be an object")
     for version, description in changelog.items():
