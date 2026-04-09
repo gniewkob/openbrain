@@ -57,6 +57,7 @@ The system guides AI behavior by categorizing tools:
 Capabilities payload note:
 - `brain_capabilities` now includes a transport-agnostic `obsidian` object (`mode`, `status`, `tools`, `reason`).
 - `brain_capabilities` now includes `health.overall` plus `health.components` (`api`, `db`, `vector_store`, `obsidian`) for component-level truthfulness.
+- `brain_capabilities` metadata contract is strict: `api_version` must follow `MAJOR.MINOR.PATCH` and must be present as a key in `schema_changelog`.
 - Legacy transport-specific keys (`obsidian_http`, `obsidian_local`) remain for backward compatibility.
 
 ## Governance Rules
