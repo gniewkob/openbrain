@@ -155,6 +155,10 @@ class MCPConfig(BaseSettings):
             raise ValueError(
                 "MCP_STREAMABLE_HTTP_PATH must not include query, fragment, or spaces"
             )
+        if "\\" in value or "//" in value:
+            raise ValueError(
+                "MCP_STREAMABLE_HTTP_PATH must not include backslashes or double slashes"
+            )
         if len(value) > 1:
             value = value.rstrip("/")
         return value

@@ -161,6 +161,26 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="spaces"):
             config.get_config()
 
+    def test_mcp_streamable_http_path_rejects_backslashes(self, monkeypatch):
+        """Test streamable path with backslashes is rejected."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/events\\path")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="backslashes"):
+            config.get_config()
+
+    def test_mcp_streamable_http_path_rejects_double_slashes(self, monkeypatch):
+        """Test streamable path with double slashes is rejected."""
+        from src import config
+
+        monkeypatch.setenv("MCP_STREAMABLE_HTTP_PATH", "/events//stream")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="double slashes"):
+            config.get_config()
+
     def test_mcp_health_probe_timeout_from_env(self, monkeypatch):
         """Test health probe timeout can be configured via MCP env var."""
         from src import config
