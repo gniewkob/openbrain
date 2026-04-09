@@ -191,6 +191,26 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="BRAIN_URL"):
             config.get_config()
 
+    def test_mcp_source_system_from_env(self, monkeypatch):
+        """Test source system can be configured via MCP env var."""
+        from src import config
+
+        monkeypatch.setenv("SOURCE_SYSTEM", "codex_agent-1")
+        config.get_config.cache_clear()
+
+        cfg = config.get_config()
+        assert cfg.mcp.source_system == "codex_agent-1"
+
+    def test_mcp_source_system_format_validation(self, monkeypatch):
+        """Test malformed source system is rejected."""
+        from src import config
+
+        monkeypatch.setenv("SOURCE_SYSTEM", "Bad Value!")
+        config.get_config.cache_clear()
+
+        with pytest.raises(ValueError, match="SOURCE_SYSTEM"):
+            config.get_config()
+
 
 class TestInternalAPIKey:
     """Test internal API key handling."""

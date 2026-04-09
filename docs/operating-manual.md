@@ -29,7 +29,7 @@ The "Industrial Wrapper" in `combined.py` provides stable ASGI routing:
 The following security improvements were applied:
 - **Timing-safe key comparison**: `X-Internal-Key` is now compared with `hmac.compare_digest`, eliminating early-exit timing attacks.
 - **Thread-safe policy registry**: `POLICY_REGISTRY` is updated via atomic reference replacement under a lock; reads also hold the lock snapshot. Eliminates the race window between `clear()` and `update()`.
-- **MCP source tagging**: `brain_store` tags records with `MCP_SOURCE_SYSTEM` (env var, default `other`). Override in your env to identify the calling agent (e.g., `claude`, `codex`, `chatgpt`).
+- **MCP source tagging**: `brain_store` tags records with `MCP_SOURCE_SYSTEM` (env var, default `other`). `SOURCE_SYSTEM` must match `[a-z0-9][a-z0-9_-]{0,31}` (for example: `claude`, `codex`, `chatgpt`) to keep provenance metadata consistent.
 - **Per-record authorization for `export` and `sync-check`**: both flows now reuse record-level access gates; unauthorized lookups are masked as `404` for `sync-check`.
 - **Local Obsidian opt-in**: `brain_obsidian_*` tools in the local stdio gateway require `ENABLE_LOCAL_OBSIDIAN_TOOLS=1` and are no longer exposed by default.
 - **HTTP transport Obsidian opt-in**: streamable HTTP transport exposes `brain_obsidian_*` only when `ENABLE_HTTP_OBSIDIAN_TOOLS=1` at process start.
