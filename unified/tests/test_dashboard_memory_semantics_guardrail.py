@@ -43,6 +43,10 @@ def test_dashboard_memory_semantics_detects_wrong_active_expr(tmp_path: Path) ->
                         "title": module.HIDDEN_TITLE,
                         "targets": [{"expr": module.HIDDEN_EXPR}],
                     },
+                    {
+                        "title": module.HIDDEN_SHARE_TITLE,
+                        "targets": [{"expr": module.HIDDEN_SHARE_EXPR}],
+                    },
                 ]
             }
         ),
@@ -88,6 +92,50 @@ def test_dashboard_memory_semantics_detects_wrong_visible_expr(tmp_path: Path) -
                     {
                         "title": module.HIDDEN_TITLE,
                         "targets": [{"expr": module.HIDDEN_EXPR}],
+                    },
+                    {
+                        "title": module.HIDDEN_SHARE_TITLE,
+                        "targets": [{"expr": module.HIDDEN_SHARE_EXPR}],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    original = module.DASHBOARD
+    module.DASHBOARD = dashboard
+    try:
+        assert module.main() == 1
+    finally:
+        module.DASHBOARD = original
+
+
+def test_dashboard_memory_semantics_detects_wrong_hidden_share_expr(
+    tmp_path: Path,
+) -> None:
+    module = _load_dashboard_memory_semantics_module()
+    dashboard = tmp_path / "dashboard.json"
+    dashboard.write_text(
+        json.dumps(
+            {
+                "panels": [
+                    {
+                        "title": module.VISIBLE_TITLE,
+                        "targets": [{"expr": module.VISIBLE_EXPR}],
+                    },
+                    {
+                        "title": module.ACTIVE_TITLE,
+                        "targets": [{"expr": module.ACTIVE_EXPR}],
+                    },
+                    {
+                        "title": module.HIDDEN_TITLE,
+                        "targets": [{"expr": module.HIDDEN_EXPR}],
+                    },
+                    {
+                        "title": module.HIDDEN_SHARE_TITLE,
+                        "targets": [
+                            {"expr": 'hidden_test_data_active_total{job="openbrain-unified"}'}
+                        ],
                     },
                 ]
             }

@@ -17,6 +17,8 @@ VISIBLE_TITLE = "Active Memories (Visible Excl Test Data)"
 VISIBLE_EXPR = 'active_memories_total{job="openbrain-unified"}'
 HIDDEN_TITLE = "Hidden Test Data (Active Only)"
 HIDDEN_EXPR = 'hidden_test_data_active_total{job="openbrain-unified"}'
+HIDDEN_SHARE_TITLE = "Hidden Test Data Share (Active)"
+HIDDEN_SHARE_EXPR = 'hidden_test_data_active_total{job="openbrain-unified"} / clamp_min(active_memories_all_total{job="openbrain-unified"}, 1)'
 
 
 def _fail(message: str) -> int:
@@ -77,6 +79,17 @@ def main() -> int:
         if hidden_expr != HIDDEN_EXPR:
             errors.append(
                 f"{HIDDEN_TITLE} must use expr {HIDDEN_EXPR!r} (got {hidden_expr!r})"
+            )
+
+    hidden_share_panel = _find_panel_by_title(payload, HIDDEN_SHARE_TITLE)
+    if hidden_share_panel is None:
+        errors.append(f"missing dashboard panel title: {HIDDEN_SHARE_TITLE}")
+    else:
+        hidden_share_expr = _extract_panel_expr(hidden_share_panel)
+        if hidden_share_expr != HIDDEN_SHARE_EXPR:
+            errors.append(
+                f"{HIDDEN_SHARE_TITLE} must use expr {HIDDEN_SHARE_EXPR!r} "
+                f"(got {hidden_share_expr!r})"
             )
 
     if errors:
