@@ -38,6 +38,15 @@ async def test_refresh_memory_gauges_sets_all_active_memory_metrics(monkeypatch)
             "personal": {"active": 0},
         }
 
+    async def fake_get_hidden_test_data_counts(_session):
+        return {
+            "hidden_test_data_total": 3,
+            "hidden_test_data_active_total": 2,
+            "hidden_test_data_build_total": 0,
+            "hidden_test_data_corporate_total": 2,
+            "hidden_test_data_personal_total": 0,
+        }
+
     captured: dict[str, float] = {}
 
     def fake_set_gauge_metric(name: str, value: float) -> None:
@@ -50,6 +59,10 @@ async def test_refresh_memory_gauges_sets_all_active_memory_metrics(monkeypatch)
         "src.telemetry_gauges.get_memory_domain_status_counts",
         fake_get_memory_domain_status_counts,
     )
+    monkeypatch.setattr(
+        "src.telemetry_gauges.get_hidden_test_data_counts",
+        fake_get_hidden_test_data_counts,
+    )
     monkeypatch.setattr("src.telemetry_gauges.set_gauge_metric", fake_set_gauge_metric)
 
     gauges = await refresh_memory_gauges(session)
@@ -58,5 +71,10 @@ async def test_refresh_memory_gauges_sets_all_active_memory_metrics(monkeypatch)
         "active_memories_build_total": 8.0,
         "active_memories_corporate_total": 2.0,
         "active_memories_personal_total": 0.0,
+        "hidden_test_data_total": 3.0,
+        "hidden_test_data_active_total": 2.0,
+        "hidden_test_data_build_total": 0.0,
+        "hidden_test_data_corporate_total": 2.0,
+        "hidden_test_data_personal_total": 0.0,
     }
     assert captured == gauges

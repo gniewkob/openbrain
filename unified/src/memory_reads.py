@@ -336,6 +336,43 @@ async def get_memory_domain_status_counts(
     return counts
 
 
+async def get_hidden_test_data_counts(session: AsyncSession) -> dict[str, int]:
+    """Return counts for records flagged as test data in metadata."""
+    is_test_data = func.coalesce(Memory.metadata_["test_data"].astext, "false") == "true"
+
+    total_result = await session.execute(
+        select(func.count(Memory.id)).where(is_test_data)
+    )
+    active_result = await session.execute(
+        select(func.count(Memory.id)).where(is_test_data, Memory.status == "active")
+    )
+    build_active_result = await session.execute(
+        select(func.count(Memory.id)).where(
+            is_test_data, Memory.status == "active", Memory.domain == DomainEnum.build
+        )
+    )
+    corporate_active_result = await session.execute(
+        select(func.count(Memory.id)).where(
+            is_test_data,
+            Memory.status == "active",
+            Memory.domain == DomainEnum.corporate,
+        )
+    )
+    personal_active_result = await session.execute(
+        select(func.count(Memory.id)).where(
+            is_test_data, Memory.status == "active", Memory.domain == DomainEnum.personal
+        )
+    )
+
+    return {
+        "hidden_test_data_total": int(total_result.scalar() or 0),
+        "hidden_test_data_active_total": int(active_result.scalar() or 0),
+        "hidden_test_data_build_total": int(build_active_result.scalar() or 0),
+        "hidden_test_data_corporate_total": int(corporate_active_result.scalar() or 0),
+        "hidden_test_data_personal_total": int(personal_active_result.scalar() or 0),
+    }
+
+
 async def list_maintenance_reports(
     session: AsyncSession, limit: int = 20
 ) -> list[MaintenanceReportEntry]:

@@ -19,6 +19,10 @@ docker exec -i openbrain-unified-db psql -U postgres -d openbrain_unified -Atc \
 curl -sS http://127.0.0.1:7010/metrics | grep -E '^active_memories_(total|build_total|corporate_total|personal_total) '
 ```
 
+```bash
+curl -sS http://127.0.0.1:7010/metrics | grep -E '^hidden_test_data_(total|active_total|build_total|corporate_total|personal_total) '
+```
+
 ## Wykrywanie kandydatów testowych (SQL)
 ```sql
 SELECT id, domain, status, match_key, left(content, 120)
