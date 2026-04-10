@@ -579,6 +579,25 @@ class MaintenanceReportDetail(BaseModel):
     links_fixed: int = 0
 
 
+class TestDataSampleEntry(BaseModel):
+    id: str
+    domain: str
+    status: str
+    owner: str
+    match_key: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TestDataHygieneReport(BaseModel):
+    generated_at: datetime
+    sample_limit: int
+    hidden_counts: dict[str, int] = Field(default_factory=dict)
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    domain_status_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
+    sample: list[TestDataSampleEntry] = Field(default_factory=list)
+
+
 class PolicyScopeEntry(BaseModel):
     allowed_domains: list[Literal["corporate", "build", "personal"]] = Field(
         default_factory=list

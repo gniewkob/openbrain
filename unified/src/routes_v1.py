@@ -13,6 +13,7 @@ from .schemas import (
     ObsidianNoteResponse,
     ObsidianSyncResponse,
     ObsidianWriteResponse,
+    TestDataHygieneReport,
 )
 
 
@@ -46,6 +47,12 @@ def register_v1_routes(app: FastAPI, handlers) -> None:
         handlers.v1_get,
         methods=["GET"],
         response_model=MemoryRecord,
+    )
+    app.add_api_route(
+        "/api/v1/memory/admin/test-data/report",
+        handlers.test_data_hygiene_report,
+        methods=["GET"],
+        response_model=TestDataHygieneReport,
     )
     app.add_api_route(
         "/api/v1/obsidian/vaults",

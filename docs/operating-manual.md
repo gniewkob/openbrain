@@ -65,6 +65,7 @@ Capabilities payload note:
 - request contract string fields are canonicalized (`trim`) at load time to keep audit placeholders deterministic (`updated_by_default`).
 - MCP tool flag `include_test_data` is strict boolean input on `brain_list` / `brain_search`; non-boolean values are rejected (no silent coercion).
 - V1 backend `/api/v1/memory/find` also enforces strict boolean typing for `filters.include_test_data`; invalid types return HTTP 422 (no silent truthy/falsy coercion).
+- Admin diagnostics endpoint `/api/v1/memory/admin/test-data/report` provides a read-only hygiene snapshot (hidden test-data counts, status/domain breakdown, sanitized sample IDs/owners/match_keys) to support controlled cleanup decisions.
 - response normalizers canonicalize actor fields (`created_by`, `updated_by`) in transport output for legacy-hit resilience.
 - Legacy transport-specific keys (`obsidian_http`, `obsidian_local`) remain for backward compatibility.
 

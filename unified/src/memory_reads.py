@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import func, select
@@ -26,6 +27,8 @@ from .schemas import (
     MemoryOut,
     MemoryRecord,
     SearchRequest,
+    TestDataHygieneReport,
+    TestDataSampleEntry,
 )
 
 
@@ -381,6 +384,79 @@ async def get_hidden_test_data_counts(session: AsyncSession) -> dict[str, int]:
         "hidden_test_data_corporate_total": int(corporate_active_result.scalar() or 0),
         "hidden_test_data_personal_total": int(personal_active_result.scalar() or 0),
     }
+
+
+async def get_test_data_hygiene_report(
+    session: AsyncSession, sample_limit: int = 20
+) -> TestDataHygieneReport:
+    """Return a read-only hygiene report for records flagged as test data."""
+    hidden_counts = await get_hidden_test_data_counts(session)
+    is_test_data = (
+        func.coalesce(Memory.metadata_["test_data"].astext, "false") == "true"
+    )
+
+    status_result = await session.execute(
+        select(Memory.status, func.count(Memory.id))
+        .where(is_test_data)
+        .group_by(Memory.status)
+    )
+    status_counts = {
+        str(status): int(count)
+        for status, count in status_result.all()
+    }
+
+    domain_result = await session.execute(
+        select(Memory.domain, Memory.status, func.count(Memory.id))
+        .where(is_test_data)
+        .group_by(Memory.domain, Memory.status)
+    )
+    domain_status_counts: dict[str, dict[str, int]] = {
+        "corporate": {},
+        "build": {},
+        "personal": {},
+    }
+    for domain, status, count in domain_result.all():
+        domain_key = domain.value if isinstance(domain, DomainEnum) else str(domain)
+        domain_status_counts.setdefault(domain_key, {})
+        domain_status_counts[domain_key][str(status)] = int(count)
+
+    sample_result = await session.execute(
+        select(
+            Memory.id,
+            Memory.domain,
+            Memory.status,
+            Memory.owner,
+            Memory.match_key,
+            Memory.created_at,
+            Memory.updated_at,
+        )
+        .where(is_test_data)
+        .order_by(Memory.updated_at.desc())
+        .limit(sample_limit)
+    )
+    sample = [
+        TestDataSampleEntry(
+            id=str(row.id),
+            domain=(
+                row.domain.value if isinstance(row.domain, DomainEnum) else str(row.domain)
+            ),
+            status=str(row.status),
+            owner=str(row.owner or ""),
+            match_key=(str(row.match_key) if row.match_key else None),
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+        for row in sample_result.all()
+    ]
+
+    return TestDataHygieneReport(
+        generated_at=datetime.now(timezone.utc),
+        sample_limit=sample_limit,
+        hidden_counts=hidden_counts,
+        status_counts=status_counts,
+        domain_status_counts=domain_status_counts,
+        sample=sample,
+    )
 
 
 async def list_maintenance_reports(

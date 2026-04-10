@@ -22,6 +22,7 @@ from ...memory_reads import (
     get_memory_as_record,
     export_memories,
     get_memory,
+    get_test_data_hygiene_report,
     list_maintenance_reports,
     get_maintenance_report,
     sync_check,
@@ -56,6 +57,7 @@ from ...schemas import (
     MemoryUpdate,
     MemoryUpsertItem,
     BulkUpsertResult,
+    TestDataHygieneReport,
 )
 from ...telemetry import incr_metric
 
@@ -250,6 +252,17 @@ async def maintain_report_detail(
     if report is None:
         raise HTTPException(status_code=404, detail="Maintenance report not found")
     return report
+
+
+@router.get("/admin/test-data/report", response_model=TestDataHygieneReport)
+async def test_data_hygiene_report(
+    sample_limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> TestDataHygieneReport:
+    """Return diagnostic report for records hidden by test-data policy."""
+    require_admin(_user)
+    return await get_test_data_hygiene_report(session, sample_limit=sample_limit)
 
 
 @router.post("/export")
