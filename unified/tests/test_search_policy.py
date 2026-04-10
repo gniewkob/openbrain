@@ -123,6 +123,58 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("memories.status", stmt_text)
         self.assertIn("= :status_1", stmt_text)
 
+    async def test_find_memories_v1_excludes_test_data_by_default(self) -> None:
+        captured_stmt = None
+
+        async def execute(stmt):
+            nonlocal captured_stmt
+            captured_stmt = stmt
+            return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
+
+        session = SimpleNamespace(execute=execute)
+
+        with patch.object(
+            memory_reads,
+            "_get_embedding_compat",
+            new=AsyncMock(return_value=None),
+        ):
+            await memory_reads.find_memories_v1(
+                session, MemoryFindRequest(query=None, limit=5)
+            )
+
+        self.assertIsNotNone(captured_stmt)
+        stmt_text = str(captured_stmt)
+        self.assertIn("metadata", stmt_text)
+        self.assertIn("memories.metadata ->>", stmt_text)
+
+    async def test_find_memories_v1_can_include_test_data_with_flag(self) -> None:
+        captured_stmt = None
+
+        async def execute(stmt):
+            nonlocal captured_stmt
+            captured_stmt = stmt
+            return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
+
+        session = SimpleNamespace(execute=execute)
+
+        with patch.object(
+            memory_reads,
+            "_get_embedding_compat",
+            new=AsyncMock(return_value=None),
+        ):
+            await memory_reads.find_memories_v1(
+                session,
+                MemoryFindRequest(
+                    query=None,
+                    limit=5,
+                    filters={"include_test_data": True},
+                ),
+            )
+
+        self.assertIsNotNone(captured_stmt)
+        stmt_text = str(captured_stmt)
+        self.assertNotIn("test_data", stmt_text)
+
     async def test_append_version_marks_previous_record_as_superseded(self) -> None:
         now = datetime.now(timezone.utc)
         existing = Memory(

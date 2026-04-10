@@ -145,11 +145,11 @@
       },
       "targets": [
         {
-          "expr": "clamp_min(memories_created_total{job=\"openbrain-unified\"} - memories_deleted_total{job=\"openbrain-unified\"}, 0)",
+          "expr": "active_memories_total{job=\"openbrain-unified\"}",
           "refId": "A"
         }
       ],
-      "title": "Estimated Active Memories",
+      "title": "Active Memories (DB Truth)",
       "type": "stat"
     },
     {
