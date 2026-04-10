@@ -95,6 +95,14 @@ def test_local_guardrails_includes_search_filter_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_list_filter_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "list filter parity",
+        "scripts/check_list_filter_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_response_normalizers_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (

@@ -19,6 +19,7 @@ GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
     ("request/runtime parity", "scripts/check_request_runtime_parity.py"),
     ("tool signature parity", "scripts/check_tool_signature_parity.py"),
     ("search filter parity", "scripts/check_search_filter_parity.py"),
+    ("list filter parity", "scripts/check_list_filter_parity.py"),
     ("response normalizers parity", "scripts/check_response_normalizers_parity.py"),
     ("capabilities truthfulness", "scripts/check_capabilities_truthfulness.py"),
     ("audit semantics", "scripts/check_audit_semantics.py"),
