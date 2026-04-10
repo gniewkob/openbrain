@@ -80,3 +80,65 @@ def test_obsidian_contract_requires_disabled_reason_snippets() -> None:
     )
     assert any("gateway disabled reason missing snippet" in err for err in errors)
     assert any("HTTP disabled reason missing snippet" in err for err in errors)
+
+
+def test_obsidian_contract_checks_capabilities_payload_semantics() -> None:
+    module = _load_obsidian_contract_module()
+
+    src_ok = """
+async def brain_capabilities():
+    obsidian_status = "disabled"
+    obsidian_tools = []
+    obsidian_reason = "x"
+    return {
+        "obsidian": {
+            "mode": "http",
+            "status": obsidian_status,
+            "tools": obsidian_tools,
+            "reason": obsidian_reason,
+        },
+        "obsidian_http": {
+            "status": obsidian_status,
+            "tools": obsidian_tools,
+            "reason": obsidian_reason,
+        },
+    }
+"""
+    assert (
+        module._check_obsidian_capabilities_payload_semantics(
+            src_ok,
+            label="http",
+            expected_mode="http",
+            expected_secondary_key="obsidian_http",
+        )
+        == []
+    )
+
+    src_bad = """
+async def brain_capabilities():
+    obsidian_status = "disabled"
+    obsidian_tools = []
+    obsidian_reason = "x"
+    return {
+        "obsidian": {
+            "mode": "local",
+            "status": "disabled",
+            "tools": [],
+            "reason": None,
+        },
+        "obsidian_http": {
+            "status": "disabled",
+            "tools": [],
+            "reason": None,
+        },
+    }
+"""
+    errors = module._check_obsidian_capabilities_payload_semantics(
+        src_bad,
+        label="http",
+        expected_mode="http",
+        expected_secondary_key="obsidian_http",
+    )
+    assert any("obsidian.mode must be constant 'http'" in err for err in errors)
+    assert any("obsidian.status must reference obsidian_status" in err for err in errors)
+    assert any("obsidian_http.status must reference obsidian_status" in err for err in errors)

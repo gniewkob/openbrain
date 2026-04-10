@@ -155,12 +155,94 @@ def _check_http_transport_contract() -> list[str]:
     return errors
 
 
+def _dict_value_for_key(node: ast.Dict, key_name: str) -> ast.AST | None:
+    for key, value in zip(node.keys, node.values):
+        if isinstance(key, ast.Constant) and key.value == key_name:
+            return value
+    return None
+
+
+def _is_name(value: ast.AST | None, expected: str) -> bool:
+    return isinstance(value, ast.Name) and value.id == expected
+
+
+def _check_obsidian_capabilities_payload_semantics(
+    text: str,
+    *,
+    label: str,
+    expected_mode: str,
+    expected_secondary_key: str,
+) -> list[str]:
+    errors: list[str] = []
+    tree = ast.parse(text)
+    fn = _find_async_function(tree, "brain_capabilities")
+    if fn is None:
+        return [f"{label} missing brain_capabilities"]
+
+    return_dict: ast.Dict | None = None
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Return) and isinstance(node.value, ast.Dict):
+            return_dict = node.value
+            break
+    if return_dict is None:
+        return [f"{label} brain_capabilities must return a dict payload"]
+
+    obsidian_value = _dict_value_for_key(return_dict, "obsidian")
+    secondary_value = _dict_value_for_key(return_dict, expected_secondary_key)
+    if not isinstance(obsidian_value, ast.Dict):
+        errors.append(f"{label} brain_capabilities must include obsidian object")
+        return errors
+    if not isinstance(secondary_value, ast.Dict):
+        errors.append(
+            f"{label} brain_capabilities must include {expected_secondary_key} object"
+        )
+        return errors
+
+    mode_value = _dict_value_for_key(obsidian_value, "mode")
+    if not (isinstance(mode_value, ast.Constant) and mode_value.value == expected_mode):
+        errors.append(
+            f"{label} obsidian.mode must be constant '{expected_mode}'"
+        )
+
+    for key_name, expected_var in (
+        ("status", "obsidian_status"),
+        ("tools", "obsidian_tools"),
+        ("reason", "obsidian_reason"),
+    ):
+        if not _is_name(_dict_value_for_key(obsidian_value, key_name), expected_var):
+            errors.append(
+                f"{label} obsidian.{key_name} must reference {expected_var}"
+            )
+        if not _is_name(_dict_value_for_key(secondary_value, key_name), expected_var):
+            errors.append(
+                f"{label} {expected_secondary_key}.{key_name} must reference {expected_var}"
+            )
+
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     errors.extend(_check_manifest())
     errors.extend(_check_gateway_gating())
     errors.extend(_check_disabled_reason_snippets())
     errors.extend(_check_http_transport_contract())
+    errors.extend(
+        _check_obsidian_capabilities_payload_semantics(
+            GATEWAY_MAIN.read_text(encoding="utf-8"),
+            label="gateway",
+            expected_mode="local",
+            expected_secondary_key="obsidian_local",
+        )
+    )
+    errors.extend(
+        _check_obsidian_capabilities_payload_semantics(
+            HTTP_TRANSPORT.read_text(encoding="utf-8"),
+            label="HTTP transport",
+            expected_mode="http",
+            expected_secondary_key="obsidian_http",
+        )
+    )
     if errors:
         for err in errors:
             _fail(err)
