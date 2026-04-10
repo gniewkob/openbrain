@@ -454,6 +454,61 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             json={"content": "policy v2", "updated_by": "agent"},
         )
 
+    async def test_brain_delete_calls_api_delete_path(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.status_code = 204
+        response.json.return_value = {}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.delete.return_value = response
+            mock_client.return_value = client
+
+            result = await gateway.brain_delete("mem-1")
+
+        self.assertEqual(result, {"deleted": True, "id": "mem-1"})
+        client.delete.assert_awaited_once_with("/api/v1/memory/mem-1")
+
+    async def test_brain_delete_404_raises_not_found(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = True
+        response.status_code = 404
+        response.json.return_value = {"detail": "not found"}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.delete.return_value = response
+            mock_client.return_value = client
+
+            with self.assertRaisesRegex(ValueError, "Memory not found: mem-1"):
+                await gateway.brain_delete("mem-1")
+
+    async def test_brain_delete_403_raises_governance_message(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = True
+        response.status_code = 403
+        response.json.return_value = {"detail": "forbidden"}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.delete.return_value = response
+            mock_client.return_value = client
+
+            with self.assertRaisesRegex(
+                ValueError, "Cannot delete corporate memories. Use deprecation instead."
+            ):
+                await gateway.brain_delete("mem-1")
+
 
 if __name__ == "__main__":
     unittest.main()
