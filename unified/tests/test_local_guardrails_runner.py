@@ -125,3 +125,11 @@ def test_local_guardrails_includes_delete_semantics_parity_step() -> None:
         "delete semantics parity",
         "scripts/check_delete_semantics_parity.py",
     ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_update_audit_semantics_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "update audit semantics parity",
+        "scripts/check_update_audit_semantics_parity.py",
+    ) in module.GUARDRAIL_STEPS
