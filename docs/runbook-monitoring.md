@@ -109,6 +109,7 @@ curl -s 'http://127.0.0.1:9090/api/v1/query?query=hidden_test_data_active_total'
 
 Alerting note:
 - `OpenBrainHiddenTestDataPresent` firing means hidden active test-data exists; use `admin/test-data/report` and `cleanup-build` flow before tuning dashboard thresholds.
+- `OpenBrainHiddenTestDataShareHigh` firing means hidden share is >= 25% of active set; treat as elevated data-quality incident (P1 hygiene).
 
 ---
 

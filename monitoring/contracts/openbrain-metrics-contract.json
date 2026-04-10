@@ -1,5 +1,5 @@
 {
-  "version": "1.5.0",
+  "version": "1.6.0",
   "service": "openbrain-unified",
   "required_metrics": [
     "active_memories_build_total",
@@ -37,6 +37,7 @@
     "operational_health_status",
     "openbrain_http_5xx_rate_5m",
     "openbrain_http_5xx_ratio_5m",
+    "openbrain_hidden_test_data_share_active",
     "openbrain_http_requests_rate_5m",
     "openbrain_policy_skip_ratio_1h",
     "openbrain_search_zero_hit_ratio_1h",
