@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
+
+from .contract_loader import load_contract
 
 def _validate_request_contracts(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
@@ -28,8 +28,7 @@ def _validate_request_contracts(data: Any) -> dict[str, Any]:
 
 
 def _load_request_contracts() -> dict[str, Any]:
-    path = Path(__file__).resolve().parents[2] / "contracts" / "request_contracts.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = load_contract("request_contracts.json")
     return _validate_request_contracts(data)
 
 

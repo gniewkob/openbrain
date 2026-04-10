@@ -42,24 +42,16 @@ def _extract_value_error_messages(tree: ast.AST, fn_name: str) -> list[str]:
     raise ValueError(f"{fn_name} not found")
 
 
-def _extract_contract_path_tokens(tree: ast.AST, fn_name: str, path_var: str) -> list[str]:
+def _extract_contract_filename(tree: ast.AST, fn_name: str) -> str:
     for node in getattr(tree, "body", []):
         if not isinstance(node, ast.FunctionDef) or node.name != fn_name:
             continue
-        for assign in node.body:
-            if not isinstance(assign, ast.Assign):
+        for sub in ast.walk(node):
+            if not isinstance(sub, ast.Constant) or not isinstance(sub.value, str):
                 continue
-            if len(assign.targets) != 1:
-                continue
-            target = assign.targets[0]
-            if not isinstance(target, ast.Name) or target.id != path_var:
-                continue
-            tokens: list[str] = []
-            for sub in ast.walk(assign.value):
-                if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
-                    tokens.append(sub.value)
-            return sorted(tokens)
-    raise ValueError(f"{path_var} assignment not found in {fn_name}")
+            if sub.value.endswith(".json"):
+                return sub.value
+    raise ValueError(f"contract filename not found in {fn_name}")
 
 
 def _extract_function_source(tree: ast.AST, source: str, fn_name: str) -> str:
@@ -106,16 +98,14 @@ def _check_request_contract_parity(http_src: str, gateway_src: str) -> list[str]
             "_validate_request_contracts ValueError semantics must stay identical in HTTP and gateway modules"
         )
 
-    http_tokens = _extract_contract_path_tokens(http_tree, "_load_request_contracts", "path")
-    gateway_tokens = _extract_contract_path_tokens(
-        gateway_tree, "_load_request_contracts", "path"
-    )
-    if http_tokens != gateway_tokens:
+    http_filename = _extract_contract_filename(http_tree, "_load_request_contracts")
+    gateway_filename = _extract_contract_filename(gateway_tree, "_load_request_contracts")
+    if http_filename != gateway_filename:
         errors.append(
-            "_load_request_contracts path semantics must stay identical in HTTP and gateway modules"
+            "_load_request_contracts must resolve the same contract filename in HTTP and gateway modules"
         )
-    if "contracts" not in http_tokens or "request_contracts.json" not in http_tokens:
-        errors.append("_load_request_contracts must resolve contracts/request_contracts.json")
+    if http_filename != "request_contracts.json":
+        errors.append("_load_request_contracts must resolve request_contracts.json")
 
     return errors
 
@@ -149,16 +139,14 @@ def _check_runtime_limits_parity(http_src: str, gateway_src: str) -> list[str]:
             "_validate_runtime_limits ValueError semantics must stay identical in HTTP and gateway modules"
         )
 
-    http_tokens = _extract_contract_path_tokens(http_tree, "load_runtime_limits", "path")
-    gateway_tokens = _extract_contract_path_tokens(
-        gateway_tree, "load_runtime_limits", "path"
-    )
-    if http_tokens != gateway_tokens:
+    http_filename = _extract_contract_filename(http_tree, "load_runtime_limits")
+    gateway_filename = _extract_contract_filename(gateway_tree, "load_runtime_limits")
+    if http_filename != gateway_filename:
         errors.append(
-            "load_runtime_limits path semantics must stay identical in HTTP and gateway modules"
+            "load_runtime_limits must resolve the same contract filename in HTTP and gateway modules"
         )
-    if "contracts" not in http_tokens or "runtime_limits.json" not in http_tokens:
-        errors.append("load_runtime_limits must resolve contracts/runtime_limits.json")
+    if http_filename != "runtime_limits.json":
+        errors.append("load_runtime_limits must resolve runtime_limits.json")
 
     return errors
 

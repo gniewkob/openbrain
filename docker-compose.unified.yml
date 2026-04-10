@@ -115,8 +115,10 @@ services:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     command:
       - "http"
+      - "http://mcp-http:7011"
       - "--url=${NGROK_DOMAIN}"
-      - "mcp-http:7011"
+
+
     networks:
       - net_unified
     depends_on:

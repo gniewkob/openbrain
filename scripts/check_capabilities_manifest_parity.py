@@ -32,24 +32,16 @@ def _extract_assignment_literal(tree: ast.AST, name: str) -> Any:
     raise ValueError(f"{name} assignment not found")
 
 
-def _extract_load_manifest_contract_path_parts(tree: ast.AST) -> list[str]:
+def _extract_contract_filename(tree: ast.AST) -> str:
     for node in ast.walk(tree):
         if not isinstance(node, ast.FunctionDef) or node.name != "load_capabilities_manifest":
             continue
-        for assign in node.body:
-            if not isinstance(assign, ast.Assign):
+        for sub in ast.walk(node):
+            if not isinstance(sub, ast.Constant) or not isinstance(sub.value, str):
                 continue
-            if len(assign.targets) != 1 or not isinstance(assign.targets[0], ast.Name):
-                continue
-            if assign.targets[0].id != "manifest_path":
-                continue
-            value = assign.value
-            parts: list[str] = []
-            for const in ast.walk(value):
-                if isinstance(const, ast.Constant) and isinstance(const.value, str):
-                    parts.append(const.value)
-            return sorted(parts)
-    raise ValueError("manifest_path assignment not found in load_capabilities_manifest")
+            if sub.value.endswith(".json"):
+                return sub.value
+    raise ValueError("contract filename not found in load_capabilities_manifest")
 
 
 def _check_manifest_parity(http_src: str, gateway_src: str) -> list[str]:
@@ -62,12 +54,12 @@ def _check_manifest_parity(http_src: str, gateway_src: str) -> list[str]:
     if http_defaults != gateway_defaults:
         errors.append("capabilities manifest _DEFAULTS must stay identical in HTTP and gateway modules")
 
-    http_parts = _extract_load_manifest_contract_path_parts(http_tree)
-    gateway_parts = _extract_load_manifest_contract_path_parts(gateway_tree)
-    if http_parts != gateway_parts:
-        errors.append("load_capabilities_manifest path semantics must stay identical in HTTP and gateway modules")
-    if "contracts" not in http_parts or "capabilities_manifest.json" not in http_parts:
-        errors.append("load_capabilities_manifest must resolve contracts/capabilities_manifest.json")
+    http_filename = _extract_contract_filename(http_tree)
+    gateway_filename = _extract_contract_filename(gateway_tree)
+    if http_filename != gateway_filename:
+        errors.append("load_capabilities_manifest must resolve the same contract filename in HTTP and gateway modules")
+    if http_filename != "capabilities_manifest.json":
+        errors.append("load_capabilities_manifest must resolve capabilities_manifest.json")
 
     return errors
 

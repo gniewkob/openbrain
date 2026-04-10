@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 import re
 from typing import Any
+
+from .contract_loader import load_contract
 
 _SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 
@@ -32,8 +32,5 @@ def _validate_metadata(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_capabilities_metadata() -> dict[str, Any]:
-    contract_path = (
-        Path(__file__).resolve().parents[2] / "contracts" / "capabilities_metadata.json"
-    )
-    data = json.loads(contract_path.read_text(encoding="utf-8"))
+    data = load_contract("capabilities_metadata.json")
     return _validate_metadata(data)

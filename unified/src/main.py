@@ -37,6 +37,9 @@ app = create_app(lifespan=lifespan)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(MetricsMiddleware)
 
+# Health checks (unversioned, at root)
+app.include_router(health_router)
+
 # API V1 Routes
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(memory_router, prefix="/api/v1")
