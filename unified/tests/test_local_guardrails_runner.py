@@ -85,3 +85,11 @@ def test_local_guardrails_includes_response_normalizers_parity_step() -> None:
         "response normalizers parity",
         "scripts/check_response_normalizers_parity.py",
     ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_delete_semantics_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "delete semantics parity",
+        "scripts/check_delete_semantics_parity.py",
+    ) in module.GUARDRAIL_STEPS
