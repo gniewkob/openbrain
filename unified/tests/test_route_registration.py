@@ -37,6 +37,7 @@ def _make_handlers(**overrides):
         "update_policy_registry",
         "maintain_reports",
         "maintain_report_detail",
+        "test_data_hygiene_report",
         "export",
         "v1_write",
         "v1_write_many",
@@ -154,6 +155,7 @@ class RouteRegistrationTests(unittest.TestCase):
             ("/api/admin/policy-registry", "PUT"),
             ("/api/admin/maintain/reports", "GET"),
             ("/api/admin/maintain/reports/{report_id}", "GET"),
+            ("/api/admin/test-data/report", "GET"),
             ("/api/memories/export", "POST"),
         ]:
             self.assertIn(path, routes)

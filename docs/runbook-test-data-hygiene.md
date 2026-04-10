@@ -23,6 +23,11 @@ curl -sS http://127.0.0.1:7010/metrics | grep -E '^active_memories_(total|build_
 curl -sS http://127.0.0.1:7010/metrics | grep -E '^hidden_test_data_(total|active_total|build_total|corporate_total|personal_total) '
 ```
 
+```bash
+# Wymaga auth/admin:
+curl -sS "http://127.0.0.1:7010/api/v1/memory/admin/test-data/report?sample_limit=20"
+```
+
 ## Wykrywanie kandydatów testowych (SQL)
 ```sql
 SELECT id, domain, status, match_key, left(content, 120)

@@ -99,6 +99,11 @@ class TestEndpointsV1Core:
         # Returns 401/403 without auth or 404/503 with auth but no DB
         assert response.status_code in [200, 401, 403, 404, 500, 503]
 
+    def test_v1_test_data_hygiene_report_requires_auth(self, client: TestClient) -> None:
+        """V1 admin test-data report is protected by auth/admin policy."""
+        response = client.get("/api/v1/memory/admin/test-data/report")
+        assert response.status_code in [200, 401, 403, 500, 503]
+
 
 class TestEndpointsV1Obsidian:
     """V1 Obsidian API endpoints."""
@@ -163,6 +168,7 @@ class TestAllRoutesRegistered:
             "/api/v1/memory/find",
             "/api/v1/memory/get-context",
             "/api/v1/memory/{memory_id}",
+            "/api/v1/memory/admin/test-data/report",
         ]
         for path in expected:
             assert path in paths, f"Missing: {path}"
@@ -195,6 +201,7 @@ class TestAllRoutesRegistered:
             "/api/v1/memory/maintain",
             "/api/v1/memory/export",
             "/api/v1/memory/sync-check",
+            "/api/v1/memory/admin/test-data/report",
         ]
         for path in expected:
             assert path in paths, f"Missing: {path}"

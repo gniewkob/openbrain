@@ -11,6 +11,7 @@ from .schemas import (
     PolicyRegistry,
     SearchResult,
     SyncCheckResponse,
+    TestDataHygieneReport,
 )
 
 
@@ -102,6 +103,12 @@ def register_crud_routes(app: FastAPI, handlers) -> None:
         handlers.maintain_report_detail,
         methods=["GET"],
         response_model=MaintenanceReportDetail,
+    )
+    app.add_api_route(
+        "/api/admin/test-data/report",
+        handlers.test_data_hygiene_report,
+        methods=["GET"],
+        response_model=TestDataHygieneReport,
     )
     app.add_api_route(
         "/api/memories/export",
