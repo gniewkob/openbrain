@@ -87,6 +87,14 @@ def test_local_guardrails_includes_tool_signature_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_capabilities_tools_truthfulness_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "capabilities tools truthfulness",
+        "scripts/check_capabilities_tools_truthfulness.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_search_filter_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (
