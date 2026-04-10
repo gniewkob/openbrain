@@ -529,6 +529,26 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             ):
                 await gateway.brain_delete("mem-1")
 
+    async def test_brain_delete_400_missing_session_id_is_actionable(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = True
+        response.status_code = 400
+        response.json.return_value = {"detail": "Missing session ID"}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.delete.return_value = response
+            mock_client.return_value = client
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Missing MCP session context; reconnect the MCP HTTP client and retry.",
+            ):
+                await gateway.brain_delete("mem-1")
+
 
 if __name__ == "__main__":
     unittest.main()

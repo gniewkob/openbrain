@@ -43,3 +43,18 @@ async def brain_delete(memory_id: str):
 """
     errors = module._check_transport_delete_semantics(src)
     assert any("map 403 explicitly" in err for err in errors)
+
+
+def test_gateway_semantics_detector_requires_backend_error_mapping() -> None:
+    module = _load_delete_semantics_module()
+    src = """
+async def brain_delete(memory_id: str):
+    async with _client() as c:
+        r = await _request_or_raise(c, "DELETE", "/api/v1/memory/x", allow_statuses={403, 404})
+    if r.status_code == 404:
+        raise ValueError(f"Memory not found: {memory_id}")
+    if r.status_code == 403:
+        raise ValueError("Cannot delete corporate memories. Use deprecation instead.")
+"""
+    errors = module._check_gateway_delete_semantics(src)
+    assert any("backend_error_message mapping" in err for err in errors)

@@ -25,6 +25,8 @@ def _check_gateway_delete_semantics(source: str) -> list[str]:
     errors: list[str] = []
     if not re.search(r"allow_statuses\s*=\s*\{\s*403\s*,\s*404\s*\}", source):
         errors.append("gateway brain_delete must allow 403 and 404 passthrough")
+    if "backend_error_message(" not in source:
+        errors.append("gateway delete path must rely on backend_error_message mapping")
     if NOT_FOUND_MESSAGE not in source:
         errors.append("gateway brain_delete must expose canonical not-found message")
     if FORBIDDEN_MESSAGE not in source:
@@ -38,6 +40,8 @@ def _check_transport_delete_semantics(source: str) -> list[str]:
         errors.append("transport brain_delete must map 404 explicitly")
     if not re.search(r"response\.status_code\s*==\s*403", source):
         errors.append("transport brain_delete must map 403 explicitly")
+    if "backend_error_message(" not in source:
+        errors.append("transport delete path must rely on backend_error_message mapping")
     if NOT_FOUND_MESSAGE not in source:
         errors.append("transport brain_delete must expose canonical not-found message")
     if FORBIDDEN_MESSAGE not in source:
