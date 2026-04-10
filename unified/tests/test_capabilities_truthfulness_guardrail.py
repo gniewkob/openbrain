@@ -111,3 +111,42 @@ def test_capabilities_truthfulness_metadata_check_requires_health_entry(tmp_path
     finally:
         module.METADATA = original
     assert any("health semantics entry" in err for err in errors)
+
+
+def test_capabilities_truthfulness_checks_health_source_and_obsidian_mapping(
+    tmp_path,
+) -> None:
+    module = _load_capabilities_truthfulness_module()
+    ok_path = tmp_path / "capabilities_health_ok.py"
+    ok_path.write_text(
+        """
+def build_capabilities_health(backend, obsidian_status):
+    return {
+        "overall": "healthy",
+        "source": backend.get("probe", "unknown"),
+        "components": {
+            "obsidian": "enabled" if obsidian_status == "enabled" else "disabled",
+        },
+    }
+""",
+        encoding="utf-8",
+    )
+    assert module._check_capabilities_health_contract(ok_path, "x") == []
+
+    bad_path = tmp_path / "capabilities_health_bad.py"
+    bad_path.write_text(
+        """
+def build_capabilities_health(backend, obsidian_status):
+    return {
+        "overall": "healthy",
+        "source": "healthz_fallback",
+        "components": {
+            "obsidian": obsidian_status,
+        },
+    }
+""",
+        encoding="utf-8",
+    )
+    errors = module._check_capabilities_health_contract(bad_path, "x")
+    assert any("health.source" in err for err in errors)
+    assert any("obsidian component" in err for err in errors)
