@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 from typing import Any
+
+from .contract_loader import load_contract
 
 _DEFAULTS = {
     "status_labels": {
@@ -18,11 +19,8 @@ _DEFAULTS = {
 
 
 def _load_contract() -> dict[str, Any]:
-    path = (
-        Path(__file__).resolve().parents[2] / "contracts" / "http_error_contracts.json"
-    )
     try:
-        data: Any = json.loads(path.read_text(encoding="utf-8"))
+        data = load_contract("http_error_contracts.json")
     except Exception:
         return dict(_DEFAULTS)
     merged = dict(_DEFAULTS)

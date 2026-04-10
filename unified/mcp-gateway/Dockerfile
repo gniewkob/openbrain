@@ -13,8 +13,9 @@ COPY mcp-gateway/pyproject.toml .
 RUN pip install -e ".[http]"
 
 COPY mcp-gateway/src ./src
-
-# Shared common module (obsidian_adapter) — exposed via PYTHONPATH=/app/src
 COPY src/common ./src/common
+
+# Place contracts at the root of /app, so parents[2] from /app/src/xxx.py points to /app/contracts
+COPY contracts ./contracts
 
 CMD ["python", "-m", "src.mcp_http"]

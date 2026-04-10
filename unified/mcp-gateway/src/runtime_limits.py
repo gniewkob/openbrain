@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
+
+from .contract_loader import load_contract
 
 _DEFAULTS = {
     "max_search_top_k": 100,
@@ -10,6 +10,8 @@ _DEFAULTS = {
     "max_sync_limit": 200,
     "max_bulk_items": 100,
 }
+
+
 def _validate_runtime_limits(data: Any) -> dict[str, int]:
     if not isinstance(data, dict):
         raise ValueError("runtime_limits must be a JSON object")
@@ -25,6 +27,5 @@ def _validate_runtime_limits(data: Any) -> dict[str, int]:
 
 
 def load_runtime_limits() -> dict[str, int]:
-    path = Path(__file__).resolve().parents[2] / "contracts" / "runtime_limits.json"
-    data: Any = json.loads(path.read_text(encoding="utf-8"))
+    data = load_contract("runtime_limits.json")
     return _validate_runtime_limits(data)

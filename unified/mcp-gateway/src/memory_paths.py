@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
+
+from .contract_loader import load_contract
 
 _DEFAULT_BASE = "/api/v1/memory"
 _DEFAULT_PATHS = {
@@ -18,9 +18,8 @@ _DEFAULT_PATHS = {
 
 
 def _load_contract() -> tuple[str, dict[str, str]]:
-    path = Path(__file__).resolve().parents[2] / "contracts" / "memory_paths.json"
     try:
-        data: Any = json.loads(path.read_text(encoding="utf-8"))
+        data = load_contract("memory_paths.json")
     except Exception:
         return _DEFAULT_BASE, dict(_DEFAULT_PATHS)
 
@@ -52,4 +51,3 @@ def memory_item_absolute_path(memory_id: str) -> str:
 
 def memory_absolute_path(name: str) -> str:
     return f"{_MEMORY_BASE}{memory_path(name)}"
-

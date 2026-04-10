@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
+
+from .contract_loader import load_contract
 
 _DEFAULTS = {
     "core_tools": ["search", "get", "store", "update"],
@@ -21,6 +21,8 @@ _DEFAULTS = {
         "obsidian_update_note",
     ],
 }
+
+
 def _validate_manifest(data: Any) -> dict[str, list[str]]:
     if not isinstance(data, dict):
         raise ValueError("capabilities_manifest must be a JSON object")
@@ -38,8 +40,5 @@ def _validate_manifest(data: Any) -> dict[str, list[str]]:
 
 
 def load_capabilities_manifest() -> dict[str, list[str]]:
-    manifest_path = (
-        Path(__file__).resolve().parents[2] / "contracts" / "capabilities_manifest.json"
-    )
-    data: Any = json.loads(manifest_path.read_text(encoding="utf-8"))
+    data = load_contract("capabilities_manifest.json")
     return _validate_manifest(data)

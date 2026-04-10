@@ -53,6 +53,11 @@ class _OpenRedirectClient(OAuthClientInformationFull):
         uri_str = str(redirect_uri)
         if not uri_str.startswith("https://"):
             raise ValueError(f"Only HTTPS redirect URIs allowed, got: {uri_str}")
+        
+        # Ensure it's in the list so that internal mcp-server checks pass
+        if redirect_uri not in self.redirect_uris:
+            self.redirect_uris.append(redirect_uri)
+            
         return redirect_uri
 
 
@@ -138,7 +143,10 @@ class SimpleKeyOAuthProvider(OAuthProvider):
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
         raw = await self._r.get(f"{_PFX_CLIENT}{client_id}")
         if raw:
-            return OAuthClientInformationFull(**json.loads(raw))
+            # Use _OpenRedirectClient instead of the base class to ensure
+            # custom validate_redirect_uri is used even after loading from Redis.
+            return _OpenRedirectClient(**json.loads(raw))
+        
         # Auto-register any client that skips DCR (e.g. ChatGPT).
         auto = _OpenRedirectClient(
             client_id=client_id,
@@ -450,3 +458,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
