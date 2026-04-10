@@ -13,6 +13,8 @@ DASHBOARD = ROOT / "monitoring/grafana/dashboards/openbrain/openbrain-overview.j
 
 ACTIVE_TITLE = "Active Memories (All incl Test Data)"
 ACTIVE_EXPR = 'active_memories_all_total{job="openbrain-unified"}'
+VISIBLE_TITLE = "Active Memories (Visible Excl Test Data)"
+VISIBLE_EXPR = 'active_memories_total{job="openbrain-unified"}'
 HIDDEN_TITLE = "Hidden Test Data (Active Only)"
 HIDDEN_EXPR = 'hidden_test_data_active_total{job="openbrain-unified"}'
 
@@ -55,6 +57,16 @@ def main() -> int:
         if active_expr != ACTIVE_EXPR:
             errors.append(
                 f"{ACTIVE_TITLE} must use expr {ACTIVE_EXPR!r} (got {active_expr!r})"
+            )
+
+    visible_panel = _find_panel_by_title(payload, VISIBLE_TITLE)
+    if visible_panel is None:
+        errors.append(f"missing dashboard panel title: {VISIBLE_TITLE}")
+    else:
+        visible_expr = _extract_panel_expr(visible_panel)
+        if visible_expr != VISIBLE_EXPR:
+            errors.append(
+                f"{VISIBLE_TITLE} must use expr {VISIBLE_EXPR!r} (got {visible_expr!r})"
             )
 
     hidden_panel = _find_panel_by_title(payload, HIDDEN_TITLE)

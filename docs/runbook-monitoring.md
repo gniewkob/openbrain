@@ -86,7 +86,11 @@ curl -s 'http://127.0.0.1:9090/api/v1/query?query=hidden_test_data_active_total'
 # expect: if > 0 then visible counters can stay near zero by design
 
 # 5. Dashboard
-# Open http://127.0.0.1:3001 → OpenBrain Overview → panels show real data
+# Open http://127.0.0.1:3001 → OpenBrain Overview.
+# Memory sanity: compare three stat panels together:
+# - Active Memories (Visible Excl Test Data)
+# - Active Memories (All incl Test Data)
+# - Hidden Test Data (Active Only)
 ```
 
 ---
