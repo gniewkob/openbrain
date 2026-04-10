@@ -18,6 +18,7 @@ from .telemetry_store import (
     get_telemetry_histograms,
     upsert_telemetry_metrics,
 )
+from .telemetry_gauges import refresh_memory_gauges
 
 log = structlog.get_logger()
 
@@ -29,6 +30,7 @@ async def periodic_telemetry_sync() -> None:
         try:
             snapshot = get_metrics_snapshot()
             async with AsyncSessionLocal() as session:
+                gauges = await refresh_memory_gauges(session)
                 await upsert_telemetry_metrics(
                     session,
                     counters=snapshot["counters"],
@@ -38,6 +40,7 @@ async def periodic_telemetry_sync() -> None:
                     "telemetry_state_synced",
                     counter_count=len(snapshot["counters"]),
                     histogram_count=len(snapshot["histograms"]),
+                    gauge_count=len(gauges),
                 )
         except Exception as exc:
             # Telemetry sync errors are non-critical, just log them
@@ -78,6 +81,15 @@ async def lifespan(app):
         # Telemetry load errors are non-critical, just log them
         # Broad exception catch because this is startup telemetry only
         log.error("telemetry_load_failed", error=str(exc), exc_info=True)
+
+    # Keep active-memory gauges truthful even if persisted telemetry table is unavailable.
+    try:
+        async with AsyncSessionLocal() as session:
+            gauges = await refresh_memory_gauges(session)
+            log.info("memory_gauges_refreshed", gauge_count=len(gauges))
+    except Exception as exc:
+        # Gauge refresh errors are non-critical and should never block app startup.
+        log.error("memory_gauge_refresh_failed", error=str(exc), exc_info=True)
 
     cfg = get_config()
     is_public = cfg.auth.public_mode or bool(cfg.auth.public_base_url)

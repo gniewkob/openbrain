@@ -124,6 +124,13 @@ def _apply_filters_to_stmt(
     Returns:
         Modified statement with filters applied
     """
+    include_test_data = bool(filters.get("include_test_data", False))
+    if not include_test_data:
+        # Hide explicitly flagged test fixtures from default operational retrieval.
+        stmt = stmt.where(
+            func.coalesce(Memory.metadata_["test_data"].astext, "false") != "true"
+        )
+
     if "domain" in filters:
         domains = (
             filters["domain"]
@@ -290,7 +297,9 @@ async def sync_check(
 
 async def get_memory_status_counts(session: AsyncSession) -> dict[str, int]:
     result = await session.execute(
-        select(Memory.status, func.count(Memory.id)).group_by(Memory.status)
+        select(Memory.status, func.count(Memory.id))
+        .where(func.coalesce(Memory.metadata_["test_data"].astext, "false") != "true")
+        .group_by(Memory.status)
     )
     counts = {status: count for status, count in result.all()}
     return {
@@ -305,9 +314,9 @@ async def get_memory_domain_status_counts(
     session: AsyncSession,
 ) -> dict[str, dict[str, int]]:
     result = await session.execute(
-        select(Memory.domain, Memory.status, func.count(Memory.id)).group_by(
-            Memory.domain, Memory.status
-        )
+        select(Memory.domain, Memory.status, func.count(Memory.id))
+        .where(func.coalesce(Memory.metadata_["test_data"].astext, "false") != "true")
+        .group_by(Memory.domain, Memory.status)
     )
     counts: dict[str, dict[str, int]] = {
         "corporate": {"active": 0, "superseded": 0, "archived": 0, "deleted": 0},
@@ -325,6 +334,47 @@ async def get_memory_domain_status_counts(
             }
         counts[domain_key][str(status)] = int(count)
     return counts
+
+
+async def get_hidden_test_data_counts(session: AsyncSession) -> dict[str, int]:
+    """Return counts for records flagged as test data in metadata."""
+    is_test_data = (
+        func.coalesce(Memory.metadata_["test_data"].astext, "false") == "true"
+    )
+
+    total_result = await session.execute(
+        select(func.count(Memory.id)).where(is_test_data)
+    )
+    active_result = await session.execute(
+        select(func.count(Memory.id)).where(is_test_data, Memory.status == "active")
+    )
+    build_active_result = await session.execute(
+        select(func.count(Memory.id)).where(
+            is_test_data, Memory.status == "active", Memory.domain == DomainEnum.build
+        )
+    )
+    corporate_active_result = await session.execute(
+        select(func.count(Memory.id)).where(
+            is_test_data,
+            Memory.status == "active",
+            Memory.domain == DomainEnum.corporate,
+        )
+    )
+    personal_active_result = await session.execute(
+        select(func.count(Memory.id)).where(
+            is_test_data,
+            Memory.status == "active",
+            Memory.domain == DomainEnum.personal,
+        )
+    )
+
+    return {
+        "hidden_test_data_total": int(total_result.scalar() or 0),
+        "hidden_test_data_active_total": int(active_result.scalar() or 0),
+        "hidden_test_data_build_total": int(build_active_result.scalar() or 0),
+        "hidden_test_data_corporate_total": int(corporate_active_result.scalar() or 0),
+        "hidden_test_data_personal_total": int(personal_active_result.scalar() or 0),
+    }
 
 
 async def list_maintenance_reports(

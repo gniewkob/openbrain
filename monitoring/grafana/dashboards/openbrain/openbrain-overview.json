@@ -145,11 +145,11 @@
       },
       "targets": [
         {
-          "expr": "clamp_min(memories_created_total{job=\"openbrain-unified\"} - memories_deleted_total{job=\"openbrain-unified\"}, 0)",
+          "expr": "active_memories_total{job=\"openbrain-unified\"}",
           "refId": "A"
         }
       ],
-      "title": "Estimated Active Memories",
+      "title": "Active Memories (DB Truth)",
       "type": "stat"
     },
     {
@@ -628,6 +628,63 @@
       ],
       "title": "OpenBrain Host Canary",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openbrain-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 32
+      },
+      "id": 44,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "hidden_test_data_active_total{job=\"openbrain-unified\"}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Hidden Test Data (Active)",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
@@ -647,6 +704,6 @@
   "timezone": "",
   "title": "OpenBrain Professional Overview",
   "uid": "openbrain-overview",
-  "version": 4,
+  "version": 5,
   "weekStart": ""
 }

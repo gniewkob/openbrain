@@ -21,6 +21,7 @@ GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
     ("audit semantics", "scripts/check_audit_semantics.py"),
     ("export contract", "scripts/check_export_contract.py"),
     ("obsidian contract", "scripts/check_obsidian_contract.py"),
+    ("mcp http session contract", "scripts/check_mcp_http_session_contract.py"),
     ("monitoring contract", "scripts/validate_monitoring_contract.py"),
 )
 
