@@ -28,6 +28,7 @@ from ...memory_reads import (
     sync_check,
 )
 from ...use_cases.memory import (
+    cleanup_build_test_data as cleanup_build_test_data_use_case,
     store_memory as handle_memory_write,
     store_memories_many as handle_memory_write_many,
     search_memories as find_memories_v1,
@@ -57,6 +58,8 @@ from ...schemas import (
     MemoryUpdate,
     MemoryUpsertItem,
     BulkUpsertResult,
+    BuildTestDataCleanupRequest,
+    BuildTestDataCleanupResponse,
     TestDataHygieneReport,
 )
 from ...telemetry import incr_metric
@@ -263,6 +266,25 @@ async def test_data_hygiene_report(
     """Return diagnostic report for records hidden by test-data policy."""
     require_admin(_user)
     return await get_test_data_hygiene_report(session, sample_limit=sample_limit)
+
+
+@router.post(
+    "/admin/test-data/cleanup-build",
+    response_model=BuildTestDataCleanupResponse,
+)
+async def cleanup_build_test_data(
+    req: BuildTestDataCleanupRequest,
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> BuildTestDataCleanupResponse:
+    """Cleanup build-domain test data with explicit dry-run by default."""
+    require_admin(_user)
+    return await cleanup_build_test_data_use_case(
+        session,
+        dry_run=req.dry_run,
+        limit=req.limit,
+        actor=get_subject(_user),
+    )
 
 
 @router.post("/export")

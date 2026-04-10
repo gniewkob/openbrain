@@ -34,6 +34,23 @@ Raport zawiera dodatkowo:
 - `null_match_key_count` — liczba rekordów testowych bez `match_key`
 - `recommended_actions` — gotowe rekomendacje operacyjne (code + priority + summary) do sekwencji: dry-run → decyzja → wykonanie
 
+## Controlled cleanup (build domain)
+```bash
+# 1) Dry-run (default behavior)
+curl -sS -X POST "http://127.0.0.1:7010/api/v1/memory/admin/test-data/cleanup-build" \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": true, "limit": 100}'
+
+# 2) Execute (after approval)
+curl -sS -X POST "http://127.0.0.1:7010/api/v1/memory/admin/test-data/cleanup-build" \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": false, "limit": 100}'
+```
+
+Zasada bezpieczeństwa:
+- endpoint działa tylko dla `domain=build` i tylko dla rekordów z `metadata.test_data=true`
+- `dry_run=true` nie wykonuje mutacji
+
 ## Wykrywanie kandydatów testowych (SQL)
 ```sql
 SELECT id, domain, status, match_key, left(content, 120)

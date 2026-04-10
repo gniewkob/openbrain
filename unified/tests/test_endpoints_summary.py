@@ -104,6 +104,11 @@ class TestEndpointsV1Core:
         response = client.get("/api/v1/memory/admin/test-data/report")
         assert response.status_code in [200, 401, 403, 500, 503]
 
+    def test_v1_cleanup_build_test_data_validation(self, client: TestClient) -> None:
+        """V1 cleanup-build endpoint validates request/auth."""
+        response = client.post("/api/v1/memory/admin/test-data/cleanup-build", json={})
+        assert response.status_code in [200, 401, 403, 422, 500, 503]
+
 
 class TestEndpointsV1Obsidian:
     """V1 Obsidian API endpoints."""
@@ -169,6 +174,7 @@ class TestAllRoutesRegistered:
             "/api/v1/memory/get-context",
             "/api/v1/memory/{memory_id}",
             "/api/v1/memory/admin/test-data/report",
+            "/api/v1/memory/admin/test-data/cleanup-build",
         ]
         for path in expected:
             assert path in paths, f"Missing: {path}"
@@ -202,6 +208,7 @@ class TestAllRoutesRegistered:
             "/api/v1/memory/export",
             "/api/v1/memory/sync-check",
             "/api/v1/memory/admin/test-data/report",
+            "/api/v1/memory/admin/test-data/cleanup-build",
         ]
         for path in expected:
             assert path in paths, f"Missing: {path}"

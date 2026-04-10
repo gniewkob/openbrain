@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from .schemas import (
+    BuildTestDataCleanupResponse,
     BulkUpsertResult,
     MaintenanceReport,
     MaintenanceReportDetail,
@@ -109,6 +110,12 @@ def register_crud_routes(app: FastAPI, handlers) -> None:
         handlers.test_data_hygiene_report,
         methods=["GET"],
         response_model=TestDataHygieneReport,
+    )
+    app.add_api_route(
+        "/api/admin/test-data/cleanup-build",
+        handlers.cleanup_build_test_data,
+        methods=["POST"],
+        response_model=BuildTestDataCleanupResponse,
     )
     app.add_api_route(
         "/api/memories/export",

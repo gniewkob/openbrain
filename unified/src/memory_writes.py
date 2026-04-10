@@ -26,9 +26,11 @@ from .crud_common import (
 )
 from .embed import get_embedding, EMBED_MAX_CHARS
 from .memory_reads import get_memory, get_memory_raw
-from .models import AuditLog, Memory
+from .models import AuditLog, DomainEnum, Memory
 from .schemas import (
     BatchResultItem,
+    BuildTestDataCleanupResponse,
+    BuildTestDataCleanupSkip,
     BulkUpsertResult,
     MaintenanceAction,
     MaintenanceReport,
@@ -946,3 +948,69 @@ async def _run_maintenance_inner(
     report.report_id = audit_entry.id
     await session.commit()
     return report
+
+
+async def cleanup_build_test_data(
+    session: AsyncSession,
+    *,
+    dry_run: bool = True,
+    limit: int = 100,
+    actor: str = "agent",
+) -> BuildTestDataCleanupResponse:
+    """
+    Cleanup flow for build-domain test data records.
+
+    Default mode is dry-run. Execution mode deletes only candidate records that pass
+    existing hard-delete policy checks.
+    """
+    is_test_data = (
+        func.coalesce(Memory.metadata_["test_data"].astext, "false") == "true"
+    )
+    candidates_stmt = (
+        select(Memory.id)
+        .where(
+            Memory.domain == DomainEnum.build,
+            Memory.status == "active",
+            is_test_data,
+        )
+        .order_by(Memory.updated_at.desc())
+        .limit(limit)
+    )
+    candidates_result = await session.execute(candidates_stmt)
+    candidate_ids = [str(row.id) for row in candidates_result.all()]
+
+    if dry_run:
+        return BuildTestDataCleanupResponse(
+            dry_run=True,
+            scanned=len(candidate_ids),
+            candidates_count=len(candidate_ids),
+            deleted_count=0,
+            skipped_count=0,
+            candidate_ids=candidate_ids,
+            deleted_ids=[],
+            skipped=[],
+        )
+
+    deleted_ids: list[str] = []
+    skipped: list[BuildTestDataCleanupSkip] = []
+    for memory_id in candidate_ids:
+        try:
+            deleted = await delete_memory(session, memory_id, actor=actor)
+        except ValueError as exc:
+            skipped.append(
+                BuildTestDataCleanupSkip(id=memory_id, reason=str(exc))
+            )
+            continue
+        if deleted:
+            deleted_ids.append(memory_id)
+
+    return BuildTestDataCleanupResponse(
+        dry_run=False,
+        scanned=len(candidate_ids),
+        candidates_count=len(candidate_ids),
+        deleted_count=len(deleted_ids),
+        skipped_count=len(skipped),
+        candidate_ids=candidate_ids,
+        deleted_ids=deleted_ids,
+        skipped=skipped,
+    )

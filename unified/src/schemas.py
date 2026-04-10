@@ -595,6 +595,27 @@ class TestDataActionSuggestion(BaseModel):
     summary: str
 
 
+class BuildTestDataCleanupRequest(BaseModel):
+    dry_run: bool = True
+    limit: int = Field(default=100, ge=1, le=500)
+
+
+class BuildTestDataCleanupSkip(BaseModel):
+    id: str
+    reason: str
+
+
+class BuildTestDataCleanupResponse(BaseModel):
+    dry_run: bool
+    scanned: int = 0
+    candidates_count: int = 0
+    deleted_count: int = 0
+    skipped_count: int = 0
+    candidate_ids: list[str] = Field(default_factory=list)
+    deleted_ids: list[str] = Field(default_factory=list)
+    skipped: list[BuildTestDataCleanupSkip] = Field(default_factory=list)
+
+
 class TestDataHygieneReport(BaseModel):
     generated_at: datetime
     sample_limit: int

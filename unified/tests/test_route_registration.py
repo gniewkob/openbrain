@@ -45,6 +45,7 @@ def _make_handlers(**overrides):
         "v1_get_context",
         "v1_get",
         "test_data_hygiene_report",
+        "cleanup_build_test_data",
         "v1_obsidian_vaults",
         "v1_obsidian_read_note",
         "v1_obsidian_sync",
@@ -127,6 +128,7 @@ class RouteRegistrationTests(unittest.TestCase):
             ("/api/v1/memory/get-context", "POST"),
             ("/api/v1/memory/{memory_id}", "GET"),
             ("/api/v1/memory/admin/test-data/report", "GET"),
+            ("/api/v1/memory/admin/test-data/cleanup-build", "POST"),
             ("/api/v1/obsidian/vaults", "GET"),
             ("/api/v1/obsidian/read-note", "POST"),
             ("/api/v1/obsidian/sync", "POST"),
@@ -156,6 +158,7 @@ class RouteRegistrationTests(unittest.TestCase):
             ("/api/admin/maintain/reports", "GET"),
             ("/api/admin/maintain/reports/{report_id}", "GET"),
             ("/api/admin/test-data/report", "GET"),
+            ("/api/admin/test-data/cleanup-build", "POST"),
             ("/api/memories/export", "POST"),
         ]:
             self.assertIn(path, routes)

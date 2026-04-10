@@ -67,6 +67,7 @@ PR_READINESS_STEPS: tuple[tuple[str, list[str]], ...] = (
             "unified/tests/test_health_route_alias_contract.py",
             "unified/tests/test_find_endpoint_validation.py",
             "unified/tests/test_test_data_hygiene_report.py",
+            "unified/tests/test_build_test_data_cleanup.py",
             "unified/tests/test_route_registration.py",
         ],
     ),
