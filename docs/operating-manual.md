@@ -190,6 +190,7 @@ Local monitoring contract check:
 - `make monitoring-check`
 - optional live-mode validation: `python3 scripts/validate_monitoring_contract.py --check-live --metrics-url http://127.0.0.1:9180/metrics`
 - default mode forbids `vector(0)` in monitoring PromQL expressions (dashboards and alert rules; opt-out for migration only: `--allow-vector-zero`)
+- Grafana `Active Memories` stat now shows all active rows including test fixtures (`active_memories_total + hidden_test_data_active_total`); `Hidden Test Data (Active Only)` remains as a separate diagnostic panel.
 
 Branch protection policy (recommended):
 - Require pull request before merging.

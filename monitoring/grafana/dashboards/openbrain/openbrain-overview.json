@@ -145,11 +145,11 @@
       },
       "targets": [
         {
-          "expr": "active_memories_total{job=\"openbrain-unified\"}",
+          "expr": "(active_memories_total{job=\"openbrain-unified\"} + hidden_test_data_active_total{job=\"openbrain-unified\"})",
           "refId": "A"
         }
       ],
-      "title": "Active Memories (DB Truth)",
+      "title": "Active Memories (All incl Test Data)",
       "type": "stat"
     },
     {
@@ -683,7 +683,7 @@
           "refId": "A"
         }
       ],
-      "title": "Hidden Test Data (Active)",
+      "title": "Hidden Test Data (Active Only)",
       "type": "stat"
     }
   ],
