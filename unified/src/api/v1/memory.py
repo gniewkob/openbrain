@@ -133,7 +133,10 @@ async def v1_find(
 ) -> list[dict[str, Any]]:
     """Find memories with filters."""
     req.filters = apply_owner_scope(_user, req.filters)
-    hits = await find_memories_v1(session, req)
+    try:
+        hits = await find_memories_v1(session, req)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     incr_metric("search_requests_total")
     if not hits:
         incr_metric("search_zero_hit_total")

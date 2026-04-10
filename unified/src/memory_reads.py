@@ -124,7 +124,13 @@ def _apply_filters_to_stmt(
     Returns:
         Modified statement with filters applied
     """
-    include_test_data = bool(filters.get("include_test_data", False))
+    raw_include_test_data = filters.get("include_test_data", False)
+    if not isinstance(raw_include_test_data, bool):
+        raise ValueError(
+            "filters.include_test_data must be bool when provided "
+            f"(got {type(raw_include_test_data).__name__})"
+        )
+    include_test_data = raw_include_test_data
     if not include_test_data:
         # Hide explicitly flagged test fixtures from default operational retrieval.
         stmt = stmt.where(

@@ -175,6 +175,23 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
         stmt_text = str(captured_stmt)
         self.assertNotIn("test_data", stmt_text)
 
+    async def test_find_memories_v1_rejects_non_bool_include_test_data(self) -> None:
+        session = SimpleNamespace(execute=AsyncMock())
+        with patch.object(
+            memory_reads,
+            "_get_embedding_compat",
+            new=AsyncMock(return_value=None),
+        ):
+            with self.assertRaisesRegex(ValueError, "include_test_data must be bool"):
+                await memory_reads.find_memories_v1(
+                    session,
+                    MemoryFindRequest(
+                        query=None,
+                        limit=5,
+                        filters={"include_test_data": "false"},
+                    ),
+                )
+
     async def test_append_version_marks_previous_record_as_superseded(self) -> None:
         now = datetime.now(timezone.utc)
         existing = Memory(
