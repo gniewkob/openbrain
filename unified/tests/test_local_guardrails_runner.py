@@ -111,6 +111,14 @@ def test_local_guardrails_includes_tool_signature_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_tool_inventory_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "tool inventory parity",
+        "scripts/check_tool_inventory_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_capabilities_tools_truthfulness_step() -> None:
     module = _load_local_guardrails_module()
     assert (

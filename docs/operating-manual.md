@@ -146,6 +146,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces request/runtime contract parity via `scripts/check_request_runtime_parity.py` (`request_contracts` and `runtime_limits` loader/validator semantics must stay contract-equivalent across transports).
 - `Unified Smoke Tests / guardrails` enforces shared backend HTTP client reuse via `scripts/check_shared_http_client_reuse.py` (both transports must keep module-level shared `httpx.AsyncClient` pooling semantics).
 - `Unified Smoke Tests / guardrails` enforces selected MCP tool signature parity via `scripts/check_tool_signature_parity.py` (`brain_search`, `brain_list`, `brain_delete`, `brain_update` argument contract must stay transport-equivalent).
+- `Unified Smoke Tests / guardrails` enforces MCP tool inventory parity via `scripts/check_tool_inventory_parity.py` (all non-Obsidian tools must match across canonical/compatibility transports; compatibility transport keeps only the approved Obsidian subset).
 - `Unified Smoke Tests / guardrails` enforces capabilities tools truthfulness via `scripts/check_capabilities_tools_truthfulness.py` (manifest-declared tools must map to real `@mcp.tool` functions in both transports).
 - `Unified Smoke Tests / guardrails` enforces `brain_search` filter parity via `scripts/check_search_filter_parity.py` (`owner` and `include_test_data` wiring to backend filters must stay transport-equivalent).
 - `Unified Smoke Tests / guardrails` enforces `brain_list` filter parity via `scripts/check_list_filter_parity.py` (`status`, `owner`, `tenant_id`, `include_test_data` wiring to backend filters must stay transport-equivalent).
@@ -172,6 +173,7 @@ CI guardrail:
   - `unified/tests/test_request_runtime_parity_guardrail.py`
   - `unified/tests/test_shared_http_client_reuse_guardrail.py`
   - `unified/tests/test_tool_signature_parity_guardrail.py`
+  - `unified/tests/test_tool_inventory_parity_guardrail.py`
   - `unified/tests/test_capabilities_tools_truthfulness_guardrail.py`
   - `unified/tests/test_response_normalizers_parity_guardrail.py`
   - `unified/tests/test_http_error_adapter_parity_guardrail.py`
