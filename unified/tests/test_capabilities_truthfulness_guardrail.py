@@ -33,6 +33,7 @@ async def _get_backend_status():
         "probe": "readyz",
         "readyz_status_code": 200,
         "primary_path": "/readyz",
+        "compat_path": "/api/v1/readyz",
         "secondary_probe": "healthz_fallback",
         "secondary_path": "/healthz",
         "fallback_probe": "api_health_fallback",
@@ -59,6 +60,7 @@ async def _get_backend_status():
     errors = module._check_health_probe_fallback_semantics(src_missing_fallback, "x")
     assert any("api_health_fallback" in err for err in errors)
     assert any("/api/v1/health" in err for err in errors)
+    assert any("/api/v1/readyz" in err for err in errors)
     assert any("healthz_fallback" in err for err in errors)
     assert any("/healthz" in err for err in errors)
     assert any("readyz_status_code" in err for err in errors)

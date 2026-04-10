@@ -118,6 +118,10 @@ def _check_health_probe_fallback_semantics(text: str, label: str) -> list[str]:
     }
     if "/readyz" not in constants:
         errors.append(f"{label} must probe /readyz as primary readiness endpoint")
+    if "/api/v1/readyz" not in constants:
+        errors.append(
+            f"{label} must probe /api/v1/readyz as readiness compatibility fallback"
+        )
     if "readyz" not in constants:
         errors.append(f"{label} must include readyz probe marker")
     if "/healthz" not in constants:
