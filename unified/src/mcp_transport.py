@@ -727,3 +727,32 @@ async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
 async def brain_maintain(dry_run: bool = True) -> dict[str, Any]:
     """Run system maintenance tasks (deduplication, normalization)."""
     return await _safe_req("POST", memory_path("maintain"), json={"dry_run": dry_run})
+
+
+@mcp.tool()
+@mcp_tool_guard
+async def brain_test_data_report(sample_limit: int = 20) -> dict[str, Any]:
+    """Return admin diagnostic report for hidden test-data records."""
+    if not 1 <= sample_limit <= 100:
+        raise ValueError(f"sample_limit must be 1–100, got {sample_limit}")
+    return await _safe_req(
+        "GET",
+        memory_path("test_data_report"),
+        params={"sample_limit": sample_limit},
+    )
+
+
+@mcp.tool()
+@mcp_tool_guard
+async def brain_cleanup_build_test_data(
+    dry_run: bool = True,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """Controlled cleanup for build-domain test-data records."""
+    if not 1 <= limit <= 500:
+        raise ValueError(f"limit must be 1–500, got {limit}")
+    return await _safe_req(
+        "POST",
+        memory_path("cleanup_build_test_data"),
+        json={"dry_run": dry_run, "limit": limit},
+    )

@@ -310,6 +310,46 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             json=[{"match_key": "mk-1", "content": "x"}],
         )
 
+    async def test_brain_test_data_report_calls_admin_report_endpoint(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = {"hidden_counts": {"hidden_test_data_total": 2}}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.get.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_test_data_report(sample_limit=7)
+
+        client.get.assert_awaited_once_with(
+            "/api/v1/memory/admin/test-data/report",
+            params={"sample_limit": 7},
+        )
+
+    async def test_brain_cleanup_build_test_data_calls_admin_cleanup_endpoint(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = {"dry_run": True, "candidates_count": 1}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_cleanup_build_test_data(dry_run=True, limit=12)
+
+        client.post.assert_awaited_once_with(
+            "/api/v1/memory/admin/test-data/cleanup-build",
+            json={"dry_run": True, "limit": 12},
+        )
+
     async def test_brain_update_uses_canonical_updated_by_placeholder(self) -> None:
         gateway = load_gateway_main()
         response = Mock()

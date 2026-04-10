@@ -115,11 +115,28 @@ class _GatewayClient:
                     "actions": [],
                 },
             )
+        if path == "/api/v1/memory/admin/test-data/cleanup-build":
+            return _FakeResponse(
+                200,
+                {
+                    "dry_run": json.get("dry_run", True),
+                    "candidates_count": 2,
+                    "candidate_ids": ["mem-a", "mem-b"],
+                },
+            )
         raise AssertionError(f"Unexpected POST path: {path}")
 
     async def get(self, path: str, params=None):
         if path == "/api/memories":
             return _FakeResponse(200, [LEGACY_MEMORY])
+        if path == "/api/v1/memory/admin/test-data/report":
+            return _FakeResponse(
+                200,
+                {
+                    "sample_limit": params.get("sample_limit", 20) if params else 20,
+                    "hidden_counts": {"hidden_test_data_total": 2},
+                },
+            )
         if path.startswith("/api/v1/memory/"):
             return _FakeResponse(200, V1_RECORD)
         raise AssertionError(f"Unexpected GET path: {path}")
@@ -177,6 +194,23 @@ class _TransportClient:
                     "owners_normalized": 0,
                     "links_fixed": 0,
                     "actions": [],
+                },
+            )
+        if method == "POST" and path == "/api/v1/memory/admin/test-data/cleanup-build":
+            return _FakeResponse(
+                200,
+                {
+                    "dry_run": kwargs.get("json", {}).get("dry_run", True),
+                    "candidates_count": 2,
+                    "candidate_ids": ["mem-a", "mem-b"],
+                },
+            )
+        if method == "GET" and path == "/api/v1/memory/admin/test-data/report":
+            return _FakeResponse(
+                200,
+                {
+                    "sample_limit": kwargs.get("params", {}).get("sample_limit", 20),
+                    "hidden_counts": {"hidden_test_data_total": 2},
                 },
             )
         if method == "GET" and path == "/api/v1/memory/mem-1":
@@ -557,6 +591,32 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         ):
             gateway_result = await gateway.brain_maintain(dry_run=True)
             transport_result = await mcp_transport.brain_maintain(dry_run=True)
+        self.assertEqual(transport_result, gateway_result)
+
+    async def test_test_data_report_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_test_data_report(sample_limit=11)
+            transport_result = await mcp_transport.brain_test_data_report(
+                sample_limit=11
+            )
+        self.assertEqual(transport_result, gateway_result)
+
+    async def test_cleanup_build_test_data_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_cleanup_build_test_data(
+                dry_run=True,
+                limit=5,
+            )
+            transport_result = await mcp_transport.brain_cleanup_build_test_data(
+                dry_run=True,
+                limit=5,
+            )
         self.assertEqual(transport_result, gateway_result)
 
     async def test_actor_normalization_parity_between_stdio_and_http(self) -> None:

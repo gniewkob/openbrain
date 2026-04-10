@@ -830,6 +830,46 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             ("POST", "/api/v1/memory/maintain", {"json": {"dry_run": True}}),
         )
 
+    async def test_brain_test_data_report_uses_v1_admin_endpoint(self) -> None:
+        response = _FakeResponse(
+            200,
+            payload={"hidden_counts": {"hidden_test_data_total": 3}, "sample": []},
+        )
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            result = await mcp_transport.brain_test_data_report(sample_limit=5)
+        self.assertEqual(result["hidden_counts"]["hidden_test_data_total"], 3)
+        self.assertEqual(
+            fake_client.last_request,
+            (
+                "GET",
+                "/api/v1/memory/admin/test-data/report",
+                {"params": {"sample_limit": 5}},
+            ),
+        )
+
+    async def test_brain_cleanup_build_test_data_uses_v1_admin_endpoint(self) -> None:
+        response = _FakeResponse(
+            200,
+            payload={"dry_run": True, "candidates_count": 2, "candidate_ids": ["a", "b"]},
+        )
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            result = await mcp_transport.brain_cleanup_build_test_data(
+                dry_run=True,
+                limit=50,
+            )
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["candidates_count"], 2)
+        self.assertEqual(
+            fake_client.last_request,
+            (
+                "POST",
+                "/api/v1/memory/admin/test-data/cleanup-build",
+                {"json": {"dry_run": True, "limit": 50}},
+            ),
+        )
+
     async def test_guard_re_raises_as_tool_error(self) -> None:
         @mcp_transport.mcp_tool_guard
         async def broken():
