@@ -51,6 +51,7 @@ PR_READINESS_STEPS: tuple[tuple[str, list[str]], ...] = (
             "unified/tests/test_telemetry_contract_parity_guardrail.py",
             "unified/tests/test_dashboard_memory_semantics_guardrail.py",
             "unified/tests/test_monitoring_contract_guardrail.py",
+            "unified/mcp-gateway/tests/test_shared_client_reuse.py",
         ],
     ),
     (
