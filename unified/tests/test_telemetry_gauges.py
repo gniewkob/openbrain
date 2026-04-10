@@ -18,6 +18,7 @@ def test_build_memory_gauges_uses_active_status_as_source_of_truth() -> None:
     )
     assert gauges == {
         "active_memories_total": 34.0,
+        "active_memories_all_total": 34.0,
         "active_memories_build_total": 31.0,
         "active_memories_corporate_total": 3.0,
         "active_memories_personal_total": 0.0,
@@ -68,6 +69,7 @@ async def test_refresh_memory_gauges_sets_all_active_memory_metrics(monkeypatch)
     gauges = await refresh_memory_gauges(session)
     assert gauges == {
         "active_memories_total": 10.0,
+        "active_memories_all_total": 12.0,
         "active_memories_build_total": 8.0,
         "active_memories_corporate_total": 2.0,
         "active_memories_personal_total": 0.0,

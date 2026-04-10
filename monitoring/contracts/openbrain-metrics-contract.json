@@ -1,9 +1,10 @@
 {
-  "version": "1.4.0",
+  "version": "1.5.0",
   "service": "openbrain-unified",
   "required_metrics": [
     "active_memories_build_total",
     "active_memories_corporate_total",
+    "active_memories_all_total",
     "active_memories_personal_total",
     "active_memories_total",
     "duplicate_candidates_per_maintain_run_ratio",

@@ -145,7 +145,7 @@
       },
       "targets": [
         {
-          "expr": "(active_memories_total{job=\"openbrain-unified\"} + hidden_test_data_active_total{job=\"openbrain-unified\"})",
+          "expr": "active_memories_all_total{job=\"openbrain-unified\"}",
           "refId": "A"
         }
       ],
