@@ -338,7 +338,9 @@ async def get_memory_domain_status_counts(
 
 async def get_hidden_test_data_counts(session: AsyncSession) -> dict[str, int]:
     """Return counts for records flagged as test data in metadata."""
-    is_test_data = func.coalesce(Memory.metadata_["test_data"].astext, "false") == "true"
+    is_test_data = (
+        func.coalesce(Memory.metadata_["test_data"].astext, "false") == "true"
+    )
 
     total_result = await session.execute(
         select(func.count(Memory.id)).where(is_test_data)
@@ -360,7 +362,9 @@ async def get_hidden_test_data_counts(session: AsyncSession) -> dict[str, int]:
     )
     personal_active_result = await session.execute(
         select(func.count(Memory.id)).where(
-            is_test_data, Memory.status == "active", Memory.domain == DomainEnum.personal
+            is_test_data,
+            Memory.status == "active",
+            Memory.domain == DomainEnum.personal,
         )
     )
 

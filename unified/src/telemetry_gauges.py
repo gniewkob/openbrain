@@ -41,9 +41,7 @@ def build_memory_gauges(
                     hidden_test_data_counts.get("hidden_test_data_build_total", 0)
                 ),
                 "hidden_test_data_corporate_total": float(
-                    hidden_test_data_counts.get(
-                        "hidden_test_data_corporate_total", 0
-                    )
+                    hidden_test_data_counts.get("hidden_test_data_corporate_total", 0)
                 ),
                 "hidden_test_data_personal_total": float(
                     hidden_test_data_counts.get("hidden_test_data_personal_total", 0)
