@@ -391,6 +391,8 @@ async def get_test_data_hygiene_report(
     session: AsyncSession, sample_limit: int = 20
 ) -> TestDataHygieneReport:
     """Return a read-only hygiene report for records flagged as test data."""
+    visible_status_counts = await get_memory_status_counts(session)
+    visible_domain_status_counts = await get_memory_domain_status_counts(session)
     hidden_counts = await get_hidden_test_data_counts(session)
     is_test_data = (
         func.coalesce(Memory.metadata_["test_data"].astext, "false") == "true"
@@ -544,6 +546,8 @@ async def get_test_data_hygiene_report(
     return TestDataHygieneReport(
         generated_at=datetime.now(timezone.utc),
         sample_limit=sample_limit,
+        visible_status_counts=visible_status_counts,
+        visible_domain_status_counts=visible_domain_status_counts,
         hidden_counts=hidden_counts,
         status_counts=status_counts,
         domain_status_counts=domain_status_counts,

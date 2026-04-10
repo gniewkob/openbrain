@@ -29,6 +29,7 @@ curl -sS "http://127.0.0.1:7010/api/v1/memory/admin/test-data/report?sample_limi
 ```
 
 Raport zawiera dodatkowo:
+- `visible_status_counts` oraz `visible_domain_status_counts` — widok produkcyjny (bez `metadata.test_data=true`) dla szybkiego porównania visible vs hidden
 - `top_owners` — najwięksi producenci test-data
 - `match_key_prefix_counts` — najczęstsze prefiksy `match_key` (np. `test`, `openbrain-bulk-test`)
 - `null_match_key_count` — liczba rekordów testowych bez `match_key`

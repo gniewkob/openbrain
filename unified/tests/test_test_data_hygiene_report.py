@@ -16,44 +16,75 @@ class TestDataHygieneReportReadTests(unittest.IsolatedAsyncioTestCase):
         now = datetime.now(timezone.utc)
 
         session = AsyncMock()
-        session.execute = AsyncMock(
-            side_effect=[
-                SimpleNamespace(scalar=lambda: 11),  # total
-                SimpleNamespace(scalar=lambda: 9),  # active
-                SimpleNamespace(scalar=lambda: 7),  # build active
-                SimpleNamespace(scalar=lambda: 1),  # corporate active
-                SimpleNamespace(scalar=lambda: 1),  # personal active
-                SimpleNamespace(all=lambda: [("active", 9), ("superseded", 2)]),
-                SimpleNamespace(
-                    all=lambda: [
-                        ("build", "active", 7),
-                        ("corporate", "active", 1),
-                        ("personal", "active", 1),
-                        ("build", "superseded", 2),
-                    ]
+        with (
+            patch.object(
+                memory_reads,
+                "get_memory_status_counts",
+                new=AsyncMock(return_value={"active": 6, "superseded": 1}),
+            ),
+            patch.object(
+                memory_reads,
+                "get_memory_domain_status_counts",
+                new=AsyncMock(
+                    return_value={
+                        "build": {"active": 4},
+                        "corporate": {"active": 1},
+                        "personal": {"active": 1},
+                    }
                 ),
-                SimpleNamespace(all=lambda: [("tester", 8), ("ci-bot", 3)]),
-                SimpleNamespace(all=lambda: [("test", 6), ("openbrain-bulk-test", 2)]),
-                SimpleNamespace(scalar=lambda: 1),
-                SimpleNamespace(
-                    all=lambda: [
-                        SimpleNamespace(
-                            id="mem-1",
-                            domain="build",
-                            status="active",
-                            owner="tester",
-                            match_key="mk:1",
-                            created_at=now,
-                            updated_at=now,
-                        )
-                    ]
+            ),
+            patch.object(
+                memory_reads,
+                "get_hidden_test_data_counts",
+                new=AsyncMock(
+                    return_value={
+                        "hidden_test_data_total": 11,
+                        "hidden_test_data_active_total": 9,
+                        "hidden_test_data_build_total": 7,
+                        "hidden_test_data_corporate_total": 1,
+                        "hidden_test_data_personal_total": 1,
+                    }
                 ),
-            ]
-        )
-
-        report = await memory_reads.get_test_data_hygiene_report(session, sample_limit=5)
+            ),
+        ):
+            session.execute = AsyncMock(
+                side_effect=[
+                    SimpleNamespace(all=lambda: [("active", 9), ("superseded", 2)]),
+                    SimpleNamespace(
+                        all=lambda: [
+                            ("build", "active", 7),
+                            ("corporate", "active", 1),
+                            ("personal", "active", 1),
+                            ("build", "superseded", 2),
+                        ]
+                    ),
+                    SimpleNamespace(all=lambda: [("tester", 8), ("ci-bot", 3)]),
+                    SimpleNamespace(
+                        all=lambda: [("test", 6), ("openbrain-bulk-test", 2)]
+                    ),
+                    SimpleNamespace(scalar=lambda: 1),
+                    SimpleNamespace(
+                        all=lambda: [
+                            SimpleNamespace(
+                                id="mem-1",
+                                domain="build",
+                                status="active",
+                                owner="tester",
+                                match_key="mk:1",
+                                created_at=now,
+                                updated_at=now,
+                            )
+                        ]
+                    ),
+                ]
+            )
+            report = await memory_reads.get_test_data_hygiene_report(
+                session, sample_limit=5
+            )
 
         self.assertEqual(report.sample_limit, 5)
+        self.assertEqual(report.visible_status_counts["active"], 6)
+        self.assertEqual(report.visible_domain_status_counts["build"]["active"], 4)
         self.assertEqual(report.hidden_counts["hidden_test_data_total"], 11)
         self.assertEqual(report.status_counts["active"], 9)
         self.assertEqual(report.domain_status_counts["build"]["active"], 7)
@@ -92,6 +123,8 @@ class TestDataHygieneReportEndpointTests(unittest.IsolatedAsyncioTestCase):
         fake_report = mem_module.TestDataHygieneReport(
             generated_at=now,
             sample_limit=3,
+            visible_status_counts={"active": 7},
+            visible_domain_status_counts={"build": {"active": 5}},
             hidden_counts={"hidden_test_data_total": 3},
             status_counts={"active": 3},
             domain_status_counts={"build": {"active": 3}},
@@ -130,23 +163,50 @@ class TestDataHygieneReportEndpointTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         now = datetime.now(timezone.utc)
         session = AsyncMock()
-        session.execute = AsyncMock(
-            side_effect=[
-                SimpleNamespace(scalar=lambda: 0),  # total
-                SimpleNamespace(scalar=lambda: 0),  # active
-                SimpleNamespace(scalar=lambda: 0),  # build active
-                SimpleNamespace(scalar=lambda: 0),  # corporate active
-                SimpleNamespace(scalar=lambda: 0),  # personal active
-                SimpleNamespace(all=lambda: []),  # status counts
-                SimpleNamespace(all=lambda: []),  # domain counts
-                SimpleNamespace(all=lambda: []),  # top owners
-                SimpleNamespace(all=lambda: []),  # prefix counts
-                SimpleNamespace(scalar=lambda: 0),  # null match key
-                SimpleNamespace(all=lambda: []),  # sample
-            ]
-        )
-
-        report = await memory_reads.get_test_data_hygiene_report(session, sample_limit=5)
+        with (
+            patch.object(
+                memory_reads,
+                "get_memory_status_counts",
+                new=AsyncMock(return_value={"active": 0}),
+            ),
+            patch.object(
+                memory_reads,
+                "get_memory_domain_status_counts",
+                new=AsyncMock(
+                    return_value={
+                        "build": {"active": 0},
+                        "corporate": {"active": 0},
+                        "personal": {"active": 0},
+                    }
+                ),
+            ),
+            patch.object(
+                memory_reads,
+                "get_hidden_test_data_counts",
+                new=AsyncMock(
+                    return_value={
+                        "hidden_test_data_total": 0,
+                        "hidden_test_data_active_total": 0,
+                        "hidden_test_data_build_total": 0,
+                        "hidden_test_data_corporate_total": 0,
+                        "hidden_test_data_personal_total": 0,
+                    }
+                ),
+            ),
+        ):
+            session.execute = AsyncMock(
+                side_effect=[
+                    SimpleNamespace(all=lambda: []),  # status counts
+                    SimpleNamespace(all=lambda: []),  # domain counts
+                    SimpleNamespace(all=lambda: []),  # top owners
+                    SimpleNamespace(all=lambda: []),  # prefix counts
+                    SimpleNamespace(scalar=lambda: 0),  # null match key
+                    SimpleNamespace(all=lambda: []),  # sample
+                ]
+            )
+            report = await memory_reads.get_test_data_hygiene_report(
+                session, sample_limit=5
+            )
         self.assertEqual(len(report.recommended_actions), 1)
         self.assertEqual(report.recommended_actions[0].code, "no_action_needed")
         self.assertEqual(report.recommended_actions[0].priority, "low")

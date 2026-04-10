@@ -619,6 +619,8 @@ class BuildTestDataCleanupResponse(BaseModel):
 class TestDataHygieneReport(BaseModel):
     generated_at: datetime
     sample_limit: int
+    visible_status_counts: dict[str, int] = Field(default_factory=dict)
+    visible_domain_status_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
     hidden_counts: dict[str, int] = Field(default_factory=dict)
     status_counts: dict[str, int] = Field(default_factory=dict)
     domain_status_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
