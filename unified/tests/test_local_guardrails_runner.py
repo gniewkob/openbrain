@@ -79,6 +79,14 @@ def test_local_guardrails_includes_request_runtime_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_shared_http_client_reuse_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "shared http client reuse",
+        "scripts/check_shared_http_client_reuse.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_tool_signature_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (
