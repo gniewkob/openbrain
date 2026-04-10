@@ -220,6 +220,7 @@ Backup branch inventory note (2026-04-08):
 - `tenant_id` is now available as a first-class indexed column and remains mirrored in `metadata_` only for compatibility with older records and tools. New code should treat the column as the source of truth.
 - Telemetry gauges and histograms remain process-local. Counter metrics can now be shared across workers by setting `TELEMETRY_BACKEND=redis`.
 - MCP transport and stdio gateway now reuse shared backend `httpx.AsyncClient` instances to preserve connection pooling under sustained tool traffic.
+- stdio gateway now refreshes shared backend `httpx.AsyncClient` automatically when runtime backend config drifts (`BRAIN_URL` / timeout / internal key), mirroring HTTP transport behavior.
 - The metrics bridge still uses Python's basic `HTTPServer`, which is sufficient for the current single-scrape local topology but not intended as a hardened multi-client ingress component.
 
 ## Operational Thresholds
