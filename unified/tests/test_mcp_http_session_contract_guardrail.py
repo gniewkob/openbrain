@@ -45,3 +45,20 @@ def consent():
     tree = module.ast.parse(src)
     assert module._has_custom_route(tree, "/consent") is True
     assert module._has_custom_route(tree, "/missing") is False
+
+
+def test_main_entrypoint_detection() -> None:
+    module = _load_guardrail_module()
+    src_ok = """
+def main():
+    return None
+
+if __name__ == "__main__":
+    main()
+"""
+    src_missing = """
+def main():
+    return None
+"""
+    assert module._has_main_entrypoint_call(module.ast.parse(src_ok)) is True
+    assert module._has_main_entrypoint_call(module.ast.parse(src_missing)) is False

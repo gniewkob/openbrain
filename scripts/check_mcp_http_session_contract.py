@@ -58,6 +58,33 @@ def _has_custom_route(tree: ast.Module, path: str) -> bool:
     return False
 
 
+def _has_main_entrypoint_call(tree: ast.Module) -> bool:
+    for node in tree.body:
+        if not isinstance(node, ast.If):
+            continue
+        test = node.test
+        if not isinstance(test, ast.Compare):
+            continue
+        if not isinstance(test.left, ast.Name) or test.left.id != "__name__":
+            continue
+        if len(test.ops) != 1 or not isinstance(test.ops[0], ast.Eq):
+            continue
+        if len(test.comparators) != 1:
+            continue
+        comparator = test.comparators[0]
+        if not isinstance(comparator, ast.Constant) or comparator.value != "__main__":
+            continue
+        for statement in node.body:
+            if not isinstance(statement, ast.Expr):
+                continue
+            if not isinstance(statement.value, ast.Call):
+                continue
+            call = statement.value
+            if isinstance(call.func, ast.Name) and call.func.id == "main":
+                return True
+    return False
+
+
 def _check_mcp_http_contract() -> list[str]:
     tree = _parse_module(MCP_HTTP)
     errors: list[str] = []
@@ -80,6 +107,8 @@ def _check_mcp_http_contract() -> list[str]:
         errors.append(
             "mcp_http.py must expose /.well-known/openid-configuration custom route"
         )
+    if not _has_main_entrypoint_call(tree):
+        errors.append("mcp_http.py must call main() from __main__ entrypoint")
 
     return errors
 
