@@ -84,6 +84,8 @@ curl -s 'http://127.0.0.1:9090/api/v1/query?query=active_memories_total'
 # expect: value >= 0 (visible active only)
 curl -s 'http://127.0.0.1:9090/api/v1/query?query=hidden_test_data_active_total'
 # expect: if > 0 then visible counters can stay near zero by design
+curl -s 'http://127.0.0.1:9090/api/v1/query?query=hidden_test_data_active_total%20%2F%20clamp_min(active_memories_all_total%2C1)'
+# expect: ratio in [0,1], >=0.25 means elevated hidden test-data share
 
 # 5. Dashboard
 # Open http://127.0.0.1:3001 → OpenBrain Overview.
