@@ -86,6 +86,8 @@ class TestDataHygieneReportReadTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report.visible_status_counts["active"], 6)
         self.assertEqual(report.visible_domain_status_counts["build"]["active"], 4)
         self.assertEqual(report.hidden_counts["hidden_test_data_total"], 11)
+        self.assertEqual(report.hidden_active_ratio, 0.6)
+        self.assertEqual(report.hidden_active_ratio_by_domain["build"], 0.6364)
         self.assertEqual(report.status_counts["active"], 9)
         self.assertEqual(report.domain_status_counts["build"]["active"], 7)
         self.assertEqual(report.top_owners["tester"], 8)
@@ -93,6 +95,7 @@ class TestDataHygieneReportReadTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report.null_match_key_count, 1)
         action_codes = {item.code for item in report.recommended_actions}
         self.assertIn("cleanup_build_test_data", action_codes)
+        self.assertIn("hidden_ratio_elevated", action_codes)
         self.assertIn("normalize_missing_match_keys", action_codes)
         self.assertIn("owner_feedback_loop", action_codes)
         self.assertEqual(len(report.sample), 1)
@@ -207,6 +210,8 @@ class TestDataHygieneReportEndpointTests(unittest.IsolatedAsyncioTestCase):
             report = await memory_reads.get_test_data_hygiene_report(
                 session, sample_limit=5
             )
+        self.assertEqual(report.hidden_active_ratio, 0.0)
+        self.assertEqual(report.hidden_active_ratio_by_domain["build"], 0.0)
         self.assertEqual(len(report.recommended_actions), 1)
         self.assertEqual(report.recommended_actions[0].code, "no_action_needed")
         self.assertEqual(report.recommended_actions[0].priority, "low")

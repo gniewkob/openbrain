@@ -457,8 +457,41 @@ async def get_test_data_hygiene_report(
 
     recommended_actions: list[TestDataActionSuggestion] = []
     hidden_total = int(hidden_counts.get("hidden_test_data_total", 0))
+    hidden_active_total = int(hidden_counts.get("hidden_test_data_active_total", 0))
     hidden_build = int(hidden_counts.get("hidden_test_data_build_total", 0))
     hidden_corporate = int(hidden_counts.get("hidden_test_data_corporate_total", 0))
+    hidden_personal = int(hidden_counts.get("hidden_test_data_personal_total", 0))
+    visible_active_total = int(visible_status_counts.get("active", 0))
+    visible_build_active = int(
+        visible_domain_status_counts.get("build", {}).get("active", 0)
+    )
+    visible_corporate_active = int(
+        visible_domain_status_counts.get("corporate", {}).get("active", 0)
+    )
+    visible_personal_active = int(
+        visible_domain_status_counts.get("personal", {}).get("active", 0)
+    )
+    active_total_all = visible_active_total + hidden_active_total
+    hidden_active_ratio = (
+        round(hidden_active_total / active_total_all, 4) if active_total_all > 0 else 0.0
+    )
+    hidden_active_ratio_by_domain = {
+        "build": (
+            round(hidden_build / (visible_build_active + hidden_build), 4)
+            if (visible_build_active + hidden_build) > 0
+            else 0.0
+        ),
+        "corporate": (
+            round(hidden_corporate / (visible_corporate_active + hidden_corporate), 4)
+            if (visible_corporate_active + hidden_corporate) > 0
+            else 0.0
+        ),
+        "personal": (
+            round(hidden_personal / (visible_personal_active + hidden_personal), 4)
+            if (visible_personal_active + hidden_personal) > 0
+            else 0.0
+        ),
+    }
 
     if hidden_total == 0:
         recommended_actions.append(
@@ -477,6 +510,17 @@ async def get_test_data_hygiene_report(
                     summary=(
                         "Build-domain test data detected; schedule controlled delete flow "
                         "(dry-run list -> approve -> delete)."
+                    ),
+                )
+            )
+        if hidden_active_ratio >= 0.25:
+            recommended_actions.append(
+                TestDataActionSuggestion(
+                    code="hidden_ratio_elevated",
+                    priority="high",
+                    summary=(
+                        "Hidden test-data share is elevated (>=25% of active records); "
+                        "prioritize cleanup/quarantine to restore dashboard and retrieval trust."
                     ),
                 )
             )
@@ -549,6 +593,8 @@ async def get_test_data_hygiene_report(
         visible_status_counts=visible_status_counts,
         visible_domain_status_counts=visible_domain_status_counts,
         hidden_counts=hidden_counts,
+        hidden_active_ratio=hidden_active_ratio,
+        hidden_active_ratio_by_domain=hidden_active_ratio_by_domain,
         status_counts=status_counts,
         domain_status_counts=domain_status_counts,
         top_owners=top_owners,

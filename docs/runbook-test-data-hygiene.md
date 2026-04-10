@@ -30,10 +30,14 @@ curl -sS "http://127.0.0.1:7010/api/v1/memory/admin/test-data/report?sample_limi
 
 Raport zawiera dodatkowo:
 - `visible_status_counts` oraz `visible_domain_status_counts` — widok produkcyjny (bez `metadata.test_data=true`) dla szybkiego porównania visible vs hidden
+- `hidden_active_ratio` oraz `hidden_active_ratio_by_domain` — udział ukrytych test-data w aktywnym zbiorze (globalnie i per domena)
 - `top_owners` — najwięksi producenci test-data
 - `match_key_prefix_counts` — najczęstsze prefiksy `match_key` (np. `test`, `openbrain-bulk-test`)
 - `null_match_key_count` — liczba rekordów testowych bez `match_key`
 - `recommended_actions` — gotowe rekomendacje operacyjne (code + priority + summary) do sekwencji: dry-run → decyzja → wykonanie
+
+Interpretacja:
+- `hidden_active_ratio >= 0.25` traktuj jako sygnał wysokiego ryzyka operacyjnego (dashboard/retrieval mogą wyglądać na „puste” mimo istniejących danych testowych).
 
 ## Controlled cleanup (build domain)
 ```bash
