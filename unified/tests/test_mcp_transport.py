@@ -892,6 +892,32 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["probe"], "readyz")
+        self.assertEqual(result["primary_path"], "/readyz")
+        self.assertEqual(result["api"], "reachable")
+        self.assertEqual(result["db"], "ok")
+        self.assertEqual(result["vector_store"], "ok")
+
+    async def test_get_backend_status_uses_api_v1_readyz_when_root_readyz_fails(self) -> None:
+        with patch.object(
+            mcp_transport,
+            "_client",
+            side_effect=[
+                _ProbeClient({"/readyz": RuntimeError("root readyz unavailable")}),
+                _ProbeClient(
+                    {
+                        "/api/v1/readyz": _FakeResponse(
+                            200,
+                            payload={"status": "ok", "db": "ok", "vector_store": "ok"},
+                        )
+                    }
+                ),
+            ],
+        ):
+            result = await mcp_transport._get_backend_status()
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["probe"], "readyz")
+        self.assertEqual(result["primary_path"], "/api/v1/readyz")
         self.assertEqual(result["api"], "reachable")
         self.assertEqual(result["db"], "ok")
         self.assertEqual(result["vector_store"], "ok")
@@ -902,6 +928,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             "_client",
             side_effect=[
                 _ProbeClient({"/readyz": RuntimeError("timeout")}),
+                _ProbeClient({"/api/v1/readyz": RuntimeError("timeout v1")}),
                 _ProbeClient(
                     {"/healthz": _FakeResponse(200, payload={"status": "ok"})}
                 ),
@@ -922,6 +949,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             "_client",
             side_effect=[
                 _ProbeClient({"/readyz": RuntimeError("readyz down")}),
+                _ProbeClient({"/api/v1/readyz": RuntimeError("readyz v1 down")}),
                 _ProbeClient({"/healthz": RuntimeError("healthz down")}),
                 _ProbeClient({"/api/v1/health": RuntimeError("api health down")}),
             ],
@@ -932,6 +960,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["api"], "unreachable")
         self.assertEqual(result["probe"], "api_health_fallback")
         self.assertIn("readyz down", result["reason"])
+        self.assertIn("readyz v1 down", result["reason"])
         self.assertIn("healthz down", result["reason"])
         self.assertIn("api health down", result["reason"])
 
@@ -943,6 +972,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             "_client",
             side_effect=[
                 _ProbeClient({"/readyz": RuntimeError("readyz timeout")}),
+                _ProbeClient({"/api/v1/readyz": RuntimeError("readyz v1 timeout")}),
                 _ProbeClient({"/healthz": RuntimeError("healthz timeout")}),
                 _ProbeClient(
                     {"/api/v1/health": _FakeResponse(200, payload={"status": "ok"})}

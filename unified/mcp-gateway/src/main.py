@@ -339,26 +339,33 @@ def _require_obsidian_local_tools_enabled() -> None:
 
 async def _get_backend_status() -> dict:
     """Probe backend readiness without conflating degradation with outage."""
-    try:
-        async with httpx.AsyncClient(timeout=HEALTH_PROBE_TIMEOUT) as client:
-            r = await client.get(f"{BRAIN_URL}/readyz")
-        data = r.json()
-        if r.status_code in {200, 503} and isinstance(data, dict):
-            return {
-                "status": data.get(
-                    "status",
-                    "ok" if r.status_code == 200 else "degraded",
-                ),
-                "url": BRAIN_URL,
-                "api": "reachable",
-                "db": data.get("db", "unknown"),
-                "vector_store": data.get("vector_store", "unknown"),
-                "readyz_status_code": r.status_code,
-                "probe": "readyz",
-            }
-        readyz_error = f"Unexpected /readyz response ({r.status_code})"
-    except Exception as exc:
-        readyz_error = str(exc)
+    readyz_paths = ("/readyz", "/api/v1/readyz")
+    readyz_failures: list[str] = []
+    for readyz_path in readyz_paths:
+        try:
+            async with httpx.AsyncClient(timeout=HEALTH_PROBE_TIMEOUT) as client:
+                r = await client.get(f"{BRAIN_URL}{readyz_path}")
+            data = r.json()
+            if r.status_code in {200, 503} and isinstance(data, dict):
+                return {
+                    "status": data.get(
+                        "status",
+                        "ok" if r.status_code == 200 else "degraded",
+                    ),
+                    "url": BRAIN_URL,
+                    "api": "reachable",
+                    "db": data.get("db", "unknown"),
+                    "vector_store": data.get("vector_store", "unknown"),
+                    "readyz_status_code": r.status_code,
+                    "probe": "readyz",
+                    "primary_path": readyz_path,
+                }
+            readyz_failures.append(
+                f"{readyz_path}: Unexpected response ({r.status_code})"
+            )
+        except Exception as exc:
+            readyz_failures.append(f"{readyz_path}: {exc}")
+    readyz_error = "; ".join(readyz_failures)
 
     try:
         async with httpx.AsyncClient(timeout=HEALTH_PROBE_TIMEOUT) as client:
