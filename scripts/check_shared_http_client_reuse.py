@@ -41,6 +41,18 @@ def _has_http_client_global(tree: ast.AST) -> bool:
     return False
 
 
+def _has_http_client_config_key_global(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.AnnAssign):
+            continue
+        if (
+            isinstance(node.target, ast.Name)
+            and node.target.id == "_http_client_config_key"
+        ):
+            return True
+    return False
+
+
 def _returns_shared_client_instance(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     for node in ast.walk(fn):
         if not isinstance(node, ast.Return):
@@ -76,11 +88,26 @@ def _class_has_async_enter_with_asyncclient(klass: ast.ClassDef) -> bool:
     return False
 
 
+def _has_client_config_refresh_path(source: str) -> bool:
+    required_snippets = (
+        "_current_http_client_config_key",
+        "_http_client_config_key",
+        "mcp_client_refreshed_due_to_config_drift",
+    )
+    return all(snippet in source for snippet in required_snippets)
+
+
 def _check_source(source: str, label: str) -> list[str]:
     tree = ast.parse(source)
     errors: list[str] = []
     if not _has_http_client_global(tree):
         errors.append(f"{label} must define module-level _http_client")
+    if not _has_http_client_config_key_global(tree):
+        errors.append(f"{label} must define module-level _http_client_config_key")
+    if not _has_client_config_refresh_path(source):
+        errors.append(
+            f"{label} must include client refresh path for runtime config drift"
+        )
 
     client_fn = _find_function(tree, "_client")
     if not _returns_shared_client_instance(client_fn):
