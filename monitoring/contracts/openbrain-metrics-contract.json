@@ -1,5 +1,5 @@
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "service": "openbrain-unified",
   "required_metrics": [
     "active_memories_build_total",
@@ -10,6 +10,11 @@
     "duplicate_candidates_total",
     "exports_total",
     "get_context_requests_total",
+    "hidden_test_data_active_total",
+    "hidden_test_data_build_total",
+    "hidden_test_data_corporate_total",
+    "hidden_test_data_personal_total",
+    "hidden_test_data_total",
     "http_request_duration_seconds",
     "http_requests_total_200",
     "http_requests_total_201",
