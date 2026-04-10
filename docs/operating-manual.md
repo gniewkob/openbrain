@@ -157,6 +157,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces `brain_delete` error parity via `scripts/check_delete_semantics_parity.py` (403/404 mappings must stay aligned between stdio gateway and HTTP transport).
 - `Unified Smoke Tests / guardrails` enforces export redaction contract semantics via `scripts/check_export_contract.py` (`EXPORT_POLICY` coverage + restricted fallback + required redactions).
 - `Unified Smoke Tests / guardrails` enforces Obsidian gating/contract semantics via `scripts/check_obsidian_contract.py` (feature-flag + capabilities + manifest subset checks).
+- `Unified Smoke Tests / guardrails` enforces telemetry/monitoring contract parity via `scripts/check_telemetry_contract_parity.py` (all gauge metrics emitted by `telemetry_gauges` must be listed in the monitoring metrics contract).
 - `Unified Smoke Tests / guardrails` enforces monitoring contract via `scripts/validate_monitoring_contract.py` (dashboard + alert-rule metric references must remain inside the declared contract).
 - `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + compose safety + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
 - `Unified Smoke Tests / guardrails` runs lightweight pytest coverage for guardrail runners:
@@ -179,6 +180,7 @@ CI guardrail:
   - `unified/tests/test_export_contract_guardrail.py`
   - `unified/tests/test_obsidian_contract_guardrail.py`
   - `unified/tests/test_monitoring_contract_guardrail.py`
+  - `unified/tests/test_telemetry_contract_parity_guardrail.py`
 
 Local PR readiness:
 - `python3 scripts/check_pr_readiness.py`

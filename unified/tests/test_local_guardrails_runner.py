@@ -42,6 +42,14 @@ def test_local_guardrails_includes_monitoring_contract_step() -> None:
     assert ("monitoring contract", "scripts/validate_monitoring_contract.py") in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_telemetry_contract_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "telemetry contract parity",
+        "scripts/check_telemetry_contract_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_export_contract_step() -> None:
     module = _load_local_guardrails_module()
     assert ("export contract", "scripts/check_export_contract.py") in module.GUARDRAIL_STEPS
