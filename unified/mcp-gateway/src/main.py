@@ -577,13 +577,14 @@ async def brain_search(
     top_k: int = 5,
     domain: str | None = None,
     entity_type: str | None = None,
+    owner: str | None = None,
     sensitivity: str | None = None,
     include_test_data: bool = False,
 ) -> list[dict]:
     """
     Semantic search across the unified knowledge base.
     Returns top-k memories most relevant to the query.
-    Optionally filter by domain (corporate|build|personal), entity_type, sensitivity.
+    Optionally filter by domain (corporate|build|personal), entity_type, owner, sensitivity.
     include_test_data: include records marked with metadata.test_data=true
     """
     if not isinstance(include_test_data, bool):
@@ -595,6 +596,7 @@ async def brain_search(
     filters = build_list_filters(
         domain=domain,
         entity_type=entity_type,
+        owner=owner,
         sensitivity=sensitivity,
         include_test_data=include_test_data,
     )
@@ -614,14 +616,14 @@ async def brain_search(
 async def brain_update(
     memory_id: str,
     content: str,
-    title: str | None = None,
     updated_by: str = "agent",
-    sensitivity: str | None = None,
+    title: str | None = None,
     owner: str | None = None,
     tenant_id: str | None = None,
     tags: list[str] | None = None,
     custom_fields: dict[str, Any] | None = None,
     obsidian_ref: str | None = None,
+    sensitivity: str | None = None,
 ) -> BrainMemory:
     """
     Update a memory by ID.

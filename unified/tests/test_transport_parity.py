@@ -368,6 +368,25 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(transport_result, gateway_result)
 
+    async def test_search_owner_filter_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_search(
+                query="payload",
+                top_k=1,
+                domain="build",
+                owner="alice",
+            )
+            transport_result = await mcp_transport.brain_search(
+                query="payload",
+                top_k=1,
+                domain="build",
+                owner="alice",
+            )
+        self.assertEqual(transport_result, gateway_result)
+
     async def test_search_and_list_validation_parity_between_stdio_and_http(self) -> None:
         with self.assertRaisesRegex(ValueError, "top_k must be 1"):
             await gateway.brain_search(query="payload", top_k=0)

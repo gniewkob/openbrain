@@ -243,6 +243,26 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             json={"query": "test", "limit": 1, "filters": {"include_test_data": True}},
         )
 
+    async def test_brain_search_can_include_owner_filter(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = []
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_search(query="test", top_k=1, owner="alice")
+
+        client.post.assert_awaited_once_with(
+            "/api/v1/memory/find",
+            json={"query": "test", "limit": 1, "filters": {"owner": "alice"}},
+        )
+
     async def test_brain_sync_check_calls_api_sync_check_path_with_json_body(
         self,
     ) -> None:

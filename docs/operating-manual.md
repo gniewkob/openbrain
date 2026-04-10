@@ -144,6 +144,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces capabilities metadata parity via `scripts/check_capabilities_metadata_parity.py` (`api_version`/changelog loader semantics must stay contract-equivalent across transports).
 - `Unified Smoke Tests / guardrails` enforces capabilities health parity via `scripts/check_capabilities_health_parity.py` (`build_capabilities_health` and component mapping logic must stay contract-equivalent across transports).
 - `Unified Smoke Tests / guardrails` enforces request/runtime contract parity via `scripts/check_request_runtime_parity.py` (`request_contracts` and `runtime_limits` loader/validator semantics must stay contract-equivalent across transports).
+- `Unified Smoke Tests / guardrails` enforces selected MCP tool signature parity via `scripts/check_tool_signature_parity.py` (`brain_search`, `brain_list`, `brain_delete`, `brain_update` argument contract must stay transport-equivalent).
 - `Unified Smoke Tests / guardrails` enforces response normalizers parity via `scripts/check_response_normalizers_parity.py` (actor normalization and legacy hit-shape normalization must stay contract-equivalent across transports).
 - `Unified Smoke Tests / guardrails` enforces capabilities status truthfulness via `scripts/check_capabilities_truthfulness.py` (health contract + fallback probe invariants).
 - `Unified Smoke Tests / guardrails` enforces audit semantics via `scripts/check_audit_semantics.py` (`created_by/updated_by` invariants at schema/API/write boundaries).

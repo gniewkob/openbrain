@@ -79,6 +79,14 @@ def test_local_guardrails_includes_request_runtime_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_tool_signature_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "tool signature parity",
+        "scripts/check_tool_signature_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_response_normalizers_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (
