@@ -413,11 +413,13 @@ async def brain_search(
     entity_type: str | None = None,
     owner: str | None = None,
     sensitivity: str | None = None,
+    include_test_data: bool = False,
 ) -> list[dict[str, Any]]:
     """Primary tool for semantic retrieval. Finds information by topic or phrase.
 
     Optionally filter by domain (corporate|build|personal), entity_type, owner,
     sensitivity.
+    include_test_data: include records marked with metadata.test_data=true
     """
     if not 1 <= top_k <= MAX_SEARCH_TOP_K:
         raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
@@ -426,6 +428,7 @@ async def brain_search(
         entity_type=entity_type,
         sensitivity=sensitivity,
         owner=owner,
+        include_test_data=include_test_data,
     )
     payload = build_find_search_payload(query=query, limit=top_k, filters=filters)
     return normalize_find_hits_to_scored_memories(
@@ -537,12 +540,14 @@ async def brain_list(
     sensitivity: str | None = None,
     owner: str | None = None,
     tenant_id: str | None = None,
+    include_test_data: bool = False,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
     """Browse memories with metadata filters.
 
     status options: active | superseded (default: active only)
     domain options: corporate | build | personal
+    include_test_data: include records marked with metadata.test_data=true
     """
     if not 1 <= limit <= MAX_LIST_LIMIT:
         raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
@@ -553,6 +558,7 @@ async def brain_list(
         sensitivity=sensitivity,
         owner=owner,
         tenant_id=tenant_id,
+        include_test_data=include_test_data,
     )
     payload = build_find_list_payload(limit=limit, filters=filters)
     hits = await _safe_req("POST", memory_path("find"), json=payload)

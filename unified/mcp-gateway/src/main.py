@@ -521,6 +521,7 @@ async def brain_list(
     sensitivity: str | None = None,
     owner: str | None = None,
     tenant_id: str | None = None,
+    include_test_data: bool = False,
     limit: int = 20,
 ) -> list[dict]:
     """
@@ -528,6 +529,7 @@ async def brain_list(
 
     status options: active | superseded (default: active only)
     domain options: corporate | build | personal
+    include_test_data: include records marked with metadata.test_data=true
     """
     if not 1 <= limit <= MAX_LIST_LIMIT:
         raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
@@ -538,6 +540,7 @@ async def brain_list(
         sensitivity=sensitivity,
         owner=owner,
         tenant_id=tenant_id,
+        include_test_data=include_test_data,
     )
     payload = build_find_list_payload(limit=limit, filters=filters)
 
@@ -571,11 +574,13 @@ async def brain_search(
     domain: str | None = None,
     entity_type: str | None = None,
     sensitivity: str | None = None,
+    include_test_data: bool = False,
 ) -> list[dict]:
     """
     Semantic search across the unified knowledge base.
     Returns top-k memories most relevant to the query.
     Optionally filter by domain (corporate|build|personal), entity_type, sensitivity.
+    include_test_data: include records marked with metadata.test_data=true
     """
     if not 1 <= top_k <= MAX_SEARCH_TOP_K:
         raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
@@ -583,6 +588,7 @@ async def brain_search(
         domain=domain,
         entity_type=entity_type,
         sensitivity=sensitivity,
+        include_test_data=include_test_data,
     )
     payload = build_find_search_payload(query=query, limit=top_k, filters=filters)
 

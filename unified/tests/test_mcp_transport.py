@@ -544,6 +544,30 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "top_k must be 1"):
             await mcp_transport.brain_search(query="x", top_k=0)
 
+    async def test_brain_search_can_include_test_data_filter(self) -> None:
+        response = _FakeResponse(200, payload=[])
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            await mcp_transport.brain_search(
+                query="x",
+                top_k=2,
+                include_test_data=True,
+            )
+        self.assertEqual(
+            fake_client.last_request,
+            (
+                "POST",
+                "/api/v1/memory/find",
+                {
+                    "json": {
+                        "query": "x",
+                        "filters": {"include_test_data": True},
+                        "limit": 2,
+                    }
+                },
+            ),
+        )
+
     async def test_brain_search_top_k_over_limit_raises(self) -> None:
         with self.assertRaisesRegex(ValueError, "top_k must be 1"):
             await mcp_transport.brain_search(
@@ -670,6 +694,27 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
                         "query": None,
                         "filters": {"domain": "build"},
                         "limit": 5,
+                        "sort": "updated_at_desc",
+                    }
+                },
+            ),
+        )
+
+    async def test_brain_list_can_include_test_data_filter(self) -> None:
+        response = _FakeResponse(200, payload=[])
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            await mcp_transport.brain_list(limit=3, include_test_data=True)
+        self.assertEqual(
+            fake_client.last_request,
+            (
+                "POST",
+                "/api/v1/memory/find",
+                {
+                    "json": {
+                        "query": None,
+                        "filters": {"include_test_data": True},
+                        "limit": 3,
                         "sort": "updated_at_desc",
                     }
                 },

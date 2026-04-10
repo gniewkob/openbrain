@@ -18,12 +18,18 @@ def test_build_list_filters_ignores_empty_values() -> None:
         sensitivity="internal",
         owner=None,
         tenant_id="tenant-a",
+        include_test_data=False,
     )
     assert filters == {
         "domain": "build",
         "sensitivity": "internal",
         "tenant_id": "tenant-a",
     }
+
+
+def test_build_list_filters_can_include_test_data_flag() -> None:
+    filters = build_list_filters(domain="build", include_test_data=True)
+    assert filters == {"domain": "build", "include_test_data": True}
 
 
 def test_build_find_list_payload_has_contract_defaults() -> None:

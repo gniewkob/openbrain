@@ -308,6 +308,23 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             transport_result = await mcp_transport.brain_list(domain="build", limit=1)
         self.assertEqual(transport_result, gateway_result)
 
+    async def test_list_include_test_data_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_list(
+                domain="build",
+                limit=1,
+                include_test_data=True,
+            )
+            transport_result = await mcp_transport.brain_list(
+                domain="build",
+                limit=1,
+                include_test_data=True,
+            )
+        self.assertEqual(transport_result, gateway_result)
+
     async def test_get_parity_between_stdio_and_http(self) -> None:
         with (
             patch("_gateway_src.main._client", return_value=_GatewayClient()),
@@ -329,6 +346,25 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             )
             transport_result = await mcp_transport.brain_search(
                 query="payload", top_k=1, domain="build"
+            )
+        self.assertEqual(transport_result, gateway_result)
+
+    async def test_search_include_test_data_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_search(
+                query="payload",
+                top_k=1,
+                domain="build",
+                include_test_data=True,
+            )
+            transport_result = await mcp_transport.brain_search(
+                query="payload",
+                top_k=1,
+                domain="build",
+                include_test_data=True,
             )
         self.assertEqual(transport_result, gateway_result)
 
