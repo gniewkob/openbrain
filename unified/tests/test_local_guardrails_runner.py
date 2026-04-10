@@ -119,6 +119,14 @@ def test_local_guardrails_includes_response_normalizers_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_http_error_adapter_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "http error adapter parity",
+        "scripts/check_http_error_adapter_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_delete_semantics_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (
