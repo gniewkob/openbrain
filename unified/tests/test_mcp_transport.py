@@ -642,6 +642,16 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fake_client.last_request[0], "DELETE")
         self.assertEqual(fake_client.last_request[1], "/api/v1/memory/mem-1")
 
+    async def test_brain_delete_maps_missing_session_id_to_actionable_hint(self) -> None:
+        response = _FakeResponse(400, payload={"detail": "Missing session ID"})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            with self.assertRaisesRegex(
+                ValueError,
+                "Missing MCP session context; reconnect the MCP HTTP client and retry.",
+            ):
+                await mcp_transport.brain_delete("mem-1")
+
     async def test_brain_export_uses_v1_export_endpoint(self) -> None:
         response = _FakeResponse(200, payload=[{"id": "mem-1"}])
         fake_client = _FakeClient(response)
