@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
     ("repository hygiene", "scripts/check_repo_hygiene.py"),
+    ("compose guardrails", "scripts/check_compose_guardrails.py"),
     ("capabilities manifest parity", "scripts/check_capabilities_manifest_parity.py"),
     ("capabilities metadata parity", "scripts/check_capabilities_metadata_parity.py"),
     ("capabilities health parity", "scripts/check_capabilities_health_parity.py"),

@@ -31,6 +31,16 @@ def find_forbidden_snippets(content: str) -> list[str]:
     return [snippet for snippet in forbidden_snippets if snippet in content]
 
 
+def find_missing_public_transport_snippets(content: str) -> list[str]:
+    required_snippets = [
+        "PUBLIC_BASE_URL=${PUBLIC_BASE_URL}",
+        "INTERNAL_API_KEY=${INTERNAL_API_KEY}",
+        "http://mcp-http:7011",
+        "--url=${NGROK_DOMAIN}",
+    ]
+    return [snippet for snippet in required_snippets if snippet not in content]
+
+
 def main() -> int:
     content = COMPOSE_PATH.read_text(encoding="utf-8")
 
@@ -47,6 +57,16 @@ def main() -> int:
     if present_forbidden:
         print("docker-compose.unified.yml still contains hardcoded dev credentials or defaults:", file=sys.stderr)
         for snippet in present_forbidden:
+            print(f"  - {snippet}", file=sys.stderr)
+        return 1
+
+    missing_public_transport = find_missing_public_transport_snippets(content)
+    if missing_public_transport:
+        print(
+            "docker-compose.unified.yml is missing public transport safety snippets:",
+            file=sys.stderr,
+        )
+        for snippet in missing_public_transport:
             print(f"  - {snippet}", file=sys.stderr)
         return 1
 

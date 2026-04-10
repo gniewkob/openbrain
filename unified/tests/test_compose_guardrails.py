@@ -34,3 +34,17 @@ def test_find_forbidden_snippets_detects_hardcoded_defaults() -> None:
     content = "DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/openbrain\n"
     forbidden = module.find_forbidden_snippets(content)
     assert "postgresql+asyncpg://postgres:postgres" in forbidden
+
+
+def test_find_missing_public_transport_snippets_detects_ngrok_regressions() -> None:
+    module = _load_compose_guardrails_module()
+    content = """
+PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
+INTERNAL_API_KEY=${INTERNAL_API_KEY}
+command:
+  - "http"
+  - "mcp-http:7011"
+"""
+    missing = module.find_missing_public_transport_snippets(content)
+    assert "http://mcp-http:7011" in missing
+    assert "--url=${NGROK_DOMAIN}" in missing
