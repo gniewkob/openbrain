@@ -78,8 +78,12 @@ for t in d['data']['activeTargets']:
 # expect: openbrain-unified  up
 
 # 4. Metric data in Prometheus
+curl -s 'http://127.0.0.1:9090/api/v1/query?query=active_memories_all_total'
+# expect: value >= 0 (all active, including hidden test data)
 curl -s 'http://127.0.0.1:9090/api/v1/query?query=active_memories_total'
-# expect: value != 0
+# expect: value >= 0 (visible active only)
+curl -s 'http://127.0.0.1:9090/api/v1/query?query=hidden_test_data_active_total'
+# expect: if > 0 then visible counters can stay near zero by design
 
 # 5. Dashboard
 # Open http://127.0.0.1:3001 → OpenBrain Overview → panels show real data
@@ -95,6 +99,7 @@ curl -s 'http://127.0.0.1:9090/api/v1/query?query=active_memories_total'
 | Bridge returns `502` | OpenBrain container not running | `docker compose ... up -d unified-server` |
 | Prometheus target `down` | Bridge not running | `launchctl load ... com.openbrain.metrics.bridge.plist` |
 | Dashboard `No data` | Prometheus can't reach bridge | Check port 9180 is bound: `lsof -i :9180` |
+| Dashboard active count is `0` but search works | Visible metric excludes `metadata.test_data=true` | Compare `active_memories_total` vs `active_memories_all_total` and `hidden_test_data_active_total` |
 | After Mac restart, bridge not up | LaunchAgent not loaded | Load the plist once: `launchctl load ~/Library/LaunchAgents/com.openbrain.metrics.bridge.plist` |
 
 ---
