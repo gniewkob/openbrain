@@ -28,6 +28,11 @@ curl -sS http://127.0.0.1:7010/metrics | grep -E '^hidden_test_data_(total|activ
 curl -sS "http://127.0.0.1:7010/api/v1/memory/admin/test-data/report?sample_limit=20"
 ```
 
+Raport zawiera dodatkowo:
+- `top_owners` — najwięksi producenci test-data
+- `match_key_prefix_counts` — najczęstsze prefiksy `match_key` (np. `test`, `openbrain-bulk-test`)
+- `null_match_key_count` — liczba rekordów testowych bez `match_key`
+
 ## Wykrywanie kandydatów testowych (SQL)
 ```sql
 SELECT id, domain, status, match_key, left(content, 120)

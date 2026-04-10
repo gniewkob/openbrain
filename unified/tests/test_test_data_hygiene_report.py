@@ -31,6 +31,9 @@ class TestDataHygieneReportReadTests(unittest.IsolatedAsyncioTestCase):
                         ("build", "superseded", 2),
                     ]
                 ),
+                SimpleNamespace(all=lambda: [("tester", 8), ("ci-bot", 3)]),
+                SimpleNamespace(all=lambda: [("test", 6), ("openbrain-bulk-test", 2)]),
+                SimpleNamespace(scalar=lambda: 1),
                 SimpleNamespace(
                     all=lambda: [
                         SimpleNamespace(
@@ -53,6 +56,9 @@ class TestDataHygieneReportReadTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report.hidden_counts["hidden_test_data_total"], 11)
         self.assertEqual(report.status_counts["active"], 9)
         self.assertEqual(report.domain_status_counts["build"]["active"], 7)
+        self.assertEqual(report.top_owners["tester"], 8)
+        self.assertEqual(report.match_key_prefix_counts["test"], 6)
+        self.assertEqual(report.null_match_key_count, 1)
         self.assertEqual(len(report.sample), 1)
         self.assertEqual(report.sample[0].id, "mem-1")
 
@@ -84,6 +90,9 @@ class TestDataHygieneReportEndpointTests(unittest.IsolatedAsyncioTestCase):
             hidden_counts={"hidden_test_data_total": 3},
             status_counts={"active": 3},
             domain_status_counts={"build": {"active": 3}},
+            top_owners={"tester": 3},
+            match_key_prefix_counts={"test": 2},
+            null_match_key_count=1,
             sample=[],
         )
 

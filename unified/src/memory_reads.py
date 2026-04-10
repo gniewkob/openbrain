@@ -420,6 +420,38 @@ async def get_test_data_hygiene_report(
         domain_status_counts.setdefault(domain_key, {})
         domain_status_counts[domain_key][str(status)] = int(count)
 
+    top_owners_result = await session.execute(
+        select(Memory.owner, func.count(Memory.id))
+        .where(is_test_data)
+        .group_by(Memory.owner)
+        .order_by(func.count(Memory.id).desc(), Memory.owner.asc())
+        .limit(10)
+    )
+    top_owners = {
+        str(owner or ""): int(count)
+        for owner, count in top_owners_result.all()
+    }
+
+    match_key_prefix_result = await session.execute(
+        select(
+            func.split_part(func.coalesce(Memory.match_key, ""), ":", 1),
+            func.count(Memory.id),
+        )
+        .where(is_test_data, Memory.match_key.is_not(None))
+        .group_by(func.split_part(func.coalesce(Memory.match_key, ""), ":", 1))
+        .order_by(func.count(Memory.id).desc())
+        .limit(10)
+    )
+    match_key_prefix_counts = {
+        (str(prefix or "") or "<empty>"): int(count)
+        for prefix, count in match_key_prefix_result.all()
+    }
+
+    null_match_key_result = await session.execute(
+        select(func.count(Memory.id)).where(is_test_data, Memory.match_key.is_(None))
+    )
+    null_match_key_count = int(null_match_key_result.scalar() or 0)
+
     sample_result = await session.execute(
         select(
             Memory.id,
@@ -455,6 +487,9 @@ async def get_test_data_hygiene_report(
         hidden_counts=hidden_counts,
         status_counts=status_counts,
         domain_status_counts=domain_status_counts,
+        top_owners=top_owners,
+        match_key_prefix_counts=match_key_prefix_counts,
+        null_match_key_count=null_match_key_count,
         sample=sample,
     )
 

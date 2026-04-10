@@ -595,6 +595,9 @@ class TestDataHygieneReport(BaseModel):
     hidden_counts: dict[str, int] = Field(default_factory=dict)
     status_counts: dict[str, int] = Field(default_factory=dict)
     domain_status_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
+    top_owners: dict[str, int] = Field(default_factory=dict)
+    match_key_prefix_counts: dict[str, int] = Field(default_factory=dict)
+    null_match_key_count: int = 0
     sample: list[TestDataSampleEntry] = Field(default_factory=list)
 
 
