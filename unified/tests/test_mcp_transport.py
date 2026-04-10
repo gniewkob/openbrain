@@ -660,6 +660,22 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             ):
                 await mcp_transport.brain_delete("mem-1")
 
+    async def test_brain_delete_404_raises_not_found_message(self) -> None:
+        response = _FakeResponse(404, payload={"detail": "not found"})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            with self.assertRaisesRegex(ValueError, "Memory not found: mem-1"):
+                await mcp_transport.brain_delete("mem-1")
+
+    async def test_brain_delete_403_raises_governance_message(self) -> None:
+        response = _FakeResponse(403, payload={"detail": "forbidden"})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            with self.assertRaisesRegex(
+                ValueError, "Cannot delete corporate memories. Use deprecation instead."
+            ):
+                await mcp_transport.brain_delete("mem-1")
+
     async def test_brain_export_uses_v1_export_endpoint(self) -> None:
         response = _FakeResponse(200, payload=[{"id": "mem-1"}])
         fake_client = _FakeClient(response)

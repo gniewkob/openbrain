@@ -585,7 +585,23 @@ async def brain_get_context(query: str, domain: Optional[str] = None) -> dict[st
 @mcp_tool_guard
 async def brain_delete(memory_id: str) -> dict[str, Any]:
     """Delete a memory. Forbidden for corporate domain."""
-    await _safe_req("DELETE", f"/{memory_id}")
+    path = memory_item_absolute_path(memory_id)
+    try:
+        async with _client() as c:
+            response = await c.request("DELETE", path)
+    except httpx.RequestError as exc:
+        raise ValueError(backend_request_failure_message(exc)) from exc
+
+    if response.status_code == 404:
+        raise ValueError(f"Memory not found: {memory_id}")
+    if response.status_code == 403:
+        raise ValueError("Cannot delete corporate memories. Use deprecation instead.")
+    if response.is_error:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text
+        raise ValueError(backend_error_message(response.status_code, detail))
     return {"deleted": True, "id": memory_id}
 
 

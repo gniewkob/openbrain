@@ -436,6 +436,82 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             transport_result = await mcp_transport.brain_delete("mem-1")
         self.assertEqual(transport_result, gateway_result)
 
+    async def test_delete_not_found_error_parity_between_stdio_and_http(self) -> None:
+        class _GatewayDelete404(_GatewayClient):
+            async def delete(self, path: str):
+                if path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(404, {"detail": "not found"})
+                raise AssertionError(f"Unexpected DELETE path: {path}")
+
+        class _TransportDelete404(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if method == "DELETE" and path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(404, {"detail": "not found"})
+                return await super().request(method, path, **kwargs)
+
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayDelete404()),
+            patch.object(mcp_transport, "_client", return_value=_TransportDelete404()),
+        ):
+            with self.assertRaisesRegex(ValueError, "Memory not found: mem-1"):
+                await gateway.brain_delete("mem-1")
+            with self.assertRaisesRegex(ValueError, "Memory not found: mem-1"):
+                await mcp_transport.brain_delete("mem-1")
+
+    async def test_delete_forbidden_error_parity_between_stdio_and_http(self) -> None:
+        class _GatewayDelete403(_GatewayClient):
+            async def delete(self, path: str):
+                if path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(403, {"detail": "forbidden"})
+                raise AssertionError(f"Unexpected DELETE path: {path}")
+
+        class _TransportDelete403(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if method == "DELETE" and path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(403, {"detail": "forbidden"})
+                return await super().request(method, path, **kwargs)
+
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayDelete403()),
+            patch.object(mcp_transport, "_client", return_value=_TransportDelete403()),
+        ):
+            with self.assertRaisesRegex(
+                ValueError, "Cannot delete corporate memories. Use deprecation instead."
+            ):
+                await gateway.brain_delete("mem-1")
+            with self.assertRaisesRegex(
+                ValueError, "Cannot delete corporate memories. Use deprecation instead."
+            ):
+                await mcp_transport.brain_delete("mem-1")
+
+    async def test_delete_missing_session_error_parity_between_stdio_and_http(self) -> None:
+        class _GatewayDelete400(_GatewayClient):
+            async def delete(self, path: str):
+                if path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                raise AssertionError(f"Unexpected DELETE path: {path}")
+
+        class _TransportDelete400(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if method == "DELETE" and path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().request(method, path, **kwargs)
+
+        expected = (
+            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
+        )
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayDelete400()),
+            patch.object(mcp_transport, "_client", return_value=_TransportDelete400()),
+        ):
+            with self.assertRaisesRegex(ValueError, expected):
+                await gateway.brain_delete("mem-1")
+            with self.assertRaisesRegex(ValueError, expected):
+                await mcp_transport.brain_delete("mem-1")
+
     async def test_sync_check_parity_between_stdio_and_http(self) -> None:
         with (
             patch("_gateway_src.main._client", return_value=_GatewayClient()),
