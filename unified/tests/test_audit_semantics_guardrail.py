@@ -48,3 +48,26 @@ async def v1_update(memory_id, data):
     updated = await update_memory(session, memory_id, data, actor=actor)
 """
     assert module._has_patch_actor_override(patch_src_bad) is False
+
+
+def test_mcp_updated_by_placeholder_guardrail_patterns(tmp_path) -> None:
+    module = _load_audit_semantics_module()
+
+    ok_src = """
+async def brain_update(memory_id: str, content: str, updated_by: str = "agent"):
+    _ = normalize_updated_by(updated_by)
+    payload = {"content": content, "updated_by": canonical_updated_by()}
+"""
+    bad_src = """
+async def brain_update(memory_id: str, content: str, updated_by: str = "agent"):
+    payload = {"content": content, "updated_by": updated_by}
+"""
+    transport = tmp_path / "transport.py"
+    gateway = tmp_path / "gateway.py"
+    transport.write_text(ok_src, encoding="utf-8")
+    gateway.write_text(bad_src, encoding="utf-8")
+
+    module.MCP_TRANSPORT = transport
+    module.MCP_GATEWAY = gateway
+    errors = module._check_mcp_updated_by_placeholder_binding()
+    assert any("mcp-gateway/src/main.py missing MCP audit placeholder pattern" in err for err in errors)

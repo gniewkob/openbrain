@@ -13,6 +13,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SCHEMAS = ROOT / "unified/src/schemas.py"
 API_V1_MEMORY = ROOT / "unified/src/api/v1/memory.py"
 MEMORY_WRITES = ROOT / "unified/src/memory_writes.py"
+MCP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
+MCP_GATEWAY = ROOT / "unified/mcp-gateway/src/main.py"
 
 
 def _fail(message: str) -> int:
@@ -131,11 +133,30 @@ def _check_write_path_actor_binding() -> list[str]:
     return errors
 
 
+def _check_mcp_updated_by_placeholder_binding() -> list[str]:
+    errors: list[str] = []
+    required_patterns = (
+        r"normalize_updated_by\s*\(\s*updated_by\s*\)",
+        r'"updated_by"\s*:\s*canonical_updated_by\s*\(\s*\)',
+    )
+    sources = (
+        ("mcp_transport.py", MCP_TRANSPORT),
+        ("mcp-gateway/src/main.py", MCP_GATEWAY),
+    )
+    for label, path in sources:
+        text = path.read_text(encoding="utf-8")
+        for pattern in required_patterns:
+            if not re.search(pattern, text):
+                errors.append(f"{label} missing MCP audit placeholder pattern: {pattern}")
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     errors.extend(_check_schemas())
     errors.extend(_check_api_patch_override())
     errors.extend(_check_write_path_actor_binding())
+    errors.extend(_check_mcp_updated_by_placeholder_binding())
     if errors:
         for err in errors:
             _fail(err)
