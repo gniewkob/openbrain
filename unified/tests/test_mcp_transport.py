@@ -574,6 +574,14 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
                 query="x", top_k=mcp_transport.MAX_SEARCH_TOP_K + 1
             )
 
+    async def test_brain_search_include_test_data_non_bool_raises(self) -> None:
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await mcp_transport.brain_search(
+                query="x",
+                top_k=1,
+                include_test_data="true",  # type: ignore[arg-type]
+            )
+
     async def test_brain_update_passes_custom_fields(self) -> None:
         response = _FakeResponse(200, payload={"id": "mem-1"})
         fake_client = _FakeClient(response)
@@ -738,6 +746,13 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     async def test_brain_list_limit_over_max_raises(self) -> None:
         with self.assertRaisesRegex(ValueError, "limit must be 1"):
             await mcp_transport.brain_list(limit=mcp_transport.MAX_LIST_LIMIT + 1)
+
+    async def test_brain_list_include_test_data_non_bool_raises(self) -> None:
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await mcp_transport.brain_list(
+                limit=1,
+                include_test_data="true",  # type: ignore[arg-type]
+            )
 
     async def test_brain_obsidian_sync_limit_bounds_when_tool_enabled(self) -> None:
         if not hasattr(mcp_transport, "brain_obsidian_sync"):

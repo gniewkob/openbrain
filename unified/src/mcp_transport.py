@@ -421,6 +421,10 @@ async def brain_search(
     sensitivity.
     include_test_data: include records marked with metadata.test_data=true
     """
+    if not isinstance(include_test_data, bool):
+        raise ValueError(
+            f"include_test_data must be bool, got {type(include_test_data).__name__}"
+        )
     if not 1 <= top_k <= MAX_SEARCH_TOP_K:
         raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
     filters = build_list_filters(
@@ -549,6 +553,10 @@ async def brain_list(
     domain options: corporate | build | personal
     include_test_data: include records marked with metadata.test_data=true
     """
+    if not isinstance(include_test_data, bool):
+        raise ValueError(
+            f"include_test_data must be bool, got {type(include_test_data).__name__}"
+        )
     if not 1 <= limit <= MAX_LIST_LIMIT:
         raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
     filters = build_list_filters(

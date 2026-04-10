@@ -379,6 +379,20 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "limit must be 1"):
             await mcp_transport.brain_list(limit=0)
 
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await gateway.brain_search(
+                query="payload", top_k=1, include_test_data="true"
+            )
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await mcp_transport.brain_search(
+                query="payload", top_k=1, include_test_data="true"
+            )
+
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await gateway.brain_list(limit=1, include_test_data="true")
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await mcp_transport.brain_list(limit=1, include_test_data="true")
+
     async def test_update_parity_between_stdio_and_http(self) -> None:
         with (
             patch("_gateway_src.main._client", return_value=_GatewayClient()),
