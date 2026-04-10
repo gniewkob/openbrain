@@ -54,6 +54,8 @@ WHERE domain='corporate'
 
 ## Debug: `Missing session ID` przy `brain_delete`
 Ten błąd zwykle pochodzi z warstwy transportu MCP HTTP (sesja streamable), nie z backendowego `DELETE /api/v1/memory/{id}`.
+Gateway/transport mapuje ten przypadek do komunikatu:
+`Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry.`
 
 Checklist:
 1. Sprawdź backend direct API (z `X-Internal-Key`) — jeśli działa, problem jest w session/transport.
