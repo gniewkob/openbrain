@@ -138,6 +138,7 @@ RELEASE_GATE_ENFORCE=1 python scripts/check_release_gate.py # fail on policy dri
 CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces release-gate policy via `scripts/check_release_gate.py` with `RELEASE_GATE_ENFORCE=1`.
 - `Unified Smoke Tests / guardrails` also enforces repository hygiene via `scripts/check_repo_hygiene.py` (known debug artifacts deny-list).
+- `Unified Smoke Tests / guardrails` enforces compose safety via `scripts/check_compose_guardrails.py` (no hardcoded DB defaults + required public MCP transport snippets such as `http://mcp-http:7011` and `--url=${NGROK_DOMAIN}`).
 - `Unified Smoke Tests / guardrails` enforces capabilities manifest parity via `scripts/check_capabilities_manifest_parity.py` (HTTP transport and stdio gateway loaders must stay contract-equivalent).
 - `Unified Smoke Tests / guardrails` enforces capabilities metadata parity via `scripts/check_capabilities_metadata_parity.py` (`api_version`/changelog loader semantics must stay contract-equivalent across transports).
 - `Unified Smoke Tests / guardrails` enforces capabilities health parity via `scripts/check_capabilities_health_parity.py` (`build_capabilities_health` and component mapping logic must stay contract-equivalent across transports).
@@ -148,7 +149,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces export redaction contract semantics via `scripts/check_export_contract.py` (`EXPORT_POLICY` coverage + restricted fallback + required redactions).
 - `Unified Smoke Tests / guardrails` enforces Obsidian gating/contract semantics via `scripts/check_obsidian_contract.py` (feature-flag + capabilities + manifest subset checks).
 - `Unified Smoke Tests / guardrails` enforces monitoring contract via `scripts/validate_monitoring_contract.py` (dashboard + alert-rule metric references must remain inside the declared contract).
-- `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
+- `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + compose safety + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
 - `Unified Smoke Tests / guardrails` runs lightweight pytest coverage for guardrail runners:
   - `unified/tests/test_local_guardrails_runner.py`
   - `unified/tests/test_repo_hygiene_guardrail.py`
