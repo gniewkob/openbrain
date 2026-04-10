@@ -167,6 +167,13 @@ def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
     assert "secret" not in msg
 
 
+def test_http_error_contract_maps_missing_session_id_hint() -> None:
+    msg = backend_error_message(400, {"detail": "Missing session ID"})
+    assert msg == (
+        "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
+    )
+
+
 def test_capabilities_tools_map_to_real_http_transport_functions() -> None:
     manifest = load_capabilities_manifest()
     expected = {"capabilities"}

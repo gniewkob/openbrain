@@ -5,7 +5,13 @@
     "404": "Resource not found",
     "422": "Validation error"
   },
+  "detail_hints": {
+    "missing_session_id": {
+      "status_code": 400,
+      "contains": "Missing session ID",
+      "message": "Missing MCP session context; reconnect the MCP HTTP client and retry."
+    }
+  },
   "fallback_5xx": "Internal server error",
   "fallback_other": "Request failed"
 }
-
