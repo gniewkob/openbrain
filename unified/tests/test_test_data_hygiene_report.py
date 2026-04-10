@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi import HTTPException
 
 from src import memory_reads
+from src.schemas import TestDataActionSuggestion as HygieneActionSuggestion
 
 
 class TestDataHygieneReportReadTests(unittest.IsolatedAsyncioTestCase):
@@ -59,6 +60,10 @@ class TestDataHygieneReportReadTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report.top_owners["tester"], 8)
         self.assertEqual(report.match_key_prefix_counts["test"], 6)
         self.assertEqual(report.null_match_key_count, 1)
+        action_codes = {item.code for item in report.recommended_actions}
+        self.assertIn("cleanup_build_test_data", action_codes)
+        self.assertIn("normalize_missing_match_keys", action_codes)
+        self.assertIn("owner_feedback_loop", action_codes)
         self.assertEqual(len(report.sample), 1)
         self.assertEqual(report.sample[0].id, "mem-1")
 
@@ -93,6 +98,13 @@ class TestDataHygieneReportEndpointTests(unittest.IsolatedAsyncioTestCase):
             top_owners={"tester": 3},
             match_key_prefix_counts={"test": 2},
             null_match_key_count=1,
+            recommended_actions=[
+                HygieneActionSuggestion(
+                    code="cleanup_build_test_data",
+                    priority="high",
+                    summary="cleanup",
+                )
+            ],
             sample=[],
         )
 
@@ -112,6 +124,32 @@ class TestDataHygieneReportEndpointTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.sample_limit, 3)
         self.assertEqual(result.hidden_counts["hidden_test_data_total"], 3)
+
+    async def test_get_test_data_hygiene_report_returns_no_action_for_empty_state(
+        self,
+    ) -> None:
+        now = datetime.now(timezone.utc)
+        session = AsyncMock()
+        session.execute = AsyncMock(
+            side_effect=[
+                SimpleNamespace(scalar=lambda: 0),  # total
+                SimpleNamespace(scalar=lambda: 0),  # active
+                SimpleNamespace(scalar=lambda: 0),  # build active
+                SimpleNamespace(scalar=lambda: 0),  # corporate active
+                SimpleNamespace(scalar=lambda: 0),  # personal active
+                SimpleNamespace(all=lambda: []),  # status counts
+                SimpleNamespace(all=lambda: []),  # domain counts
+                SimpleNamespace(all=lambda: []),  # top owners
+                SimpleNamespace(all=lambda: []),  # prefix counts
+                SimpleNamespace(scalar=lambda: 0),  # null match key
+                SimpleNamespace(all=lambda: []),  # sample
+            ]
+        )
+
+        report = await memory_reads.get_test_data_hygiene_report(session, sample_limit=5)
+        self.assertEqual(len(report.recommended_actions), 1)
+        self.assertEqual(report.recommended_actions[0].code, "no_action_needed")
+        self.assertEqual(report.recommended_actions[0].priority, "low")
 
 
 if __name__ == "__main__":

@@ -589,6 +589,12 @@ class TestDataSampleEntry(BaseModel):
     updated_at: datetime
 
 
+class TestDataActionSuggestion(BaseModel):
+    code: str
+    priority: Literal["low", "medium", "high"]
+    summary: str
+
+
 class TestDataHygieneReport(BaseModel):
     generated_at: datetime
     sample_limit: int
@@ -598,6 +604,7 @@ class TestDataHygieneReport(BaseModel):
     top_owners: dict[str, int] = Field(default_factory=dict)
     match_key_prefix_counts: dict[str, int] = Field(default_factory=dict)
     null_match_key_count: int = 0
+    recommended_actions: list[TestDataActionSuggestion] = Field(default_factory=list)
     sample: list[TestDataSampleEntry] = Field(default_factory=list)
 
 

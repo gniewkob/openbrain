@@ -32,6 +32,7 @@ Raport zawiera dodatkowo:
 - `top_owners` — najwięksi producenci test-data
 - `match_key_prefix_counts` — najczęstsze prefiksy `match_key` (np. `test`, `openbrain-bulk-test`)
 - `null_match_key_count` — liczba rekordów testowych bez `match_key`
+- `recommended_actions` — gotowe rekomendacje operacyjne (code + priority + summary) do sekwencji: dry-run → decyzja → wykonanie
 
 ## Wykrywanie kandydatów testowych (SQL)
 ```sql

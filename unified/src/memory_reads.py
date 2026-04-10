@@ -27,6 +27,7 @@ from .schemas import (
     MemoryOut,
     MemoryRecord,
     SearchRequest,
+    TestDataActionSuggestion,
     TestDataHygieneReport,
     TestDataSampleEntry,
 )
@@ -452,6 +453,65 @@ async def get_test_data_hygiene_report(
     )
     null_match_key_count = int(null_match_key_result.scalar() or 0)
 
+    recommended_actions: list[TestDataActionSuggestion] = []
+    hidden_total = int(hidden_counts.get("hidden_test_data_total", 0))
+    hidden_build = int(hidden_counts.get("hidden_test_data_build_total", 0))
+    hidden_corporate = int(hidden_counts.get("hidden_test_data_corporate_total", 0))
+
+    if hidden_total == 0:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="no_action_needed",
+                priority="low",
+                summary="No records flagged as test data were detected.",
+            )
+        )
+    else:
+        if hidden_build > 0:
+            recommended_actions.append(
+                TestDataActionSuggestion(
+                    code="cleanup_build_test_data",
+                    priority="high",
+                    summary=(
+                        "Build-domain test data detected; schedule controlled delete flow "
+                        "(dry-run list -> approve -> delete)."
+                    ),
+                )
+            )
+        if hidden_corporate > 0:
+            recommended_actions.append(
+                TestDataActionSuggestion(
+                    code="review_corporate_test_data",
+                    priority="high",
+                    summary=(
+                        "Corporate-domain test data detected; keep append-only constraints and "
+                        "review quarantine-only remediation."
+                    ),
+                )
+            )
+        if null_match_key_count > 0:
+            recommended_actions.append(
+                TestDataActionSuggestion(
+                    code="normalize_missing_match_keys",
+                    priority="medium",
+                    summary=(
+                        "Some test-data records have null match_key; add deterministic key policy "
+                        "to improve dedup and cleanup safety."
+                    ),
+                )
+            )
+        if top_owners:
+            recommended_actions.append(
+                TestDataActionSuggestion(
+                    code="owner_feedback_loop",
+                    priority="medium",
+                    summary=(
+                        "Top owners are identifiable; align ingestion hygiene with owners to reduce "
+                        "future test-data churn."
+                    ),
+                )
+            )
+
     sample_result = await session.execute(
         select(
             Memory.id,
@@ -490,6 +550,7 @@ async def get_test_data_hygiene_report(
         top_owners=top_owners,
         match_key_prefix_counts=match_key_prefix_counts,
         null_match_key_count=null_match_key_count,
+        recommended_actions=recommended_actions,
         sample=sample,
     )
 
