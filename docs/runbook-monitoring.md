@@ -106,6 +106,9 @@ curl -s 'http://127.0.0.1:9090/api/v1/query?query=hidden_test_data_active_total'
 | Dashboard active count is `0` but search works | Visible metric excludes `metadata.test_data=true` | Compare `active_memories_total` vs `active_memories_all_total` and `hidden_test_data_active_total` |
 | After Mac restart, bridge not up | LaunchAgent not loaded | Load the plist once: `launchctl load ~/Library/LaunchAgents/com.openbrain.metrics.bridge.plist` |
 
+Alerting note:
+- `OpenBrainHiddenTestDataPresent` firing means hidden active test-data exists; use `admin/test-data/report` and `cleanup-build` flow before tuning dashboard thresholds.
+
 ---
 
 ## Files

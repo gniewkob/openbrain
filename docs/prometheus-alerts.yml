@@ -107,6 +107,16 @@ groups:
           summary: "Attempted hard delete of append-only memories"
           description: "At least one delete attempt was blocked by governance in the last hour. Review caller behavior and delete expectations."
 
+      - alert: OpenBrainHiddenTestDataPresent
+        expr: hidden_test_data_active_total > 0
+        for: 15m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "Hidden test data present in active memory set"
+          description: "There are active records flagged as metadata.test_data=true; verify cleanup/quarantine posture and retrieval filters."
+
   - name: openbrain-retrieval
     rules:
       - alert: OpenBrainSearchZeroHitRateElevated
