@@ -57,6 +57,7 @@ PR_READINESS_STEPS: tuple[tuple[str, list[str]], ...] = (
             "-q",
             "unified/tests/test_contract_integrity.py",
             "unified/tests/test_capabilities_response_contract.py",
+            "unified/tests/test_health_route_alias_contract.py",
         ],
     ),
 )
