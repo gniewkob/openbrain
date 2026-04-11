@@ -58,6 +58,14 @@ def test_local_guardrails_includes_dashboard_memory_semantics_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_hidden_test_data_alert_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "hidden test-data alert parity",
+        "scripts/check_hidden_test_data_alert_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_export_contract_step() -> None:
     module = _load_local_guardrails_module()
     assert ("export contract", "scripts/check_export_contract.py") in module.GUARDRAIL_STEPS

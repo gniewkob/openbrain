@@ -34,6 +34,10 @@ GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
     ("mcp http session contract", "scripts/check_mcp_http_session_contract.py"),
     ("telemetry contract parity", "scripts/check_telemetry_contract_parity.py"),
     ("dashboard memory semantics", "scripts/check_dashboard_memory_semantics.py"),
+    (
+        "hidden test-data alert parity",
+        "scripts/check_hidden_test_data_alert_parity.py",
+    ),
     ("monitoring contract", "scripts/validate_monitoring_contract.py"),
 )
 

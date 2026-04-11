@@ -162,7 +162,8 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces export redaction contract semantics via `scripts/check_export_contract.py` (`EXPORT_POLICY` coverage + restricted fallback + required redactions).
 - `Unified Smoke Tests / guardrails` enforces Obsidian gating/contract semantics via `scripts/check_obsidian_contract.py` (feature-flag + capabilities + manifest subset checks).
 - `Unified Smoke Tests / guardrails` enforces telemetry/monitoring contract parity via `scripts/check_telemetry_contract_parity.py` (all gauge metrics emitted by `telemetry_gauges` must be listed in the monitoring metrics contract).
-- `Unified Smoke Tests / guardrails` enforces dashboard memory panel semantics via `scripts/check_dashboard_memory_semantics.py` (active memory panel must use `active_memories_all_total`; hidden test-data panel must keep `hidden_test_data_active_total`).
+- `Unified Smoke Tests / guardrails` enforces dashboard memory panel semantics via `scripts/check_dashboard_memory_semantics.py` (visible/all/hidden memory panels and hidden-share panel must keep canonical PromQL expressions).
+- `Unified Smoke Tests / guardrails` enforces hidden test-data alert parity via `scripts/check_hidden_test_data_alert_parity.py` (runtime alert rules and docs alert rules must keep aligned alert names and threshold semantics).
 - `Unified Smoke Tests / guardrails` enforces monitoring contract via `scripts/validate_monitoring_contract.py` (dashboard + alert-rule metric references must remain inside the declared contract).
 - `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + compose safety + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
 - `Unified Smoke Tests / guardrails` runs lightweight pytest coverage for guardrail runners:
@@ -188,6 +189,7 @@ CI guardrail:
   - `unified/tests/test_monitoring_contract_guardrail.py`
   - `unified/tests/test_telemetry_contract_parity_guardrail.py`
   - `unified/tests/test_dashboard_memory_semantics_guardrail.py`
+  - `unified/tests/test_hidden_test_data_alert_parity_guardrail.py`
   - `unified/mcp-gateway/tests/test_shared_client_reuse.py`
 
 Local PR readiness:
@@ -203,7 +205,7 @@ Local monitoring contract check:
 - optional live-mode validation: `python3 scripts/validate_monitoring_contract.py --check-live --metrics-url http://127.0.0.1:9180/metrics`
 - default mode forbids `vector(0)` in monitoring PromQL expressions (dashboards and alert rules; opt-out for migration only: `--allow-vector-zero`)
 - `active_memories_all_total` now exposes all active rows including hidden test fixtures (`active_memories_total + hidden_test_data_active_total`) for dashboard truthfulness.
-- Grafana `Active Memories` stat now reads `active_memories_all_total`; `Hidden Test Data (Active Only)` remains as a separate diagnostic panel.
+- Grafana memory diagnostics now include `Active Memories (Visible Excl Test Data)`, `Active Memories (All incl Test Data)`, `Hidden Test Data (Active Only)`, and `Hidden Test Data Share (Active)`.
 
 Branch protection policy (recommended):
 - Require pull request before merging.
