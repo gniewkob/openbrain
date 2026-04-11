@@ -119,6 +119,42 @@ class BuildTestDataCleanupEndpointTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.deleted_count, 2)
         use_case_mock.assert_awaited_once()
+        self.assertEqual(use_case_mock.await_args.kwargs["dry_run"], False)
+        self.assertEqual(use_case_mock.await_args.kwargs["limit"], 5)
+        self.assertEqual(use_case_mock.await_args.kwargs["actor"], "admin-user")
+
+    async def test_endpoint_falls_back_actor_to_agent_when_subject_empty(self) -> None:
+        from src.api.v1 import memory as mem_module
+
+        request = mem_module.BuildTestDataCleanupRequest(dry_run=True, limit=3)
+        fake_response = mem_module.BuildTestDataCleanupResponse(
+            dry_run=True,
+            scanned=0,
+            candidates_count=0,
+            deleted_count=0,
+            skipped_count=0,
+            candidate_ids=[],
+            deleted_ids=[],
+            skipped=[],
+        )
+
+        with (
+            patch.object(mem_module, "require_admin"),
+            patch.object(mem_module, "get_subject", return_value=""),
+            patch.object(
+                mem_module,
+                "cleanup_build_test_data_use_case",
+                new=AsyncMock(return_value=fake_response),
+            ) as use_case_mock,
+        ):
+            result = await mem_module.cleanup_build_test_data(
+                req=request,
+                session=object(),
+                _user={"sub": ""},
+            )
+
+        self.assertTrue(result.dry_run)
+        self.assertEqual(use_case_mock.await_args.kwargs["actor"], "agent")
 
 
 if __name__ == "__main__":

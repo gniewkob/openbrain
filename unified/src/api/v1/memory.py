@@ -279,11 +279,12 @@ async def cleanup_build_test_data(
 ) -> BuildTestDataCleanupResponse:
     """Cleanup build-domain test data with explicit dry-run by default."""
     require_admin(_user)
+    actor = get_subject(_user) or "agent"
     return await cleanup_build_test_data_use_case(
         session,
         dry_run=req.dry_run,
         limit=req.limit,
-        actor=get_subject(_user),
+        actor=actor,
     )
 
 
