@@ -213,6 +213,22 @@ class TestAllRoutesRegistered:
         for path in expected:
             assert path in paths, f"Missing: {path}"
 
+    def test_test_data_hygiene_report_schema_includes_visibility_ratio_fields(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI schema for TestDataHygieneReport includes visibility/ratio fields."""
+        response = client.get("/openapi.json")
+        data = response.json()
+        schemas = data.get("components", {}).get("schemas", {})
+        report_schema = schemas.get("TestDataHygieneReport", {})
+        properties = report_schema.get("properties", {})
+
+        assert "visible_status_counts" in properties
+        assert "visible_domain_status_counts" in properties
+        assert "hidden_active_ratio" in properties
+        assert "hidden_active_ratio_by_domain" in properties
+        assert "recommended_actions" in properties
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
