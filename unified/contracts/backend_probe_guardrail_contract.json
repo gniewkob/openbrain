@@ -1,0 +1,20 @@
+{
+  "readyz_paths": [
+    "/readyz",
+    "/api/v1/readyz"
+  ],
+  "fallback_paths": [
+    "/healthz",
+    "/api/v1/health"
+  ],
+  "probe_labels": [
+    "readyz",
+    "healthz_fallback",
+    "api_health_fallback"
+  ],
+  "reason_fragments": [
+    "/readyz probe failed",
+    "/healthz probe failed",
+    "/api/v1/health probe failed"
+  ]
+}

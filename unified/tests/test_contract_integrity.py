@@ -262,6 +262,22 @@ def test_shared_http_client_reuse_contract_shape() -> None:
     )
 
 
+def test_backend_probe_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "backend_probe_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["readyz_paths"], list) and raw["readyz_paths"]
+    assert isinstance(raw["fallback_paths"], list) and raw["fallback_paths"]
+    assert isinstance(raw["probe_labels"], list) and raw["probe_labels"]
+    assert isinstance(raw["reason_fragments"], list) and raw["reason_fragments"]
+    assert all(isinstance(item, str) and item for item in raw["readyz_paths"])
+    assert all(isinstance(item, str) and item for item in raw["fallback_paths"])
+    assert all(isinstance(item, str) and item for item in raw["probe_labels"])
+    assert all(isinstance(item, str) and item for item in raw["reason_fragments"])
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(
