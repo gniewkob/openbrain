@@ -146,6 +146,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces capabilities manifest parity via `scripts/check_capabilities_manifest_parity.py` (HTTP transport and stdio gateway loaders must stay contract-equivalent).
 - `Unified Smoke Tests / guardrails` enforces capabilities metadata parity via `scripts/check_capabilities_metadata_parity.py` (`api_version`/changelog loader semantics must stay contract-equivalent across transports).
 - `Unified Smoke Tests / guardrails` enforces capabilities health parity via `scripts/check_capabilities_health_parity.py` (`build_capabilities_health` and component mapping logic must stay contract-equivalent across transports).
+- `Unified Smoke Tests / guardrails` enforces backend probe contract parity via `scripts/check_backend_probe_contract_parity.py` (`_get_backend_status` must keep aligned probe order `/readyz` -> `/api/v1/readyz` plus fallback probes `/healthz` and `/api/v1/health`, with stable probe labels/reason fragments).
 - `Unified Smoke Tests / guardrails` enforces request/runtime contract parity via `scripts/check_request_runtime_parity.py` (`request_contracts` and `runtime_limits` loader/validator semantics must stay contract-equivalent across transports).
 - `Unified Smoke Tests / guardrails` enforces shared backend HTTP client reuse via `scripts/check_shared_http_client_reuse.py` (both transports must keep module-level shared `httpx.AsyncClient` pooling semantics).
 - `Unified Smoke Tests / guardrails` enforces selected MCP tool signature parity via `scripts/check_tool_signature_parity.py` (`brain_search`, `brain_list`, `brain_delete`, `brain_update` argument contract must stay transport-equivalent).
@@ -177,6 +178,7 @@ CI guardrail:
   - `unified/tests/test_capabilities_manifest_parity_guardrail.py`
   - `unified/tests/test_capabilities_metadata_parity_guardrail.py`
   - `unified/tests/test_capabilities_health_parity_guardrail.py`
+  - `unified/tests/test_backend_probe_contract_parity_guardrail.py`
   - `unified/tests/test_request_runtime_parity_guardrail.py`
   - `unified/tests/test_shared_http_client_reuse_guardrail.py`
   - `unified/tests/test_tool_signature_parity_guardrail.py`
