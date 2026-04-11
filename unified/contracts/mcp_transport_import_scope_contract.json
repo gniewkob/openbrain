@@ -1,0 +1,13 @@
+{
+  "scan_dirs": [
+    "unified",
+    "scripts"
+  ],
+  "required_runtime_importers": [
+    "unified/src/combined.py"
+  ],
+  "allowed_runtime_importers": [
+    "unified/src/combined.py"
+  ],
+  "allowed_test_importer_prefix": "unified/tests/"
+}

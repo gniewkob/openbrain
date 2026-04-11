@@ -160,6 +160,23 @@ def test_memory_paths_contract_is_loaded() -> None:
     assert memory_absolute_path("write") == f'{raw["memory_base"]}{raw["paths"]["write"]}'
 
 
+def test_mcp_transport_import_scope_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "mcp_transport_import_scope_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["scan_dirs"], list) and raw["scan_dirs"]
+    assert isinstance(raw["required_runtime_importers"], list) and raw[
+        "required_runtime_importers"
+    ]
+    assert isinstance(raw["allowed_runtime_importers"], list) and raw[
+        "allowed_runtime_importers"
+    ]
+    assert isinstance(raw["allowed_test_importer_prefix"], str)
+    assert raw["allowed_test_importer_prefix"]
+
+
 def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
     monkeypatch.setenv("ENV", "production")
     msg = backend_error_message(500, {"detail": "secret"})

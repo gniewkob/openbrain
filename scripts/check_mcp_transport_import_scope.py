@@ -4,16 +4,13 @@
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SCAN_DIRS = (ROOT / "unified", ROOT / "scripts")
-ALLOWED_IMPORTERS = {
-    "unified/src/combined.py",
-}
-ALLOWED_TEST_PREFIX = "unified/tests/"
+CONTRACT = ROOT / "unified" / "contracts" / "mcp_transport_import_scope_contract.json"
 
 
 def _fail(message: str) -> int:
@@ -44,9 +41,37 @@ def _is_mcp_transport_import(node: ast.AST) -> bool:
     return False
 
 
-def _discover_importers() -> list[str]:
+def _load_contract() -> dict[str, object]:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+
+    required_keys = {
+        "scan_dirs",
+        "required_runtime_importers",
+        "allowed_runtime_importers",
+        "allowed_test_importer_prefix",
+    }
+    missing = sorted(required_keys - set(payload.keys()))
+    if missing:
+        raise ValueError(f"contract missing keys: {missing}")
+
+    for key in ("scan_dirs", "required_runtime_importers", "allowed_runtime_importers"):
+        value = payload.get(key)
+        if not isinstance(value, list) or not value or any(
+            not isinstance(item, str) or not item.strip() for item in value
+        ):
+            raise ValueError(f"contract {key} must be a non-empty string list")
+
+    test_prefix = payload.get("allowed_test_importer_prefix")
+    if not isinstance(test_prefix, str) or not test_prefix.strip():
+        raise ValueError("contract allowed_test_importer_prefix must be non-empty string")
+
+    return payload
+
+
+def _discover_importers(scan_dirs: list[str]) -> list[str]:
     importers: list[str] = []
-    for scan_dir in SCAN_DIRS:
+    for rel_dir in scan_dirs:
+        scan_dir = ROOT / rel_dir
         if not scan_dir.exists():
             continue
         for path in scan_dir.rglob("*.py"):
@@ -57,27 +82,33 @@ def _discover_importers() -> list[str]:
     return sorted(importers)
 
 
-def _check_import_scope(importers: list[str]) -> list[str]:
+def _check_import_scope(importers: list[str], contract: dict[str, object]) -> list[str]:
     errors: list[str] = []
-    if "unified/src/combined.py" not in importers:
-        errors.append("unified/src/combined.py must import mcp_transport")
+    required_importers = set(contract["required_runtime_importers"])
+    allowed_importers = set(contract["allowed_runtime_importers"])
+    allowed_test_prefix = str(contract["allowed_test_importer_prefix"])
+
+    for required in sorted(required_importers):
+        if required not in importers:
+            errors.append(f"{required} must import mcp_transport")
 
     for path in importers:
-        if path in ALLOWED_IMPORTERS:
+        if path in allowed_importers:
             continue
-        if path.startswith(ALLOWED_TEST_PREFIX):
+        if path.startswith(allowed_test_prefix):
             continue
         errors.append(
             "mcp_transport import outside approved scope: "
-            f"{path} (allowed: {sorted(ALLOWED_IMPORTERS)} + {ALLOWED_TEST_PREFIX}*)"
+            f"{path} (allowed: {sorted(allowed_importers)} + {allowed_test_prefix}*)"
         )
     return errors
 
 
 def main() -> int:
     try:
-        importers = _discover_importers()
-        errors = _check_import_scope(importers)
+        contract = _load_contract()
+        importers = _discover_importers(list(contract["scan_dirs"]))
+        errors = _check_import_scope(importers, contract)
     except Exception as exc:
         _fail(f"mcp transport import scope check failed: {exc}")
         return 1
