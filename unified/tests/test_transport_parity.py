@@ -604,6 +604,27 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(transport_result, gateway_result)
 
+    async def test_admin_tool_parameter_bounds_parity_between_stdio_and_http(self) -> None:
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
+            await gateway.brain_test_data_report(sample_limit=0)
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
+            await mcp_transport.brain_test_data_report(sample_limit=0)
+
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
+            await gateway.brain_test_data_report(sample_limit=101)
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
+            await mcp_transport.brain_test_data_report(sample_limit=101)
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1"):
+            await gateway.brain_cleanup_build_test_data(limit=0)
+        with self.assertRaisesRegex(ValueError, "limit must be 1"):
+            await mcp_transport.brain_cleanup_build_test_data(limit=0)
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1"):
+            await gateway.brain_cleanup_build_test_data(limit=501)
+        with self.assertRaisesRegex(ValueError, "limit must be 1"):
+            await mcp_transport.brain_cleanup_build_test_data(limit=501)
+
     async def test_cleanup_build_test_data_parity_between_stdio_and_http(self) -> None:
         with (
             patch("_gateway_src.main._client", return_value=_GatewayClient()),
