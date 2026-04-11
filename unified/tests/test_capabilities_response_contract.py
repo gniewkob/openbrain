@@ -42,10 +42,20 @@ def _cap_metadata() -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _cap_manifest() -> dict:
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "contracts"
+        / "capabilities_manifest.json"
+    )
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 @pytest.mark.asyncio
 async def test_http_transport_capabilities_follow_response_contract() -> None:
     contract = _contract()
     metadata = _cap_metadata()
+    manifest = _cap_manifest()
     backend = {
         "status": "ok",
         "api": "reachable",
@@ -76,6 +86,11 @@ async def test_http_transport_capabilities_follow_response_contract() -> None:
     assert caps["obsidian"]["mode"] in contract["obsidian_modes"]
     assert caps["obsidian"]["status"] in contract["obsidian_statuses"]
     assert isinstance(caps["obsidian"]["tools"], list)
+    assert caps["tier_1_core"]["tools"] == manifest["core_tools"]
+    assert caps["tier_2_advanced"]["tools"] == manifest["advanced_tools"]
+    assert caps["tier_3_admin"]["tools"] == manifest["admin_tools"]
+    assert "test_data_report" in caps["tier_3_admin"]["tools"]
+    assert "cleanup_build_test_data" in caps["tier_3_admin"]["tools"]
 
 
 @pytest.mark.asyncio
@@ -84,6 +99,7 @@ async def test_gateway_capabilities_follow_response_contract_when_available() ->
         pytest.skip(f"gateway import failed: {_GATEWAY_IMPORT_ERROR}")
     contract = _contract()
     metadata = _cap_metadata()
+    manifest = _cap_manifest()
     backend = {
         "status": "ok",
         "api": "reachable",
@@ -111,3 +127,8 @@ async def test_gateway_capabilities_follow_response_contract_when_available() ->
     assert caps["obsidian"]["mode"] in contract["obsidian_modes"]
     assert caps["obsidian"]["status"] in contract["obsidian_statuses"]
     assert isinstance(caps["obsidian"]["tools"], list)
+    assert caps["tier_1_core"]["tools"] == manifest["core_tools"]
+    assert caps["tier_2_advanced"]["tools"] == manifest["advanced_tools"]
+    assert caps["tier_3_admin"]["tools"] == manifest["admin_tools"]
+    assert "test_data_report" in caps["tier_3_admin"]["tools"]
+    assert "cleanup_build_test_data" in caps["tier_3_admin"]["tools"]
