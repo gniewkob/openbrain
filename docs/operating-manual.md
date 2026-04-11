@@ -173,6 +173,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + compose safety + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
 - `Unified Smoke Tests / guardrails` runs lightweight pytest coverage for guardrail runners:
   - `unified/tests/test_local_guardrails_runner.py`
+  - `unified/tests/test_pr_readiness_runner.py`
   - `unified/tests/test_repo_hygiene_guardrail.py`
   - `unified/tests/test_compose_guardrails.py`
   - `unified/tests/test_secret_scan_guardrail.py`

@@ -27,6 +27,7 @@ PR_READINESS_STEPS: tuple[tuple[str, list[str]], ...] = (
             "pytest",
             "-q",
             "unified/tests/test_local_guardrails_runner.py",
+            "unified/tests/test_pr_readiness_runner.py",
             "unified/tests/test_repo_hygiene_guardrail.py",
             "unified/tests/test_compose_guardrails.py",
             "unified/tests/test_secret_scan_guardrail.py",
