@@ -24,6 +24,7 @@ The "Industrial Wrapper" in `combined.py` provides stable ASGI routing:
 5. **Health Probe Timeout**: transport readiness fallback probes use `MCP_HEALTH_PROBE_TIMEOUT_S` (default `5.0`) for `/readyz`, `/api/v1/readyz`, `/healthz`, and `/api/v1/health`. Allowed range: finite `(0, 30]`, and it must not exceed `BACKEND_TIMEOUT_S` in both unified transport and stdio gateway startup.
 6. **Backend Timeout Validation**: MCP backend timeout (`BACKEND_TIMEOUT_S`) must stay in finite `(0, 120]`; invalid values fail fast at config load in both unified transport and stdio gateway startup.
 7. **Backend URL Validation**: MCP backend URL (`BRAIN_URL`) must be a valid `http(s)` URL and must not include credentials/path/query/fragment or internal whitespace, to avoid silent runtime misrouting. Surrounding whitespace and trailing `/` are normalized away in both unified transport and stdio gateway startup paths.
+8. **Streamable HTTP Session Independence**: `mcp_http` runs `streamable-http` with `stateless_http=True`, so tool calls are not coupled to transport session headers (`Mcp-Session-Id`) and remain robust across client reconnects.
 
 ## Security Hardening (v2.3)
 The following security improvements were applied:
