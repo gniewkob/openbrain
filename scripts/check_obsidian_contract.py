@@ -70,6 +70,30 @@ def _sync_function_calls_name(func: ast.FunctionDef, call_name: str) -> bool:
     return False
 
 
+def _validate_snippet_list(value: object, field_name: str) -> str | None:
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(not isinstance(snippet, str) or not snippet for snippet in value)
+    ):
+        return f"{field_name} must be non-empty list[str]"
+    return None
+
+
+def _load_obsidian_guardrail_contract() -> tuple[dict[str, object], list[str]]:
+    errors: list[str] = []
+    raw = json.loads(GUARDRAIL_CONTRACT.read_text(encoding="utf-8"))
+    gateway = raw.get("gateway")
+    http = raw.get("http")
+    if not isinstance(gateway, dict):
+        errors.append("obsidian_guardrail_contract gateway must be object")
+        gateway = {}
+    if not isinstance(http, dict):
+        errors.append("obsidian_guardrail_contract http must be object")
+        http = {}
+    return {"gateway": gateway, "http": http}, errors
+
+
 def _http_obsidian_tools_defined_under_flag(text: str, tool_names: list[str]) -> bool:
     tree = ast.parse(text)
     required_defs = {f"brain_{name}" for name in tool_names}
@@ -93,12 +117,13 @@ def _check_gateway_gating() -> list[str]:
     text = GATEWAY_MAIN.read_text(encoding="utf-8")
     tree = ast.parse(text)
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    guardrail = json.loads(GUARDRAIL_CONTRACT.read_text(encoding="utf-8"))
-    gateway_guardrail = guardrail.get("gateway", {})
+    contract, contract_errors = _load_obsidian_guardrail_contract()
+    errors.extend(contract_errors)
+    gateway_guardrail = contract["gateway"]
     local_tools = payload.get("local_obsidian_tools", [])
-    required_env_constant = gateway_guardrail.get("required_env_constant_snippet")
-    required_guard_function = gateway_guardrail.get("required_guard_function")
-    required_caps = gateway_guardrail.get("required_capability_snippets", [])
+    required_env_constant = gateway_guardrail.get("required_env_constant_snippet") if isinstance(gateway_guardrail, dict) else None
+    required_guard_function = gateway_guardrail.get("required_guard_function") if isinstance(gateway_guardrail, dict) else None
+    required_caps = gateway_guardrail.get("required_capability_snippets", []) if isinstance(gateway_guardrail, dict) else []
 
     if not isinstance(required_env_constant, str) or not required_env_constant:
         errors.append(
@@ -110,14 +135,11 @@ def _check_gateway_gating() -> list[str]:
             "obsidian_guardrail_contract gateway.required_guard_function must be non-empty string"
         )
         required_guard_function = ""
-    if (
-        not isinstance(required_caps, list)
-        or not required_caps
-        or any(not isinstance(snippet, str) or not snippet for snippet in required_caps)
-    ):
-        errors.append(
-            "obsidian_guardrail_contract gateway.required_capability_snippets must be non-empty list[str]"
-        )
+    list_error = _validate_snippet_list(
+        required_caps, "obsidian_guardrail_contract gateway.required_capability_snippets"
+    )
+    if list_error:
+        errors.append(list_error)
         required_caps = []
 
     if required_env_constant and required_env_constant not in text:
@@ -199,25 +221,23 @@ def _check_http_transport_contract() -> list[str]:
     errors: list[str] = []
     text = HTTP_TRANSPORT.read_text(encoding="utf-8")
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    guardrail = json.loads(GUARDRAIL_CONTRACT.read_text(encoding="utf-8"))
-    http_guardrail = guardrail.get("http", {})
+    contract, contract_errors = _load_obsidian_guardrail_contract()
+    errors.extend(contract_errors)
+    http_guardrail = contract["http"]
     http_tools = payload.get("http_obsidian_tools", [])
-    required_gate = http_guardrail.get("required_gate_snippet")
-    required_caps = http_guardrail.get("required_capability_snippets", [])
+    required_gate = http_guardrail.get("required_gate_snippet") if isinstance(http_guardrail, dict) else None
+    required_caps = http_guardrail.get("required_capability_snippets", []) if isinstance(http_guardrail, dict) else []
 
     if not isinstance(required_gate, str) or not required_gate:
         errors.append(
             "obsidian_guardrail_contract http.required_gate_snippet must be non-empty string"
         )
         required_gate = ""
-    if (
-        not isinstance(required_caps, list)
-        or not required_caps
-        or any(not isinstance(snippet, str) or not snippet for snippet in required_caps)
-    ):
-        errors.append(
-            "obsidian_guardrail_contract http.required_capability_snippets must be non-empty list[str]"
-        )
+    list_error = _validate_snippet_list(
+        required_caps, "obsidian_guardrail_contract http.required_capability_snippets"
+    )
+    if list_error:
+        errors.append(list_error)
         required_caps = []
 
     if required_gate and required_gate not in text:

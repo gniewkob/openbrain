@@ -202,3 +202,19 @@ def test_obsidian_contract_validates_guardrail_contract_shape(tmp_path: Path) ->
     assert any("required_capability_snippets" in err for err in gateway_errors)
     assert any("required_gate_snippet" in err for err in http_errors)
     assert any("required_capability_snippets" in err for err in http_errors)
+
+
+def test_obsidian_contract_guardrail_loader_requires_sections(tmp_path: Path) -> None:
+    module = _load_obsidian_contract_module()
+    broken = tmp_path / "obsidian_guardrail_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+
+    old_contract = module.GUARDRAIL_CONTRACT
+    module.GUARDRAIL_CONTRACT = broken
+    try:
+        _, errors = module._load_obsidian_guardrail_contract()
+    finally:
+        module.GUARDRAIL_CONTRACT = old_contract
+
+    assert any("gateway must be object" in err for err in errors)
+    assert any("http must be object" in err for err in errors)
