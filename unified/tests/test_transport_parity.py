@@ -640,6 +640,65 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(transport_result, gateway_result)
 
+    async def test_test_data_report_missing_session_error_parity_between_stdio_and_http(
+        self,
+    ) -> None:
+        class _GatewayReport400(_GatewayClient):
+            async def get(self, path: str, params=None):
+                if path == "/api/v1/memory/admin/test-data/report":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().get(path, params)
+
+        class _TransportReport400(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if method == "GET" and path == "/api/v1/memory/admin/test-data/report":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().request(method, path, **kwargs)
+
+        expected = (
+            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
+        )
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayReport400()),
+            patch.object(mcp_transport, "_client", return_value=_TransportReport400()),
+        ):
+            with self.assertRaisesRegex(ValueError, expected):
+                await gateway.brain_test_data_report(sample_limit=10)
+            with self.assertRaisesRegex(ValueError, expected):
+                await mcp_transport.brain_test_data_report(sample_limit=10)
+
+    async def test_cleanup_build_test_data_missing_session_error_parity_between_stdio_and_http(
+        self,
+    ) -> None:
+        class _GatewayCleanup400(_GatewayClient):
+            async def post(self, path: str, json=None):
+                if path == "/api/v1/memory/admin/test-data/cleanup-build":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().post(path, json)
+
+        class _TransportCleanup400(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if (
+                    method == "POST"
+                    and path == "/api/v1/memory/admin/test-data/cleanup-build"
+                ):
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().request(method, path, **kwargs)
+
+        expected = (
+            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
+        )
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayCleanup400()),
+            patch.object(mcp_transport, "_client", return_value=_TransportCleanup400()),
+        ):
+            with self.assertRaisesRegex(ValueError, expected):
+                await gateway.brain_cleanup_build_test_data(dry_run=True, limit=10)
+            with self.assertRaisesRegex(ValueError, expected):
+                await mcp_transport.brain_cleanup_build_test_data(dry_run=True, limit=10)
+
     async def test_actor_normalization_parity_between_stdio_and_http(self) -> None:
         hits = [
             {
