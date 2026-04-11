@@ -65,3 +65,21 @@ async def brain_obsidian_sync():
 """
     errors = module._check_tool_inventory_parity(http_src, gateway_src)
     assert any("HTTP transport obsidian tool set drifted" in err for err in errors)
+
+
+def test_tool_inventory_parity_validates_manifest_shape(tmp_path: Path) -> None:
+    module = _load_tool_inventory_parity_module()
+    broken = tmp_path / "capabilities_manifest.json"
+    broken.write_text("{}", encoding="utf-8")
+
+    old_manifest = module.MANIFEST
+    module.MANIFEST = broken
+    try:
+        errors = module._check_tool_inventory_parity(
+            http_src="@mcp.tool()\nasync def brain_store():\n    return {}\n",
+            gateway_src="@mcp.tool()\nasync def brain_store():\n    return {}\n",
+        )
+    finally:
+        module.MANIFEST = old_manifest
+
+    assert any("http_obsidian_tools must be non-empty list" in err for err in errors)

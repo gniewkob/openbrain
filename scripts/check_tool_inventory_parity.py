@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from pathlib import Path
 
@@ -11,12 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MCP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
 MCP_GATEWAY = ROOT / "unified/mcp-gateway/src/main.py"
-
-HTTP_ALLOWED_OBSIDIAN_TOOLS = {
-    "brain_obsidian_vaults",
-    "brain_obsidian_read_note",
-    "brain_obsidian_sync",
-}
+MANIFEST = ROOT / "unified/contracts/capabilities_manifest.json"
 
 
 def _fail(message: str) -> int:
@@ -47,8 +43,26 @@ def _obsidian_tools(tool_names: set[str]) -> set[str]:
     return {name for name in tool_names if name.startswith("brain_obsidian_")}
 
 
+def _load_expected_http_obsidian_tools() -> tuple[set[str], list[str]]:
+    errors: list[str] = []
+    raw = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    tools = raw.get("http_obsidian_tools")
+    if not isinstance(tools, list) or not tools:
+        return set(), ["capabilities_manifest http_obsidian_tools must be non-empty list"]
+    if any(not isinstance(tool, str) or not tool for tool in tools):
+        return (
+            set(),
+            ["capabilities_manifest http_obsidian_tools must contain non-empty strings"],
+        )
+    return {f"brain_{tool}" for tool in tools}, errors
+
+
 def _check_tool_inventory_parity(http_src: str, gateway_src: str) -> list[str]:
     errors: list[str] = []
+    expected_http_obsidian, manifest_errors = _load_expected_http_obsidian_tools()
+    errors.extend(manifest_errors)
+    if manifest_errors:
+        return errors
 
     http_tools = _extract_mcp_tools(http_src)
     gateway_tools = _extract_mcp_tools(gateway_src)
@@ -57,10 +71,10 @@ def _check_tool_inventory_parity(http_src: str, gateway_src: str) -> list[str]:
     gateway_obsidian = _obsidian_tools(gateway_tools)
     if not gateway_obsidian:
         errors.append("gateway must expose obsidian MCP tools")
-    if http_obsidian != HTTP_ALLOWED_OBSIDIAN_TOOLS:
+    if http_obsidian != expected_http_obsidian:
         errors.append(
             "HTTP transport obsidian tool set drifted: "
-            f"expected={sorted(HTTP_ALLOWED_OBSIDIAN_TOOLS)} actual={sorted(http_obsidian)}"
+            f"expected={sorted(expected_http_obsidian)} actual={sorted(http_obsidian)}"
         )
     if not http_obsidian.issubset(gateway_obsidian):
         errors.append(
