@@ -46,6 +46,15 @@ def test_pr_readiness_contract_smoke_includes_transport_parity() -> None:
     assert "unified/tests/test_transport_parity.py" in step
 
 
+def test_pr_readiness_contract_smoke_includes_admin_openapi_contract() -> None:
+    module = _load_pr_readiness_module()
+    step = next(
+        (cmd for label, cmd in module.PR_READINESS_STEPS if label == "contract integrity smoke"),
+        [],
+    )
+    assert "unified/tests/test_admin_openapi_contract.py" in step
+
+
 def test_pr_readiness_guardrail_runner_includes_self_runner_test() -> None:
     module = _load_pr_readiness_module()
     step = next(
