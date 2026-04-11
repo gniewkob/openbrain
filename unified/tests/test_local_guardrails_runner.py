@@ -138,6 +138,14 @@ def test_local_guardrails_includes_request_runtime_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_makefile_pr_readiness_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "makefile pr-readiness parity",
+        "scripts/check_makefile_pr_readiness_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_shared_http_client_reuse_step() -> None:
     module = _load_local_guardrails_module()
     assert (

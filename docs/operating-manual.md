@@ -149,6 +149,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces capabilities tier status parity via `scripts/check_capabilities_tier_status_parity.py` (`brain_capabilities` must keep aligned tier status values in stdio and HTTP and stay inside contract `tier_status_values`).
 - `Unified Smoke Tests / guardrails` enforces backend probe contract parity via `scripts/check_backend_probe_contract_parity.py` (`_get_backend_status` must keep aligned probe order `/readyz` -> `/api/v1/readyz` plus fallback probes `/healthz` and `/api/v1/health`, with stable probe labels/reason fragments).
 - `Unified Smoke Tests / guardrails` enforces request/runtime contract parity via `scripts/check_request_runtime_parity.py` (`request_contracts` and `runtime_limits` loader/validator semantics must stay contract-equivalent across transports).
+- `Unified Smoke Tests / guardrails` enforces Makefile vs PR-readiness parity via `scripts/check_makefile_pr_readiness_parity.py` (`make guardrail-tests` and `make contract-smoke` test lists must match `check_pr_readiness.py` bundles).
 - `Unified Smoke Tests / guardrails` enforces shared backend HTTP client reuse via `scripts/check_shared_http_client_reuse.py` (both transports must keep module-level shared `httpx.AsyncClient` pooling semantics).
 - `Unified Smoke Tests / guardrails` enforces selected MCP tool signature parity via `scripts/check_tool_signature_parity.py` (`brain_search`, `brain_list`, `brain_delete`, `brain_update` argument contract must stay transport-equivalent).
 - `Unified Smoke Tests / guardrails` enforces admin parameter bounds parity via `scripts/check_admin_bounds_parity.py` (`brain_test_data_report.sample_limit` and `brain_cleanup_build_test_data.limit` ranges/defaults must stay transport-equivalent).
@@ -186,6 +187,7 @@ CI guardrail:
   - `unified/tests/test_capabilities_tier_status_parity_guardrail.py`
   - `unified/tests/test_backend_probe_contract_parity_guardrail.py`
   - `unified/tests/test_request_runtime_parity_guardrail.py`
+  - `unified/tests/test_makefile_pr_readiness_parity_guardrail.py`
   - `unified/tests/test_shared_http_client_reuse_guardrail.py`
   - `unified/tests/test_tool_signature_parity_guardrail.py`
   - `unified/tests/test_admin_bounds_parity_guardrail.py`

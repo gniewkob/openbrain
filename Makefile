@@ -74,6 +74,7 @@ guardrail-tests: check-unified-venv
 		unified/tests/test_capabilities_tier_status_parity_guardrail.py \
 		unified/tests/test_backend_probe_contract_parity_guardrail.py \
 		unified/tests/test_request_runtime_parity_guardrail.py \
+		unified/tests/test_makefile_pr_readiness_parity_guardrail.py \
 		unified/tests/test_shared_http_client_reuse_guardrail.py \
 		unified/tests/test_tool_signature_parity_guardrail.py \
 		unified/tests/test_admin_bounds_parity_guardrail.py \

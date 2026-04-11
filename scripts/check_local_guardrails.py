@@ -25,6 +25,10 @@ GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
         "scripts/check_backend_probe_contract_parity.py",
     ),
     ("request/runtime parity", "scripts/check_request_runtime_parity.py"),
+    (
+        "makefile pr-readiness parity",
+        "scripts/check_makefile_pr_readiness_parity.py",
+    ),
     ("shared http client reuse", "scripts/check_shared_http_client_reuse.py"),
     ("tool signature parity", "scripts/check_tool_signature_parity.py"),
     ("admin bounds parity", "scripts/check_admin_bounds_parity.py"),
