@@ -44,6 +44,7 @@ PR_READINESS_STEPS: tuple[tuple[str, list[str]], ...] = (
             "unified/tests/test_list_filter_parity_guardrail.py",
             "unified/tests/test_response_normalizers_parity_guardrail.py",
             "unified/tests/test_http_error_adapter_parity_guardrail.py",
+            "unified/tests/test_http_error_contract_semantics_guardrail.py",
             "unified/tests/test_capabilities_truthfulness_guardrail.py",
             "unified/tests/test_audit_semantics_guardrail.py",
             "unified/tests/test_update_audit_semantics_parity_guardrail.py",

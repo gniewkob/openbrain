@@ -157,6 +157,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces `brain_list` filter parity via `scripts/check_list_filter_parity.py` (`status`, `owner`, `tenant_id`, `include_test_data` wiring to backend filters must stay transport-equivalent).
 - `Unified Smoke Tests / guardrails` enforces response normalizers parity via `scripts/check_response_normalizers_parity.py` (actor normalization and legacy hit-shape normalization must stay contract-equivalent across transports).
 - `Unified Smoke Tests / guardrails` enforces HTTP error adapter parity via `scripts/check_http_error_adapter_parity.py` (shared status labels + detail-hint mapping + production-safe request-failure fallback must stay transport-equivalent).
+- `Unified Smoke Tests / guardrails` enforces HTTP error contract semantics via `scripts/check_http_error_contract_semantics.py` (`http_error_contracts.json` must retain required status labels, fallback labels, and `missing_session_id` hint semantics).
 - `Unified Smoke Tests / guardrails` enforces capabilities status truthfulness via `scripts/check_capabilities_truthfulness.py` (health contract + fallback probe invariants).
 - `Unified Smoke Tests / guardrails` enforces audit semantics via `scripts/check_audit_semantics.py` (`created_by/updated_by` invariants at schema/API/write boundaries).
 - `Unified Smoke Tests / guardrails` enforces update actor semantics parity via `scripts/check_update_audit_semantics_parity.py` (`brain_update` must normalize compatibility `updated_by` input and persist canonical server-side audit actor).
@@ -185,6 +186,7 @@ CI guardrail:
   - `unified/tests/test_capabilities_tools_truthfulness_guardrail.py`
   - `unified/tests/test_response_normalizers_parity_guardrail.py`
   - `unified/tests/test_http_error_adapter_parity_guardrail.py`
+  - `unified/tests/test_http_error_contract_semantics_guardrail.py`
   - `unified/tests/test_capabilities_truthfulness_guardrail.py`
   - `unified/tests/test_audit_semantics_guardrail.py`
   - `unified/tests/test_update_audit_semantics_parity_guardrail.py`
