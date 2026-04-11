@@ -317,6 +317,20 @@ def test_capabilities_health_guardrail_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in raw["required_function_names"])
 
 
+def test_admin_bounds_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "admin_bounds_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    checked_bounds = raw["checked_bounds"]
+    assert isinstance(checked_bounds, list) and checked_bounds
+    for item in checked_bounds:
+        assert isinstance(item, dict)
+        assert isinstance(item["function"], str) and item["function"]
+        assert isinstance(item["parameter"], str) and item["parameter"]
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(
