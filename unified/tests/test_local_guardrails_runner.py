@@ -95,6 +95,14 @@ def test_local_guardrails_includes_capabilities_health_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_capabilities_tier_status_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "capabilities tier status parity",
+        "scripts/check_capabilities_tier_status_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_backend_probe_contract_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (

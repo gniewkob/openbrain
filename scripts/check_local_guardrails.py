@@ -17,6 +17,10 @@ GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
     ("capabilities metadata parity", "scripts/check_capabilities_metadata_parity.py"),
     ("capabilities health parity", "scripts/check_capabilities_health_parity.py"),
     (
+        "capabilities tier status parity",
+        "scripts/check_capabilities_tier_status_parity.py",
+    ),
+    (
         "backend probe contract parity",
         "scripts/check_backend_probe_contract_parity.py",
     ),
