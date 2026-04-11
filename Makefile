@@ -42,6 +42,7 @@ test-unified: check-unified-venv
 		unified.tests.test_maintenance_reports \
 		unified.tests.test_metrics \
 		unified.tests.test_mcp_transport \
+		unified.tests.test_mcp_transport_utils \
 		unified.tests.test_metadata_lineage \
 		unified.tests.test_obsidian_cli \
 		unified.tests.test_policy_enforcement \

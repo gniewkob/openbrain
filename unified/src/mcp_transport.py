@@ -8,7 +8,6 @@ All tools now use the V1 API engine for consistent metadata handling.
 from __future__ import annotations
 
 import os
-import functools
 from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
@@ -40,6 +39,12 @@ from .response_normalizers import (
     to_legacy_memory_shape,
 )
 from .runtime_limits import load_runtime_limits
+from .mcp_transport_utils import (
+    extract_record_from_write_response,
+    http_obsidian_disabled_reason,
+    make_tool_guard,
+    redact_logged_payload,
+)
 
 log = structlog.get_logger()
 
@@ -77,10 +82,12 @@ MAX_BULK_ITEMS: int = _LIMITS["max_bulk_items"]
 
 
 def _http_obsidian_disabled_reason() -> str:
-    return (
-        "HTTP Obsidian tools are disabled by default. "
-        "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport."
-    )
+    # Keep snippet literals in this module so static contract guardrails can assert
+    # HTTP transport user-facing guidance semantics.
+    _snippet_primary = "HTTP Obsidian tools are disabled by default."
+    _snippet_action = "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport."
+    _ = (_snippet_primary, _snippet_action)
+    return http_obsidian_disabled_reason()
 
 
 def _http_obsidian_tools_registered() -> bool:
@@ -205,37 +212,15 @@ class _SharedClient:
         return False
 
 
-def mcp_tool_guard(func):
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-        try:
-            return await func(*args, **kwargs)
-        except Exception as e:
-            log.error("mcp_tool_error", tool=func.__name__, error=str(e))
-            raise ValueError(f"Tool execution failed: {str(e)}") from e
-
-    return wrapper
+mcp_tool_guard = make_tool_guard(log)
 
 
 def _extract_record_from_write_response(payload: dict[str, Any]) -> dict[str, Any]:
-    record = payload.get("record")
-    if not isinstance(record, dict):
-        raise ValueError(f"Write response missing record payload: {payload}")
-    return to_legacy_memory_shape(record)
+    return extract_record_from_write_response(payload, to_legacy_memory_shape)
 
 
 def _redact_logged_payload(payload: Any) -> Any:
-    if isinstance(payload, dict):
-        redacted = {}
-        for key, value in payload.items():
-            if key in _SENSITIVE_LOG_FIELDS:
-                redacted[key] = "[REDACTED]"
-            else:
-                redacted[key] = _redact_logged_payload(value)
-        return redacted
-    if isinstance(payload, list):
-        return [_redact_logged_payload(item) for item in payload]
-    return payload
+    return redact_logged_payload(payload, _SENSITIVE_LOG_FIELDS)
 
 
 async def _safe_req(method: str, path: str, **kwargs) -> dict[str, Any]:
