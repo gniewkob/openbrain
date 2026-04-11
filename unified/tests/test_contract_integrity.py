@@ -288,6 +288,25 @@ def test_http_error_adapter_guardrail_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in raw["required_defaults_keys"])
 
 
+def test_hidden_test_data_alert_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "hidden_test_data_alert_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["runtime_alerts_path"], str) and raw["runtime_alerts_path"]
+    assert isinstance(raw["docs_alerts_path"], str) and raw["docs_alerts_path"]
+    assert isinstance(raw["alerts"], dict)
+    present = raw["alerts"]["present"]
+    share_high = raw["alerts"]["share_high"]
+    assert isinstance(present["name"], str) and present["name"]
+    assert isinstance(share_high["name"], str) and share_high["name"]
+    assert isinstance(present["allowed_exprs"], list) and present["allowed_exprs"]
+    assert isinstance(share_high["allowed_exprs"], list) and share_high["allowed_exprs"]
+    assert all(isinstance(item, str) and item for item in present["allowed_exprs"])
+    assert all(isinstance(item, str) and item for item in share_high["allowed_exprs"])
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(
