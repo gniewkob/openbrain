@@ -210,6 +210,7 @@ CI guardrail:
 Local PR readiness:
 - `python3 scripts/check_pr_readiness.py`
 - or `make pr-readiness`
+- local static guardrails only: `make local-guardrails`
 - step-level timeouts are enforced (`local guardrails`: 180s, test steps: 300s) to prevent indefinite hangs.
 - bundle includes:
   - `check_local_guardrails.py`
