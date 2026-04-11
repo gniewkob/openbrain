@@ -1,0 +1,19 @@
+{
+  "gateway": {
+    "required_env_constant_snippet": "OBSIDIAN_LOCAL_TOOLS_ENV = \"ENABLE_LOCAL_OBSIDIAN_TOOLS\"",
+    "required_guard_function": "_require_obsidian_local_tools_enabled",
+    "required_capability_snippets": [
+      "\"obsidian\": {",
+      "\"obsidian_local\": {",
+      "\"mode\": \"local\""
+    ]
+  },
+  "http": {
+    "required_gate_snippet": "if ENABLE_HTTP_OBSIDIAN_TOOLS:",
+    "required_capability_snippets": [
+      "\"obsidian\": {",
+      "\"obsidian_http\": {",
+      "\"mode\": \"http\""
+    ]
+  }
+}

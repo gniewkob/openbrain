@@ -189,6 +189,35 @@ def test_obsidian_disabled_reason_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in raw["http_snippets"])
 
 
+def test_obsidian_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "obsidian_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    gateway = raw["gateway"]
+    http = raw["http"]
+    assert isinstance(gateway["required_env_constant_snippet"], str) and gateway[
+        "required_env_constant_snippet"
+    ]
+    assert isinstance(gateway["required_guard_function"], str) and gateway[
+        "required_guard_function"
+    ]
+    assert isinstance(gateway["required_capability_snippets"], list) and gateway[
+        "required_capability_snippets"
+    ]
+    assert all(
+        isinstance(item, str) and item for item in gateway["required_capability_snippets"]
+    )
+    assert isinstance(http["required_gate_snippet"], str) and http["required_gate_snippet"]
+    assert isinstance(http["required_capability_snippets"], list) and http[
+        "required_capability_snippets"
+    ]
+    assert all(
+        isinstance(item, str) and item for item in http["required_capability_snippets"]
+    )
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(

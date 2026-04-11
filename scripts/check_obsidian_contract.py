@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "unified/contracts/capabilities_manifest.json"
 DISABLED_REASON_CONTRACT = ROOT / "unified/contracts/obsidian_disabled_reason_contract.json"
+GUARDRAIL_CONTRACT = ROOT / "unified/contracts/obsidian_guardrail_contract.json"
 GATEWAY_MAIN = ROOT / "unified/mcp-gateway/src/main.py"
 HTTP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
 HTTP_TRANSPORT_UTILS = ROOT / "unified/src/mcp_transport_utils.py"
@@ -92,11 +93,36 @@ def _check_gateway_gating() -> list[str]:
     text = GATEWAY_MAIN.read_text(encoding="utf-8")
     tree = ast.parse(text)
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    guardrail = json.loads(GUARDRAIL_CONTRACT.read_text(encoding="utf-8"))
+    gateway_guardrail = guardrail.get("gateway", {})
     local_tools = payload.get("local_obsidian_tools", [])
+    required_env_constant = gateway_guardrail.get("required_env_constant_snippet")
+    required_guard_function = gateway_guardrail.get("required_guard_function")
+    required_caps = gateway_guardrail.get("required_capability_snippets", [])
 
-    if 'OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"' not in text:
+    if not isinstance(required_env_constant, str) or not required_env_constant:
+        errors.append(
+            "obsidian_guardrail_contract gateway.required_env_constant_snippet must be non-empty string"
+        )
+        required_env_constant = ""
+    if not isinstance(required_guard_function, str) or not required_guard_function:
+        errors.append(
+            "obsidian_guardrail_contract gateway.required_guard_function must be non-empty string"
+        )
+        required_guard_function = ""
+    if (
+        not isinstance(required_caps, list)
+        or not required_caps
+        or any(not isinstance(snippet, str) or not snippet for snippet in required_caps)
+    ):
+        errors.append(
+            "obsidian_guardrail_contract gateway.required_capability_snippets must be non-empty list[str]"
+        )
+        required_caps = []
+
+    if required_env_constant and required_env_constant not in text:
         errors.append("gateway must define ENABLE_LOCAL_OBSIDIAN_TOOLS env constant")
-    if "_require_obsidian_local_tools_enabled" not in text:
+    if required_guard_function and required_guard_function not in text:
         errors.append("gateway must guard local obsidian tools with _require_obsidian_local_tools_enabled")
     for tool in local_tools:
         fn_name = f"brain_{tool}"
@@ -104,14 +130,8 @@ def _check_gateway_gating() -> list[str]:
         if fn is None:
             errors.append(f"missing function: {fn_name}")
             continue
-        if not _function_calls_name(fn, "_require_obsidian_local_tools_enabled"):
+        if required_guard_function and not _function_calls_name(fn, required_guard_function):
             errors.append(f"{fn_name} must call _require_obsidian_local_tools_enabled()")
-
-    required_caps = (
-        '"obsidian": {',
-        '"obsidian_local": {',
-        '"mode": "local"',
-    )
     for snippet in required_caps:
         if snippet not in text:
             errors.append(f"gateway capabilities missing snippet: {snippet}")
@@ -179,19 +199,33 @@ def _check_http_transport_contract() -> list[str]:
     errors: list[str] = []
     text = HTTP_TRANSPORT.read_text(encoding="utf-8")
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    guardrail = json.loads(GUARDRAIL_CONTRACT.read_text(encoding="utf-8"))
+    http_guardrail = guardrail.get("http", {})
     http_tools = payload.get("http_obsidian_tools", [])
+    required_gate = http_guardrail.get("required_gate_snippet")
+    required_caps = http_guardrail.get("required_capability_snippets", [])
 
-    if "if ENABLE_HTTP_OBSIDIAN_TOOLS:" not in text:
+    if not isinstance(required_gate, str) or not required_gate:
+        errors.append(
+            "obsidian_guardrail_contract http.required_gate_snippet must be non-empty string"
+        )
+        required_gate = ""
+    if (
+        not isinstance(required_caps, list)
+        or not required_caps
+        or any(not isinstance(snippet, str) or not snippet for snippet in required_caps)
+    ):
+        errors.append(
+            "obsidian_guardrail_contract http.required_capability_snippets must be non-empty list[str]"
+        )
+        required_caps = []
+
+    if required_gate and required_gate not in text:
         errors.append("HTTP transport must gate Obsidian tools with ENABLE_HTTP_OBSIDIAN_TOOLS")
     elif not _http_obsidian_tools_defined_under_flag(text, http_tools):
         errors.append(
             "HTTP transport must define all http_obsidian_tools under ENABLE_HTTP_OBSIDIAN_TOOLS gate"
         )
-    required_caps = (
-        '"obsidian": {',
-        '"obsidian_http": {',
-        '"mode": "http"',
-    )
     for snippet in required_caps:
         if snippet not in text:
             errors.append(f"HTTP capabilities missing snippet: {snippet}")

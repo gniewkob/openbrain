@@ -182,3 +182,23 @@ def test_obsidian_contract_validates_disabled_reason_contract_shape(tmp_path: Pa
         module.DISABLED_REASON_CONTRACT = old_contract
 
     assert any("gateway_snippets" in err for err in errors)
+
+
+def test_obsidian_contract_validates_guardrail_contract_shape(tmp_path: Path) -> None:
+    module = _load_obsidian_contract_module()
+    broken = tmp_path / "obsidian_guardrail_contract.json"
+    broken.write_text('{"gateway":{},"http":{}}', encoding="utf-8")
+
+    old_contract = module.GUARDRAIL_CONTRACT
+    module.GUARDRAIL_CONTRACT = broken
+    try:
+        gateway_errors = module._check_gateway_gating()
+        http_errors = module._check_http_transport_contract()
+    finally:
+        module.GUARDRAIL_CONTRACT = old_contract
+
+    assert any("required_env_constant_snippet" in err for err in gateway_errors)
+    assert any("required_guard_function" in err for err in gateway_errors)
+    assert any("required_capability_snippets" in err for err in gateway_errors)
+    assert any("required_gate_snippet" in err for err in http_errors)
+    assert any("required_capability_snippets" in err for err in http_errors)
