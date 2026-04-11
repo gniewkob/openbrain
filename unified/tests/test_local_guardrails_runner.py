@@ -119,6 +119,14 @@ def test_local_guardrails_includes_tool_signature_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_admin_bounds_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "admin bounds parity",
+        "scripts/check_admin_bounds_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_tool_inventory_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (
