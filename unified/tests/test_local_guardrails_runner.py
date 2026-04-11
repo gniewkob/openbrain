@@ -207,6 +207,14 @@ def test_local_guardrails_includes_delete_semantics_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_cleanup_actor_semantics_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "cleanup actor semantics",
+        "scripts/check_cleanup_actor_semantics.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_update_audit_semantics_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (

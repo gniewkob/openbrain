@@ -37,6 +37,7 @@ GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
     ("http error contract semantics", "scripts/check_http_error_contract_semantics.py"),
     ("capabilities truthfulness", "scripts/check_capabilities_truthfulness.py"),
     ("audit semantics", "scripts/check_audit_semantics.py"),
+    ("cleanup actor semantics", "scripts/check_cleanup_actor_semantics.py"),
     ("update audit semantics parity", "scripts/check_update_audit_semantics_parity.py"),
     ("delete semantics parity", "scripts/check_delete_semantics_parity.py"),
     ("export contract", "scripts/check_export_contract.py"),
