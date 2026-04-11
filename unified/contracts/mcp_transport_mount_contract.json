@@ -1,0 +1,15 @@
+{
+  "required_import_name": "mcp_transport",
+  "required_import_level": 1,
+  "required_mount_target": "mcp_app",
+  "required_mount_attr_chain": [
+    "mcp_transport",
+    "mcp",
+    "streamable_http_app"
+  ],
+  "required_redirect_target": "streamable_http_path",
+  "required_redirect_attr_chain": [
+    "mcp_transport",
+    "STREAMABLE_HTTP_PATH"
+  ]
+}

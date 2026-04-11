@@ -189,6 +189,26 @@ def test_obsidian_disabled_reason_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in raw["http_snippets"])
 
 
+def test_mcp_transport_mount_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_import_name"], str) and raw["required_import_name"]
+    assert isinstance(raw["required_import_level"], int)
+    assert isinstance(raw["required_mount_target"], str) and raw["required_mount_target"]
+    assert isinstance(raw["required_mount_attr_chain"], list) and raw[
+        "required_mount_attr_chain"
+    ]
+    assert isinstance(raw["required_redirect_target"], str) and raw[
+        "required_redirect_target"
+    ]
+    assert isinstance(raw["required_redirect_attr_chain"], list) and raw[
+        "required_redirect_attr_chain"
+    ]
+
+
 def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
     monkeypatch.setenv("ENV", "production")
     msg = backend_error_message(500, {"detail": "secret"})

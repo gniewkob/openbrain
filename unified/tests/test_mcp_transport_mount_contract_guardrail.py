@@ -25,28 +25,31 @@ def test_mcp_transport_mount_contract_guardrail_passes_for_current_sources() -> 
 
 def test_mount_contract_detects_missing_transport_import() -> None:
     module = _load_guardrail_module()
+    contract = module._load_contract()
     src = """
 from .main import app as rest_app
 
 mcp_app = mcp_transport.mcp.streamable_http_app()
 """
-    errors = module._check_mount_contract(src)
+    errors = module._check_mount_contract(src, contract)
     assert any("must import mcp_transport" in err for err in errors)
 
 
 def test_mount_contract_detects_non_transport_mcp_app_assignment() -> None:
     module = _load_guardrail_module()
+    contract = module._load_contract()
     src = """
 from . import mcp_transport
 
 mcp_app = mcp.streamable_http_app()
 """
-    errors = module._check_mount_contract(src)
+    errors = module._check_mount_contract(src, contract)
     assert any("must assign mcp_app" in err for err in errors)
 
 
 def test_mount_contract_detects_missing_streamable_path_read() -> None:
     module = _load_guardrail_module()
+    contract = module._load_contract()
     src = """
 from . import mcp_transport
 
@@ -55,5 +58,22 @@ mcp_app = mcp_transport.mcp.streamable_http_app()
 def app():
     streamable_http_path = "/sse"
 """
-    errors = module._check_mount_contract(src)
+    errors = module._check_mount_contract(src, contract)
     assert any("root redirect must read" in err for err in errors)
+
+
+def test_mount_contract_loader_validates_required_keys(tmp_path: Path) -> None:
+    module = _load_guardrail_module()
+    broken = tmp_path / "contract.json"
+    broken.write_text("{}", encoding="utf-8")
+
+    old_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for missing contract keys"
+        except ValueError as exc:
+            assert "missing keys" in str(exc)
+    finally:
+        module.CONTRACT = old_contract
