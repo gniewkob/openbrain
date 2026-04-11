@@ -115,6 +115,35 @@ def test_capabilities_truthfulness_metadata_check_requires_health_entry(tmp_path
     assert any("health semantics entry" in err for err in errors)
 
 
+def test_capabilities_truthfulness_contract_requires_tier_keys(tmp_path) -> None:
+    module = _load_capabilities_truthfulness_module()
+    contract_path = tmp_path / "capabilities_response_contract.json"
+    contract_path.write_text(
+        json.dumps(
+            {
+                "required_top_level_keys": ["health"],
+                "health_required_keys": ["overall", "source", "components"],
+                "health_component_required_keys": [
+                    "api",
+                    "db",
+                    "vector_store",
+                    "obsidian",
+                ],
+                "health_overall_values": ["healthy", "degraded", "unavailable"],
+                "tier_required_keys": ["status"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    original = module.CONTRACT
+    module.CONTRACT = contract_path
+    try:
+        errors = module._check_contract()
+    finally:
+        module.CONTRACT = original
+    assert any("tier_required_keys" in err for err in errors)
+
+
 def test_capabilities_truthfulness_checks_health_source_and_obsidian_mapping(
     tmp_path,
 ) -> None:

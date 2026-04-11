@@ -54,6 +54,14 @@ def _check_contract() -> list[str]:
             "contract health_overall_values must be exactly "
             f"{sorted(expected_overall_values)} (got {sorted(overall_values)})"
         )
+
+    required_tier_keys = set(payload.get("tier_required_keys", []))
+    expected_tier_keys = {"status", "tools"}
+    if required_tier_keys != expected_tier_keys:
+        errors.append(
+            "contract tier_required_keys must be exactly "
+            f"{sorted(expected_tier_keys)} (got {sorted(required_tier_keys)})"
+        )
     return errors
 
 

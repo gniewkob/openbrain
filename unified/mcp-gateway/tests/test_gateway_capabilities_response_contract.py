@@ -62,6 +62,9 @@ class GatewayCapabilitiesResponseContractTests(unittest.IsolatedAsyncioTestCase)
             self.assertIn(key, caps["health"]["components"])
         for key in contract["obsidian_required_keys"]:
             self.assertIn(key, caps["obsidian"])
+        for tier in ("tier_1_core", "tier_2_advanced", "tier_3_admin"):
+            for key in contract["tier_required_keys"]:
+                self.assertIn(key, caps[tier])
 
         self.assertIn(caps["health"]["overall"], contract["health_overall_values"])
         self.assertIn(caps["obsidian"]["mode"], contract["obsidian_modes"])
