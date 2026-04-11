@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -35,6 +36,24 @@ def test_local_guardrails_runner_stops_on_first_failure(monkeypatch) -> None:
     monkeypatch.setattr(module, "run_step", _run_step)
     assert module.main() == 2
     assert seen == [module.GUARDRAIL_STEPS[0][0], module.GUARDRAIL_STEPS[1][0]]
+
+
+def test_local_guardrails_step_timeouts_defined_for_all_steps() -> None:
+    module = _load_local_guardrails_module()
+    labels = {label for label, _ in module.GUARDRAIL_STEPS}
+    missing = [label for label in labels if label not in module.STEP_TIMEOUT_SECONDS]
+    # A missing explicit timeout falls back to default 60s, but we pin all known steps.
+    assert missing == []
+
+
+def test_local_guardrails_run_step_returns_124_on_timeout(monkeypatch) -> None:
+    module = _load_local_guardrails_module()
+
+    def _timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd=["python"], timeout=1)
+
+    monkeypatch.setattr(module.subprocess, "run", _timeout)
+    assert module.run_step("repository hygiene", "scripts/check_repo_hygiene.py") == 124
 
 
 def test_local_guardrails_includes_monitoring_contract_step() -> None:

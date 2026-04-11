@@ -56,16 +56,27 @@ GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
     ("monitoring contract", "scripts/validate_monitoring_contract.py"),
 )
 
+STEP_TIMEOUT_SECONDS: dict[str, int] = {
+    label: 60 for label, _ in GUARDRAIL_STEPS
+}
+STEP_TIMEOUT_SECONDS["monitoring contract"] = 90
+
 
 def run_step(label: str, rel_script: str) -> int:
     script = ROOT / rel_script
-    proc = subprocess.run(
-        [sys.executable, str(script)],
-        cwd=str(ROOT),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    timeout_s = STEP_TIMEOUT_SECONDS[label]
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=str(ROOT),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"[FAIL] {label}: timed out after {timeout_s}s", file=sys.stderr)
+        return 124
     if proc.stdout.strip():
         print(proc.stdout.strip())
     if proc.returncode != 0:

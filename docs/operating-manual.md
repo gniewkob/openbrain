@@ -173,6 +173,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces hidden test-data alert parity via `scripts/check_hidden_test_data_alert_parity.py` (runtime alert rules and docs alert rules must keep aligned alert names and threshold semantics).
 - `Unified Smoke Tests / guardrails` enforces monitoring contract via `scripts/validate_monitoring_contract.py` (dashboard + alert-rule metric references must remain inside the declared contract).
 - `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + compose safety + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
+- `check_local_guardrails.py` enforces per-step timeouts (default 60s, monitoring contract 90s) and fails with exit code `124` on timeout.
 - `Unified Smoke Tests / guardrails` runs lightweight pytest coverage for guardrail runners:
   - `unified/tests/test_local_guardrails_runner.py`
   - `unified/tests/test_pr_readiness_runner.py`
