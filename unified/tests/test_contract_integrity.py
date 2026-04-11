@@ -218,6 +218,25 @@ def test_obsidian_guardrail_contract_shape() -> None:
     )
 
 
+def test_compose_guardrails_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "compose_guardrails_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_snippets"], list) and raw["required_snippets"]
+    assert isinstance(raw["forbidden_snippets"], list) and raw["forbidden_snippets"]
+    assert isinstance(raw["required_public_transport_snippets"], list) and raw[
+        "required_public_transport_snippets"
+    ]
+    assert all(isinstance(item, str) and item for item in raw["required_snippets"])
+    assert all(isinstance(item, str) and item for item in raw["forbidden_snippets"])
+    assert all(
+        isinstance(item, str) and item
+        for item in raw["required_public_transport_snippets"]
+    )
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(
