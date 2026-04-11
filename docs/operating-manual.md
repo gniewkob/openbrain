@@ -158,6 +158,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces admin endpoint contract parity via `scripts/check_admin_endpoint_contract_parity.py` (`brain_test_data_report` and `brain_cleanup_build_test_data` must keep aligned method/path-alias/payload-key mapping across stdio and HTTP transports).
 - `Unified Smoke Tests / guardrails` enforces MCP tool inventory parity via `scripts/check_tool_inventory_parity.py` (all non-Obsidian tools must match across canonical/compatibility transports; compatibility transport keeps only the approved Obsidian subset).
 - `Unified Smoke Tests / guardrails` enforces MCP transport import scope via `scripts/check_mcp_transport_import_scope.py` (`mcp_transport` may be imported only by `unified/src/combined.py` in runtime code; all other importers must stay in `unified/tests/*`).
+- `Unified Smoke Tests / guardrails` enforces MCP transport mount contract via `scripts/check_mcp_transport_mount_contract.py` (`combined.py` must keep importing `mcp_transport`, mount `mcp_transport.mcp.streamable_http_app()`, and read `mcp_transport.STREAMABLE_HTTP_PATH` for root redirect).
 - `Unified Smoke Tests / guardrails` enforces capabilities tools truthfulness via `scripts/check_capabilities_tools_truthfulness.py` (manifest-declared tools must map to real `@mcp.tool` functions in both transports).
 - `Unified Smoke Tests / guardrails` enforces `brain_search` filter parity via `scripts/check_search_filter_parity.py` (`owner` and `include_test_data` wiring to backend filters must stay transport-equivalent).
 - `Unified Smoke Tests / guardrails` enforces `brain_list` filter parity via `scripts/check_list_filter_parity.py` (`status`, `owner`, `tenant_id`, `include_test_data` wiring to backend filters must stay transport-equivalent).
@@ -197,6 +198,7 @@ CI guardrail:
   - `unified/tests/test_admin_endpoint_contract_parity_guardrail.py`
   - `unified/tests/test_tool_inventory_parity_guardrail.py`
   - `unified/tests/test_mcp_transport_import_scope_guardrail.py`
+  - `unified/tests/test_mcp_transport_mount_contract_guardrail.py`
   - `unified/tests/test_capabilities_tools_truthfulness_guardrail.py`
   - `unified/tests/test_response_normalizers_parity_guardrail.py`
   - `unified/tests/test_http_error_adapter_parity_guardrail.py`

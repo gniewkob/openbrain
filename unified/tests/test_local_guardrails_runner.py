@@ -194,6 +194,14 @@ def test_local_guardrails_includes_mcp_transport_import_scope_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_mcp_transport_mount_contract_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "mcp transport mount contract",
+        "scripts/check_mcp_transport_mount_contract.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_capabilities_tools_truthfulness_step() -> None:
     module = _load_local_guardrails_module()
     assert (

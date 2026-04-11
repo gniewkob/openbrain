@@ -41,6 +41,10 @@ GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
         "mcp transport import scope",
         "scripts/check_mcp_transport_import_scope.py",
     ),
+    (
+        "mcp transport mount contract",
+        "scripts/check_mcp_transport_mount_contract.py",
+    ),
     ("capabilities tools truthfulness", "scripts/check_capabilities_tools_truthfulness.py"),
     ("search filter parity", "scripts/check_search_filter_parity.py"),
     ("list filter parity", "scripts/check_list_filter_parity.py"),
