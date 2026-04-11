@@ -248,6 +248,41 @@ class TestAllRoutesRegistered:
         assert "deleted_ids" in properties
         assert "skipped" in properties
 
+    def test_test_data_hygiene_report_query_bounds_in_openapi(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI keeps sample_limit bounds/default stable for admin report."""
+        response = client.get("/openapi.json")
+        data = response.json()
+        get_op = data["paths"]["/api/v1/memory/admin/test-data/report"]["get"]
+        parameters = get_op.get("parameters", [])
+        sample_param = next(
+            (item for item in parameters if item.get("name") == "sample_limit"),
+            {},
+        )
+        schema = sample_param.get("schema", {})
+
+        assert schema.get("default") == 20
+        assert schema.get("minimum") == 1
+        assert schema.get("maximum") == 100
+
+    def test_cleanup_build_request_bounds_in_openapi(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI keeps cleanup request body bounds/defaults stable."""
+        response = client.get("/openapi.json")
+        data = response.json()
+        schemas = data.get("components", {}).get("schemas", {})
+        request_schema = schemas.get("BuildTestDataCleanupRequest", {})
+        properties = request_schema.get("properties", {})
+        limit_schema = properties.get("limit", {})
+        dry_run_schema = properties.get("dry_run", {})
+
+        assert limit_schema.get("default") == 100
+        assert limit_schema.get("minimum") == 1
+        assert limit_schema.get("maximum") == 500
+        assert dry_run_schema.get("default") is True
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
