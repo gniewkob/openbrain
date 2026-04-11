@@ -80,6 +80,7 @@ guardrail-tests: check-unified-venv
 		unified/tests/test_admin_bounds_parity_guardrail.py \
 		unified/tests/test_admin_endpoint_contract_parity_guardrail.py \
 		unified/tests/test_tool_inventory_parity_guardrail.py \
+		unified/tests/test_mcp_transport_import_scope_guardrail.py \
 		unified/tests/test_capabilities_tools_truthfulness_guardrail.py \
 		unified/tests/test_search_filter_parity_guardrail.py \
 		unified/tests/test_list_filter_parity_guardrail.py \

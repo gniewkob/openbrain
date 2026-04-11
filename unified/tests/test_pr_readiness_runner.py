@@ -80,6 +80,15 @@ def test_pr_readiness_guardrail_runner_includes_self_runner_test() -> None:
     assert "unified/tests/test_pr_readiness_runner.py" in step
 
 
+def test_pr_readiness_guardrail_runner_includes_mcp_transport_import_scope_test() -> None:
+    module = _load_pr_readiness_module()
+    step = next(
+        (cmd for label, cmd in module.PR_READINESS_STEPS if label == "guardrail runner tests"),
+        [],
+    )
+    assert "unified/tests/test_mcp_transport_import_scope_guardrail.py" in step
+
+
 def test_pr_readiness_step_timeouts_defined_for_all_steps() -> None:
     module = _load_pr_readiness_module()
     labels = {label for label, _ in module.PR_READINESS_STEPS}

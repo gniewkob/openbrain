@@ -186,6 +186,14 @@ def test_local_guardrails_includes_tool_inventory_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_mcp_transport_import_scope_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "mcp transport import scope",
+        "scripts/check_mcp_transport_import_scope.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_capabilities_tools_truthfulness_step() -> None:
     module = _load_local_guardrails_module()
     assert (
