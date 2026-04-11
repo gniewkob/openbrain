@@ -229,6 +229,25 @@ class TestAllRoutesRegistered:
         assert "hidden_active_ratio_by_domain" in properties
         assert "recommended_actions" in properties
 
+    def test_cleanup_build_test_data_schema_includes_result_fields(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI schema for cleanup endpoint includes deterministic result fields."""
+        response = client.get("/openapi.json")
+        data = response.json()
+        schemas = data.get("components", {}).get("schemas", {})
+        cleanup_schema = schemas.get("BuildTestDataCleanupResponse", {})
+        properties = cleanup_schema.get("properties", {})
+
+        assert "dry_run" in properties
+        assert "scanned" in properties
+        assert "candidates_count" in properties
+        assert "deleted_count" in properties
+        assert "skipped_count" in properties
+        assert "candidate_ids" in properties
+        assert "deleted_ids" in properties
+        assert "skipped" in properties
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
