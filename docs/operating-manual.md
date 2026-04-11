@@ -160,6 +160,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces HTTP error adapter parity via `scripts/check_http_error_adapter_parity.py` (shared status labels + detail-hint mapping + production-safe request-failure fallback must stay transport-equivalent).
 - `Unified Smoke Tests / guardrails` enforces HTTP error contract semantics via `scripts/check_http_error_contract_semantics.py` (`http_error_contracts.json` must retain required status labels, fallback labels, and `missing_session_id` hint semantics).
 - `Unified Smoke Tests / guardrails` enforces capabilities status truthfulness via `scripts/check_capabilities_truthfulness.py` (health contract + fallback probe invariants).
+  - contract now pins tier status semantics via `tier_status_values` (`stable`, `active`, `guarded`) to prevent capability-level drift.
 - `Unified Smoke Tests / guardrails` enforces audit semantics via `scripts/check_audit_semantics.py` (`created_by/updated_by` invariants at schema/API/write boundaries).
 - `Unified Smoke Tests / guardrails` enforces cleanup actor semantics via `scripts/check_cleanup_actor_semantics.py` (`cleanup_build_test_data` must preserve `actor = get_subject(_user) or "agent"` and forward `actor` to use-case layer for auditable deletes).
 - `Unified Smoke Tests / guardrails` enforces update actor semantics parity via `scripts/check_update_audit_semantics_parity.py` (`brain_update` must normalize compatibility `updated_by` input and persist canonical server-side audit actor).

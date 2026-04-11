@@ -50,5 +50,10 @@
   "tier_required_keys": [
     "status",
     "tools"
+  ],
+  "tier_status_values": [
+    "stable",
+    "active",
+    "guarded"
   ]
 }

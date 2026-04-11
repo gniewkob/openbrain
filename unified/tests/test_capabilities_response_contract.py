@@ -84,6 +84,7 @@ async def test_http_transport_capabilities_follow_response_contract() -> None:
     for tier in ("tier_1_core", "tier_2_advanced", "tier_3_admin"):
         for key in contract["tier_required_keys"]:
             assert key in caps[tier]
+        assert caps[tier]["status"] in contract["tier_status_values"]
 
     assert caps["health"]["overall"] in contract["health_overall_values"]
     assert caps["obsidian"]["mode"] in contract["obsidian_modes"]
@@ -128,6 +129,7 @@ async def test_gateway_capabilities_follow_response_contract_when_available() ->
     for tier in ("tier_1_core", "tier_2_advanced", "tier_3_admin"):
         for key in contract["tier_required_keys"]:
             assert key in caps[tier]
+        assert caps[tier]["status"] in contract["tier_status_values"]
 
     assert caps["health"]["overall"] in contract["health_overall_values"]
     assert caps["obsidian"]["mode"] in contract["obsidian_modes"]

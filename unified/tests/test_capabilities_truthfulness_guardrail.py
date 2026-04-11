@@ -131,6 +131,7 @@ def test_capabilities_truthfulness_contract_requires_tier_keys(tmp_path) -> None
                 ],
                 "health_overall_values": ["healthy", "degraded", "unavailable"],
                 "tier_required_keys": ["status"],
+                "tier_status_values": ["stable", "active", "guarded"],
             }
         ),
         encoding="utf-8",
@@ -142,6 +143,36 @@ def test_capabilities_truthfulness_contract_requires_tier_keys(tmp_path) -> None
     finally:
         module.CONTRACT = original
     assert any("tier_required_keys" in err for err in errors)
+
+
+def test_capabilities_truthfulness_contract_requires_tier_status_values(tmp_path) -> None:
+    module = _load_capabilities_truthfulness_module()
+    contract_path = tmp_path / "capabilities_response_contract.json"
+    contract_path.write_text(
+        json.dumps(
+            {
+                "required_top_level_keys": ["health"],
+                "health_required_keys": ["overall", "source", "components"],
+                "health_component_required_keys": [
+                    "api",
+                    "db",
+                    "vector_store",
+                    "obsidian",
+                ],
+                "health_overall_values": ["healthy", "degraded", "unavailable"],
+                "tier_required_keys": ["status", "tools"],
+                "tier_status_values": ["stable", "active"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    original = module.CONTRACT
+    module.CONTRACT = contract_path
+    try:
+        errors = module._check_contract()
+    finally:
+        module.CONTRACT = original
+    assert any("tier_status_values" in err for err in errors)
 
 
 def test_capabilities_truthfulness_checks_health_source_and_obsidian_mapping(

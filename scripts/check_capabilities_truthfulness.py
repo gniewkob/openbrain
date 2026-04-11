@@ -62,6 +62,14 @@ def _check_contract() -> list[str]:
             "contract tier_required_keys must be exactly "
             f"{sorted(expected_tier_keys)} (got {sorted(required_tier_keys)})"
         )
+
+    tier_status_values = set(payload.get("tier_status_values", []))
+    expected_tier_status_values = {"stable", "active", "guarded"}
+    if tier_status_values != expected_tier_status_values:
+        errors.append(
+            "contract tier_status_values must be exactly "
+            f"{sorted(expected_tier_status_values)} (got {sorted(tier_status_values)})"
+        )
     return errors
 
 
