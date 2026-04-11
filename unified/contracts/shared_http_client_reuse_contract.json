@@ -1,0 +1,14 @@
+{
+  "required_globals": [
+    "_http_client",
+    "_http_client_config_key"
+  ],
+  "required_refresh_snippets": [
+    "_current_http_client_config_key",
+    "_http_client_config_key",
+    "mcp_client_refreshed_due_to_config_drift"
+  ],
+  "required_client_factory_name": "_client",
+  "required_client_factory_return_call": "_SharedClient",
+  "required_shared_client_class_name": "_SharedClient"
+}

@@ -25,8 +25,10 @@ def test_shared_http_client_reuse_guardrail_passes_for_current_sources() -> None
 
 def test_shared_http_client_reuse_guardrail_detects_missing_client_factory() -> None:
     module = _load_shared_http_client_reuse_module()
+    contract = module._load_contract()
     src = """
 _http_client: object | None = None
+_http_client_config_key: tuple[str, str] | None = None
 
 class _SharedClient:
     async def __aenter__(self):
@@ -38,14 +40,16 @@ class _SharedClient:
 def _client():
     return object()
 """
-    errors = module._check_source(src, "x")
+    errors = module._check_source(src, "x", contract)
     assert any("_client() must return _SharedClient()" in err for err in errors)
 
 
 def test_shared_http_client_reuse_guardrail_detects_missing_none_guard() -> None:
     module = _load_shared_http_client_reuse_module()
+    contract = module._load_contract()
     src = """
 _http_client: object | None = None
+_http_client_config_key: tuple[str, str] | None = None
 
 class _SharedClient:
     async def __aenter__(self):
@@ -54,5 +58,23 @@ class _SharedClient:
 def _client():
     return _SharedClient()
 """
-    errors = module._check_source(src, "x")
+    errors = module._check_source(src, "x", contract)
     assert any("must guard _http_client is None" in err for err in errors)
+
+
+def test_shared_http_client_reuse_contract_loader_validates_required_keys(
+    tmp_path: Path,
+) -> None:
+    module = _load_shared_http_client_reuse_module()
+    broken = tmp_path / "shared_http_client_reuse_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+    old_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for invalid shared http client contract"
+        except ValueError as exc:
+            assert "required_globals" in str(exc)
+    finally:
+        module.CONTRACT = old_contract

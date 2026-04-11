@@ -237,6 +237,31 @@ def test_compose_guardrails_contract_shape() -> None:
     )
 
 
+def test_shared_http_client_reuse_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "shared_http_client_reuse_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_globals"], list) and raw["required_globals"]
+    assert isinstance(raw["required_refresh_snippets"], list) and raw[
+        "required_refresh_snippets"
+    ]
+    assert isinstance(raw["required_client_factory_name"], str) and raw[
+        "required_client_factory_name"
+    ]
+    assert isinstance(raw["required_client_factory_return_call"], str) and raw[
+        "required_client_factory_return_call"
+    ]
+    assert isinstance(raw["required_shared_client_class_name"], str) and raw[
+        "required_shared_client_class_name"
+    ]
+    assert all(isinstance(item, str) and item for item in raw["required_globals"])
+    assert all(
+        isinstance(item, str) and item for item in raw["required_refresh_snippets"]
+    )
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(
