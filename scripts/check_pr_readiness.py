@@ -83,15 +83,30 @@ PR_READINESS_STEPS: tuple[tuple[str, list[str]], ...] = (
     ),
 )
 
+STEP_TIMEOUT_SECONDS: dict[str, int] = {
+    "local guardrails": 180,
+    "guardrail runner tests": 300,
+    "contract integrity smoke": 300,
+}
+
 
 def run_step(label: str, cmd: list[str]) -> int:
-    proc = subprocess.run(
-        cmd,
-        cwd=str(ROOT),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    timeout_s = STEP_TIMEOUT_SECONDS.get(label, 300)
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(ROOT),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except subprocess.TimeoutExpired:
+        print(
+            f"[FAIL] {label}: timed out after {timeout_s}s",
+            file=sys.stderr,
+        )
+        return 124
     if proc.stdout.strip():
         print(proc.stdout.strip())
     if proc.returncode != 0:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -77,3 +78,19 @@ def test_pr_readiness_guardrail_runner_includes_self_runner_test() -> None:
         [],
     )
     assert "unified/tests/test_pr_readiness_runner.py" in step
+
+
+def test_pr_readiness_step_timeouts_defined_for_all_steps() -> None:
+    module = _load_pr_readiness_module()
+    labels = {label for label, _ in module.PR_READINESS_STEPS}
+    assert labels.issubset(set(module.STEP_TIMEOUT_SECONDS.keys()))
+
+
+def test_pr_readiness_run_step_returns_124_on_timeout(monkeypatch) -> None:
+    module = _load_pr_readiness_module()
+
+    def _timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd=["pytest"], timeout=1)
+
+    monkeypatch.setattr(module.subprocess, "run", _timeout)
+    assert module.run_step("contract integrity smoke", ["pytest"]) == 124
