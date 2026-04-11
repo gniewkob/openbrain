@@ -163,3 +163,22 @@ async def brain_capabilities():
     assert any("obsidian.mode must be constant 'http'" in err for err in errors)
     assert any("obsidian.status must reference obsidian_status" in err for err in errors)
     assert any("obsidian_http.status must reference obsidian_status" in err for err in errors)
+
+
+def test_obsidian_contract_validates_disabled_reason_contract_shape(tmp_path: Path) -> None:
+    module = _load_obsidian_contract_module()
+    broken = tmp_path / "obsidian_disabled_reason_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+
+    old_contract = module.DISABLED_REASON_CONTRACT
+    module.DISABLED_REASON_CONTRACT = broken
+    try:
+        errors = module._check_disabled_reason_snippets(
+            gateway_text="x",
+            http_text="x",
+            http_utils_text="x",
+        )
+    finally:
+        module.DISABLED_REASON_CONTRACT = old_contract
+
+    assert any("gateway_snippets" in err for err in errors)

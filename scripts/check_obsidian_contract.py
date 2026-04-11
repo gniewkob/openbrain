@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "unified/contracts/capabilities_manifest.json"
+DISABLED_REASON_CONTRACT = ROOT / "unified/contracts/obsidian_disabled_reason_contract.json"
 GATEWAY_MAIN = ROOT / "unified/mcp-gateway/src/main.py"
 HTTP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
 HTTP_TRANSPORT_UTILS = ROOT / "unified/src/mcp_transport_utils.py"
@@ -137,19 +138,22 @@ def _check_disabled_reason_snippets(
         else HTTP_TRANSPORT_UTILS.read_text(encoding="utf-8")
     )
 
-    gateway_snippets = (
-        "Local Obsidian tools are disabled by default.",
-        "trusted local stdio gateway",
-        "Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1",
-    )
+    contract = json.loads(DISABLED_REASON_CONTRACT.read_text(encoding="utf-8"))
+    gateway_snippets = contract.get("gateway_snippets", [])
+    http_snippets = contract.get("http_snippets", [])
+    if not isinstance(gateway_snippets, list) or not gateway_snippets:
+        return ["obsidian_disabled_reason_contract gateway_snippets must be non-empty list"]
+    if not isinstance(http_snippets, list) or not http_snippets:
+        return ["obsidian_disabled_reason_contract http_snippets must be non-empty list"]
+    if any(not isinstance(snippet, str) or not snippet for snippet in gateway_snippets):
+        return ["obsidian_disabled_reason_contract gateway_snippets must contain non-empty strings"]
+    if any(not isinstance(snippet, str) or not snippet for snippet in http_snippets):
+        return ["obsidian_disabled_reason_contract http_snippets must contain non-empty strings"]
+
     for snippet in gateway_snippets:
         if snippet not in gateway_text:
             errors.append(f"gateway disabled reason missing snippet: {snippet}")
 
-    http_snippets = (
-        "HTTP Obsidian tools are disabled by default.",
-        "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport.",
-    )
     missing_http_snippets = [snippet for snippet in http_snippets if snippet not in http_text]
     if missing_http_snippets:
         try:

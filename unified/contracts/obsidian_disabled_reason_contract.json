@@ -1,0 +1,11 @@
+{
+  "gateway_snippets": [
+    "Local Obsidian tools are disabled by default.",
+    "trusted local stdio gateway",
+    "Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1"
+  ],
+  "http_snippets": [
+    "HTTP Obsidian tools are disabled by default.",
+    "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport."
+  ]
+}

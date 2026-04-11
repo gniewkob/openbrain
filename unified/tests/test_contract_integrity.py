@@ -177,6 +177,18 @@ def test_mcp_transport_import_scope_contract_shape() -> None:
     assert raw["allowed_test_importer_prefix"]
 
 
+def test_obsidian_disabled_reason_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "obsidian_disabled_reason_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["gateway_snippets"], list) and raw["gateway_snippets"]
+    assert isinstance(raw["http_snippets"], list) and raw["http_snippets"]
+    assert all(isinstance(item, str) and item for item in raw["gateway_snippets"])
+    assert all(isinstance(item, str) and item for item in raw["http_snippets"])
+
+
 def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
     monkeypatch.setenv("ENV", "production")
     msg = backend_error_message(500, {"detail": "secret"})
