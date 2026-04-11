@@ -35,3 +35,12 @@ def test_pr_readiness_runner_stops_on_first_failure(monkeypatch) -> None:
     monkeypatch.setattr(module, "run_step", _run_step)
     assert module.main() == 3
     assert seen == [module.PR_READINESS_STEPS[0][0], module.PR_READINESS_STEPS[1][0]]
+
+
+def test_pr_readiness_contract_smoke_includes_transport_parity() -> None:
+    module = _load_pr_readiness_module()
+    step = next(
+        (cmd for label, cmd in module.PR_READINESS_STEPS if label == "contract integrity smoke"),
+        [],
+    )
+    assert "unified/tests/test_transport_parity.py" in step

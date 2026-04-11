@@ -208,7 +208,7 @@ Local PR readiness:
 - bundle includes:
   - `check_local_guardrails.py`
   - guardrail runner unit tests
-  - contract integrity smoke (`test_contract_integrity.py`, `test_capabilities_response_contract.py`, `test_health_route_alias_contract.py`)
+  - contract integrity smoke (`test_contract_integrity.py`, `test_capabilities_response_contract.py`, `test_health_route_alias_contract.py`, `test_transport_parity.py`)
 
 Local monitoring contract check:
 - `make monitoring-check`
