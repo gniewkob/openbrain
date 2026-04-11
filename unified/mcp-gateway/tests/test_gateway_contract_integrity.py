@@ -16,6 +16,40 @@ class GatewayContractIntegrityTests(unittest.TestCase):
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertIsInstance(data, dict, f"{path.name} must contain JSON object")
 
+    def test_capabilities_tier_status_change_is_versioned_in_metadata(self) -> None:
+        meta = json.loads(
+            (self._contracts_dir() / "capabilities_metadata.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        response_contract = json.loads(
+            (self._contracts_dir() / "capabilities_response_contract.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        tier_status_values = response_contract.get("tier_status_values", [])
+        self.assertTrue(
+            tier_status_values,
+            "capabilities response contract must define tier_status_values",
+        )
+
+        api_version = meta.get("api_version")
+        self.assertIsInstance(api_version, str)
+        self.assertRegex(api_version, r"^\d+\.\d+\.\d+$")
+
+        changelog = meta.get("schema_changelog", {})
+        self.assertIn(
+            api_version,
+            changelog,
+            "schema_changelog must include current capabilities metadata api_version",
+        )
+        self.assertIn(
+            "tier status",
+            str(changelog[api_version]).lower(),
+            "latest capabilities metadata changelog entry must document tier status semantics",
+        )
+
     def test_gateway_constants_follow_contracts(self) -> None:
         gateway = load_gateway_main()
         caps = json.loads(

@@ -1,6 +1,7 @@
 {
-  "api_version": "2.4.0",
+  "api_version": "2.5.0",
   "schema_changelog": {
+    "2.5.0": "Pinned tier status semantics in capabilities contract via tier_status_values to prevent transport drift",
     "2.4.0": "Capabilities contract tightened with tier-required keys (status/tools) and readiness compatibility fallback via /api/v1/readyz",
     "2.3.0": "Added health.overall and health.components in capabilities payload for truthful component-level status",
     "2.2.0": "Added PATCH support for partial updates (brain_update); circuit breaker for Ollama",

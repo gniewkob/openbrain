@@ -59,6 +59,7 @@ Capabilities payload note:
 - `brain_capabilities` now includes a transport-agnostic `obsidian` object (`mode`, `status`, `tools`, `reason`).
 - `brain_capabilities` now includes `health.overall` plus `health.components` (`api`, `db`, `vector_store`, `obsidian`) for component-level truthfulness.
 - `brain_capabilities` metadata contract is strict: `api_version` must follow `MAJOR.MINOR.PATCH` and must be present as a key in `schema_changelog`.
+- current capabilities metadata version is `2.5.0` (tier status semantics explicitly versioned in changelog).
 - capabilities manifest contract is strict: each tool tier list must contain non-empty string names only and must not contain duplicates (no silent fallback defaults).
 - request/runtime contracts are strict too: `request_contracts.json` and `runtime_limits.json` must be valid and complete (no silent fallback to baked-in defaults).
 - this strict contract loading is enforced in both transports (HTTP + stdio gateway), so drift is caught early at startup/tests.
