@@ -266,6 +266,21 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             set(gateway_caps["tier_2_advanced"]["tools"]),
             set(transport_caps["tier_2_advanced"]["tools"]),
         )
+        self.assertEqual(
+            gateway_caps["tier_1_core"]["status"],
+            transport_caps["tier_1_core"]["status"],
+        )
+        self.assertEqual(
+            gateway_caps["tier_2_advanced"]["status"],
+            transport_caps["tier_2_advanced"]["status"],
+        )
+        self.assertEqual(
+            gateway_caps["tier_3_admin"]["status"],
+            transport_caps["tier_3_admin"]["status"],
+        )
+        self.assertEqual(gateway_caps["tier_1_core"]["status"], "stable")
+        self.assertEqual(gateway_caps["tier_2_advanced"]["status"], "active")
+        self.assertEqual(gateway_caps["tier_3_admin"]["status"], "guarded")
         self.assertEqual(gateway_caps["obsidian"]["status"], transport_caps["obsidian"]["status"])
         self.assertEqual(gateway_caps["obsidian"]["tools"], transport_caps["obsidian"]["tools"])
 
