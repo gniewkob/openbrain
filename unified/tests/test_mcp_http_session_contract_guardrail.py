@@ -68,3 +68,20 @@ def main():
 """
     assert module._has_main_entrypoint_call(module.ast.parse(src_ok)) is True
     assert module._has_main_entrypoint_call(module.ast.parse(src_missing)) is False
+
+
+def test_mcp_http_session_contract_loader_validates_required_keys(tmp_path: Path) -> None:
+    module = _load_guardrail_module()
+    broken = tmp_path / "mcp_http_session_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+
+    old_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for missing contract keys"
+        except ValueError as exc:
+            assert "missing keys" in str(exc)
+    finally:
+        module.CONTRACT = old_contract

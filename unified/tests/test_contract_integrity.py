@@ -209,6 +209,22 @@ def test_mcp_transport_mount_contract_shape() -> None:
     ]
 
 
+def test_mcp_http_session_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "mcp_http_session_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_run_kwargs"], dict) and raw["required_run_kwargs"]
+    assert isinstance(raw["required_custom_routes"], list) and raw[
+        "required_custom_routes"
+    ]
+    assert isinstance(raw["require_main_entrypoint_call"], bool)
+    assert isinstance(raw["runbook_required_snippets"], list) and raw[
+        "runbook_required_snippets"
+    ]
+
+
 def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
     monkeypatch.setenv("ENV", "production")
     msg = backend_error_message(500, {"detail": "secret"})

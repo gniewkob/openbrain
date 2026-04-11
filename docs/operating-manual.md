@@ -159,6 +159,7 @@ CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces MCP tool inventory parity via `scripts/check_tool_inventory_parity.py` (all non-Obsidian tools must match across canonical/compatibility transports; compatibility transport keeps only the approved Obsidian subset).
 - `Unified Smoke Tests / guardrails` enforces MCP transport import scope via `scripts/check_mcp_transport_import_scope.py` (`mcp_transport` may be imported only by `unified/src/combined.py` in runtime code; all other importers must stay in `unified/tests/*`). Rules are contract-driven via `unified/contracts/mcp_transport_import_scope_contract.json`.
 - `Unified Smoke Tests / guardrails` enforces MCP transport mount contract via `scripts/check_mcp_transport_mount_contract.py` (`combined.py` must keep importing `mcp_transport`, mount `mcp_transport.mcp.streamable_http_app()`, and read `mcp_transport.STREAMABLE_HTTP_PATH` for root redirect). Rules are contract-driven via `unified/contracts/mcp_transport_mount_contract.json`.
+- `Unified Smoke Tests / guardrails` enforces MCP HTTP session contract via `scripts/check_mcp_http_session_contract.py` (`mcp_http.py` must keep required `mcp.run` kwargs, required custom routes, and `__main__` entrypoint call; runbook must document required session-failure snippet). Rules are contract-driven via `unified/contracts/mcp_http_session_contract.json`.
 - `Unified Smoke Tests / guardrails` enforces capabilities tools truthfulness via `scripts/check_capabilities_tools_truthfulness.py` (manifest-declared tools must map to real `@mcp.tool` functions in both transports).
 - `Unified Smoke Tests / guardrails` enforces `brain_search` filter parity via `scripts/check_search_filter_parity.py` (`owner` and `include_test_data` wiring to backend filters must stay transport-equivalent).
 - `Unified Smoke Tests / guardrails` enforces `brain_list` filter parity via `scripts/check_list_filter_parity.py` (`status`, `owner`, `tenant_id`, `include_test_data` wiring to backend filters must stay transport-equivalent).
@@ -209,6 +210,7 @@ CI guardrail:
   - `unified/tests/test_update_audit_semantics_parity_guardrail.py`
   - `unified/tests/test_export_contract_guardrail.py`
   - `unified/tests/test_obsidian_contract_guardrail.py`
+  - `unified/tests/test_mcp_http_session_contract_guardrail.py`
   - `unified/tests/test_monitoring_contract_guardrail.py`
   - `unified/tests/test_telemetry_contract_parity_guardrail.py`
   - `unified/tests/test_dashboard_memory_semantics_guardrail.py`
