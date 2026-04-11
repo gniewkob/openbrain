@@ -99,6 +99,10 @@ def _check_mcp_http_contract() -> list[str]:
 
     if run_kwargs.get("path") != "/":
         errors.append("mcp.run path must stay '/' for streamable session compatibility")
+    if run_kwargs.get("stateless_http") != "True":
+        errors.append(
+            "mcp.run must set stateless_http=True to avoid MCP session-header coupling"
+        )
 
     if not _has_custom_route(tree, "/consent"):
         errors.append("mcp_http.py must expose /consent custom route")

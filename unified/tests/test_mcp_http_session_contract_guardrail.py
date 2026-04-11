@@ -27,12 +27,18 @@ def test_extract_mcp_run_kwargs() -> None:
     module = _load_guardrail_module()
     src = """
 def main():
-    mcp.run(transport="streamable-http", path="/", host="0.0.0.0")
+    mcp.run(
+        transport="streamable-http",
+        path="/",
+        host="0.0.0.0",
+        stateless_http=True,
+    )
 """
     tree = module.ast.parse(src)
     kwargs = module._extract_mcp_run_kwargs(tree)
     assert kwargs["transport"] == "streamable-http"
     assert kwargs["path"] == "/"
+    assert kwargs["stateless_http"] == "True"
 
 
 def test_custom_route_detection() -> None:

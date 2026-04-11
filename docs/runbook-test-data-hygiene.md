@@ -86,14 +86,14 @@ WHERE domain='corporate'
 ```
 
 ## Debug: `Missing session ID` przy `brain_delete`
-Ten błąd zwykle pochodzi z warstwy transportu MCP HTTP (sesja streamable), nie z backendowego `DELETE /api/v1/memory/{id}`.
-Gateway/transport mapuje ten przypadek do komunikatu:
-`Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry.`
+Ten błąd pochodzi z warstwy transportu MCP HTTP (sesja streamable), nie z backendowego `DELETE /api/v1/memory/{id}`.
+Od `mcp_http` z `stateless_http=True` nie powinien już występować w normalnym flow ChatGPT/Claude.
+Jeśli się pojawia, najczęściej oznacza stary proces `mcp-http` albo klienta działającego na starej sesji.
 
 Checklist:
 1. Sprawdź backend direct API (z `X-Internal-Key`) — jeśli działa, problem jest w session/transport.
-2. Sprawdź flow MCP HTTP: auth -> session start -> tool call.
-3. Zrestartuj `mcp-http` i klienta MCP, aby odnowić sesję.
+2. Zweryfikuj, że `unified/mcp-gateway/src/mcp_http.py` uruchamia `mcp.run(..., stateless_http=True, ...)`.
+3. Zrestartuj `mcp-http` i klienta MCP, aby wymusić nowe połączenie.
 4. Jeśli błąd wraca tylko dla `delete`, zbierz request/response z gatewaya i porównaj z `store/get`.
 
 ## Kontrola końcowa
