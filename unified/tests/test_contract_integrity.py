@@ -307,6 +307,16 @@ def test_hidden_test_data_alert_guardrail_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in share_high["allowed_exprs"])
 
 
+def test_capabilities_health_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "capabilities_health_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_function_names"], list) and raw["required_function_names"]
+    assert all(isinstance(item, str) and item for item in raw["required_function_names"])
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(

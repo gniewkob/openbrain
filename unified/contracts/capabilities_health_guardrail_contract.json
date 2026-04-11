@@ -1,0 +1,7 @@
+{
+  "required_function_names": [
+    "_api_component",
+    "_store_component",
+    "build_capabilities_health"
+  ]
+}
