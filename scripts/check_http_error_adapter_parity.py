@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from pathlib import Path
 
@@ -11,8 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MCP_TRANSPORT = ROOT / "unified/src/http_error_adapter.py"
 MCP_GATEWAY = ROOT / "unified/mcp-gateway/src/http_error_adapter.py"
-
-REQUIRED_DEFAULT_KEYS = {"status_labels", "fallback_5xx", "fallback_other", "detail_hints"}
+CONTRACT = ROOT / "unified/contracts/http_error_adapter_guardrail_contract.json"
 
 
 def _fail(message: str) -> int:
@@ -25,6 +25,18 @@ def _find_function(tree: ast.AST, fn_name: str) -> ast.FunctionDef:
         if isinstance(node, ast.FunctionDef) and node.name == fn_name:
             return node
     raise ValueError(f"{fn_name} not found")
+
+
+def _load_contract() -> dict[str, object]:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("http_error_adapter_guardrail_contract must be object")
+    keys = payload.get("required_defaults_keys")
+    if not isinstance(keys, list) or not keys:
+        raise ValueError("contract required_defaults_keys must be non-empty list")
+    if any(not isinstance(key, str) or not key for key in keys):
+        raise ValueError("contract required_defaults_keys must contain non-empty strings")
+    return payload
 
 
 def _extract_default_keys(tree: ast.AST) -> set[str]:
@@ -99,13 +111,13 @@ def _check_backend_request_failure_semantics(fn: ast.FunctionDef, label: str) ->
     return []
 
 
-def _check_source(source: str, label: str) -> list[str]:
+def _check_source(source: str, label: str, required_default_keys: set[str]) -> list[str]:
     tree = ast.parse(source)
     errors: list[str] = []
     default_keys = _extract_default_keys(tree)
-    if default_keys != REQUIRED_DEFAULT_KEYS:
+    if default_keys != required_default_keys:
         errors.append(
-            f"{label} _DEFAULTS keys drift: expected={sorted(REQUIRED_DEFAULT_KEYS)} got={sorted(default_keys)}"
+            f"{label} _DEFAULTS keys drift: expected={sorted(required_default_keys)} got={sorted(default_keys)}"
         )
     errors.extend(
         _check_backend_error_message_semantics(_find_function(tree, "backend_error_message"), label)
@@ -119,11 +131,13 @@ def _check_source(source: str, label: str) -> list[str]:
 
 
 def main() -> int:
+    contract = _load_contract()
+    required_default_keys = {str(item) for item in contract["required_defaults_keys"]}
     transport_src = MCP_TRANSPORT.read_text(encoding="utf-8")
     gateway_src = MCP_GATEWAY.read_text(encoding="utf-8")
     errors: list[str] = []
-    errors.extend(_check_source(transport_src, "HTTP transport"))
-    errors.extend(_check_source(gateway_src, "stdio gateway"))
+    errors.extend(_check_source(transport_src, "HTTP transport", required_default_keys))
+    errors.extend(_check_source(gateway_src, "stdio gateway", required_default_keys))
     if errors:
         for error in errors:
             _fail(error)

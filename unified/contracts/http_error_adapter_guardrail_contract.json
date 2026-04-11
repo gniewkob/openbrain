@@ -1,0 +1,8 @@
+{
+  "required_defaults_keys": [
+    "status_labels",
+    "fallback_5xx",
+    "fallback_other",
+    "detail_hints"
+  ]
+}
