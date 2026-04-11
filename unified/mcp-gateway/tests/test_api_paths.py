@@ -330,6 +330,15 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             params={"sample_limit": 7},
         )
 
+    async def test_brain_test_data_report_validates_sample_limit_bounds(self) -> None:
+        gateway = load_gateway_main()
+
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1–100, got 0"):
+            await gateway.brain_test_data_report(sample_limit=0)
+
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1–100, got 101"):
+            await gateway.brain_test_data_report(sample_limit=101)
+
     async def test_brain_cleanup_build_test_data_calls_admin_cleanup_endpoint(self) -> None:
         gateway = load_gateway_main()
         response = Mock()
@@ -349,6 +358,15 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             "/api/v1/memory/admin/test-data/cleanup-build",
             json={"dry_run": True, "limit": 12},
         )
+
+    async def test_brain_cleanup_build_test_data_validates_limit_bounds(self) -> None:
+        gateway = load_gateway_main()
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1–500, got 0"):
+            await gateway.brain_cleanup_build_test_data(limit=0)
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1–500, got 501"):
+            await gateway.brain_cleanup_build_test_data(limit=501)
 
     async def test_brain_update_uses_canonical_updated_by_placeholder(self) -> None:
         gateway = load_gateway_main()

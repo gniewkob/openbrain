@@ -848,6 +848,13 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
+    async def test_brain_test_data_report_validates_sample_limit_bounds(self) -> None:
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1–100, got 0"):
+            await mcp_transport.brain_test_data_report(sample_limit=0)
+
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1–100, got 101"):
+            await mcp_transport.brain_test_data_report(sample_limit=101)
+
     async def test_brain_cleanup_build_test_data_uses_v1_admin_endpoint(self) -> None:
         response = _FakeResponse(
             200,
@@ -869,6 +876,13 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
                 {"json": {"dry_run": True, "limit": 50}},
             ),
         )
+
+    async def test_brain_cleanup_build_test_data_validates_limit_bounds(self) -> None:
+        with self.assertRaisesRegex(ValueError, "limit must be 1–500, got 0"):
+            await mcp_transport.brain_cleanup_build_test_data(limit=0)
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1–500, got 501"):
+            await mcp_transport.brain_cleanup_build_test_data(limit=501)
 
     async def test_guard_re_raises_as_tool_error(self) -> None:
         @mcp_transport.mcp_tool_guard
