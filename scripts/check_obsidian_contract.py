@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "unified/contracts/capabilities_manifest.json"
 GATEWAY_MAIN = ROOT / "unified/mcp-gateway/src/main.py"
 HTTP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
+HTTP_TRANSPORT_UTILS = ROOT / "unified/src/mcp_transport_utils.py"
 
 
 def _fail(message: str) -> int:
@@ -42,7 +43,23 @@ def _find_async_function(tree: ast.AST, function_name: str) -> ast.AsyncFunction
     return None
 
 
+def _find_function(tree: ast.AST, function_name: str) -> ast.FunctionDef | None:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == function_name:
+            return node
+    return None
+
+
 def _function_calls_name(func: ast.AsyncFunctionDef, call_name: str) -> bool:
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name) and node.func.id == call_name:
+            return True
+    return False
+
+
+def _sync_function_calls_name(func: ast.FunctionDef, call_name: str) -> bool:
     for node in ast.walk(func):
         if not isinstance(node, ast.Call):
             continue
@@ -101,7 +118,9 @@ def _check_gateway_gating() -> list[str]:
 
 
 def _check_disabled_reason_snippets(
-    gateway_text: str | None = None, http_text: str | None = None
+    gateway_text: str | None = None,
+    http_text: str | None = None,
+    http_utils_text: str | None = None,
 ) -> list[str]:
     errors: list[str] = []
     gateway_text = (
@@ -111,6 +130,11 @@ def _check_disabled_reason_snippets(
     )
     http_text = (
         http_text if http_text is not None else HTTP_TRANSPORT.read_text(encoding="utf-8")
+    )
+    http_utils_text = (
+        http_utils_text
+        if http_utils_text is not None
+        else HTTP_TRANSPORT_UTILS.read_text(encoding="utf-8")
     )
 
     gateway_snippets = (
@@ -126,9 +150,24 @@ def _check_disabled_reason_snippets(
         "HTTP Obsidian tools are disabled by default.",
         "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport.",
     )
-    for snippet in http_snippets:
-        if snippet not in http_text:
-            errors.append(f"HTTP disabled reason missing snippet: {snippet}")
+    missing_http_snippets = [snippet for snippet in http_snippets if snippet not in http_text]
+    if missing_http_snippets:
+        try:
+            tree = ast.parse(http_text)
+        except SyntaxError:
+            tree = None
+        helper_fn = _find_function(tree, "_http_obsidian_disabled_reason") if tree else None
+        helper_delegates = bool(
+            helper_fn is not None
+            and _sync_function_calls_name(helper_fn, "http_obsidian_disabled_reason")
+        )
+        if helper_delegates:
+            for snippet in http_snippets:
+                if snippet not in http_utils_text:
+                    errors.append(f"HTTP disabled reason missing snippet: {snippet}")
+        else:
+            for snippet in missing_http_snippets:
+                errors.append(f"HTTP disabled reason missing snippet: {snippet}")
     return errors
 
 

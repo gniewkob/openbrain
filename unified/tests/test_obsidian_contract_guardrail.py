@@ -77,9 +77,30 @@ def test_obsidian_contract_requires_disabled_reason_snippets() -> None:
     errors = module._check_disabled_reason_snippets(
         gateway_text="Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1",
         http_text="Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport.",
+        http_utils_text="",
     )
     assert any("gateway disabled reason missing snippet" in err for err in errors)
     assert any("HTTP disabled reason missing snippet" in err for err in errors)
+
+
+def test_obsidian_contract_allows_http_disabled_reason_via_utils_delegate() -> None:
+    module = _load_obsidian_contract_module()
+    errors = module._check_disabled_reason_snippets(
+        gateway_text=(
+            "Local Obsidian tools are disabled by default.\n"
+            "trusted local stdio gateway\n"
+            "Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1"
+        ),
+        http_text=(
+            "def _http_obsidian_disabled_reason():\n"
+            "    return http_obsidian_disabled_reason()\n"
+        ),
+        http_utils_text=(
+            "HTTP Obsidian tools are disabled by default.\n"
+            "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport.\n"
+        ),
+    )
+    assert errors == []
 
 
 def test_obsidian_contract_checks_capabilities_payload_semantics() -> None:
