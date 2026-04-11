@@ -52,6 +52,10 @@ async def v1_update(memory_id, data):
 
 def test_mcp_updated_by_placeholder_guardrail_patterns(tmp_path) -> None:
     module = _load_audit_semantics_module()
+    contract = module._load_contract()
+    mcp_patterns = [
+        str(pattern) for pattern in contract["mcp_placeholder_required_patterns"]
+    ]
 
     ok_src = """
 async def brain_update(memory_id: str, content: str, updated_by: str = "agent"):
@@ -69,5 +73,21 @@ async def brain_update(memory_id: str, content: str, updated_by: str = "agent"):
 
     module.MCP_TRANSPORT = transport
     module.MCP_GATEWAY = gateway
-    errors = module._check_mcp_updated_by_placeholder_binding()
+    errors = module._check_mcp_updated_by_placeholder_binding(mcp_patterns)
     assert any("mcp-gateway/src/main.py missing MCP audit placeholder pattern" in err for err in errors)
+
+
+def test_audit_semantics_contract_loader_validates_shape(tmp_path: Path) -> None:
+    module = _load_audit_semantics_module()
+    broken = tmp_path / "audit_semantics_guardrail_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+    old_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for invalid audit semantics contract"
+        except ValueError as exc:
+            assert "memory_write_required_patterns" in str(exc)
+    finally:
+        module.CONTRACT = old_contract

@@ -331,6 +331,20 @@ def test_admin_bounds_guardrail_contract_shape() -> None:
         assert isinstance(item["parameter"], str) and item["parameter"]
 
 
+def test_audit_semantics_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "audit_semantics_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    write_patterns = raw["memory_write_required_patterns"]
+    mcp_patterns = raw["mcp_placeholder_required_patterns"]
+    assert isinstance(write_patterns, list) and write_patterns
+    assert isinstance(mcp_patterns, list) and mcp_patterns
+    assert all(isinstance(item, str) and item for item in write_patterns)
+    assert all(isinstance(item, str) and item for item in mcp_patterns)
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(

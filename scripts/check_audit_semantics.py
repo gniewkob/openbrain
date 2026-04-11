@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 import ast
@@ -15,6 +16,7 @@ API_V1_MEMORY = ROOT / "unified/src/api/v1/memory.py"
 MEMORY_WRITES = ROOT / "unified/src/memory_writes.py"
 MCP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
 MCP_GATEWAY = ROOT / "unified/mcp-gateway/src/main.py"
+CONTRACT = ROOT / "unified/contracts/audit_semantics_guardrail_contract.json"
 
 
 def _fail(message: str) -> int:
@@ -93,6 +95,22 @@ def _has_patch_actor_override(text: str) -> bool:
     return False
 
 
+def _load_contract() -> dict[str, object]:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("audit_semantics_guardrail_contract must be object")
+    for key in (
+        "memory_write_required_patterns",
+        "mcp_placeholder_required_patterns",
+    ):
+        value = payload.get(key)
+        if not isinstance(value, list) or not value:
+            raise ValueError(f"contract {key} must be non-empty list")
+        if any(not isinstance(pattern, str) or not pattern for pattern in value):
+            raise ValueError(f"contract {key} must contain non-empty strings")
+    return payload
+
+
 def _check_schemas() -> list[str]:
     errors: list[str] = []
     text = SCHEMAS.read_text(encoding="utf-8")
@@ -117,14 +135,9 @@ def _check_api_patch_override() -> list[str]:
     return errors
 
 
-def _check_write_path_actor_binding() -> list[str]:
+def _check_write_path_actor_binding(required_patterns: list[str]) -> list[str]:
     errors: list[str] = []
     text = MEMORY_WRITES.read_text(encoding="utf-8")
-    required_patterns = (
-        r"created_by\s*=\s*actor",
-        r'"updated_by"\s*:\s*actor',
-        r"created_by\s*=\s*existing\.created_by",
-    )
     for pattern in required_patterns:
         if not re.search(pattern, text):
             errors.append(
@@ -133,12 +146,8 @@ def _check_write_path_actor_binding() -> list[str]:
     return errors
 
 
-def _check_mcp_updated_by_placeholder_binding() -> list[str]:
+def _check_mcp_updated_by_placeholder_binding(required_patterns: list[str]) -> list[str]:
     errors: list[str] = []
-    required_patterns = (
-        r"normalize_updated_by\s*\(\s*updated_by\s*\)",
-        r'"updated_by"\s*:\s*canonical_updated_by\s*\(\s*\)',
-    )
     sources = (
         ("mcp_transport.py", MCP_TRANSPORT),
         ("mcp-gateway/src/main.py", MCP_GATEWAY),
@@ -152,11 +161,18 @@ def _check_mcp_updated_by_placeholder_binding() -> list[str]:
 
 
 def main() -> int:
+    contract = _load_contract()
+    memory_write_patterns = [
+        str(pattern) for pattern in contract["memory_write_required_patterns"]
+    ]
+    mcp_placeholder_patterns = [
+        str(pattern) for pattern in contract["mcp_placeholder_required_patterns"]
+    ]
     errors: list[str] = []
     errors.extend(_check_schemas())
     errors.extend(_check_api_patch_override())
-    errors.extend(_check_write_path_actor_binding())
-    errors.extend(_check_mcp_updated_by_placeholder_binding())
+    errors.extend(_check_write_path_actor_binding(memory_write_patterns))
+    errors.extend(_check_mcp_updated_by_placeholder_binding(mcp_placeholder_patterns))
     if errors:
         for err in errors:
             _fail(err)
