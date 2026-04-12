@@ -620,7 +620,9 @@ class TestDataHygieneReport(BaseModel):
     generated_at: datetime
     sample_limit: int
     visible_status_counts: dict[str, int] = Field(default_factory=dict)
-    visible_domain_status_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
+    visible_domain_status_counts: dict[str, dict[str, int]] = Field(
+        default_factory=dict
+    )
     hidden_counts: dict[str, int] = Field(default_factory=dict)
     hidden_active_ratio: float = 0.0
     hidden_active_ratio_by_domain: dict[str, float] = Field(default_factory=dict)

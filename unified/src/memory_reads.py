@@ -403,10 +403,7 @@ async def get_test_data_hygiene_report(
         .where(is_test_data)
         .group_by(Memory.status)
     )
-    status_counts = {
-        str(status): int(count)
-        for status, count in status_result.all()
-    }
+    status_counts = {str(status): int(count) for status, count in status_result.all()}
 
     domain_result = await session.execute(
         select(Memory.domain, Memory.status, func.count(Memory.id))
@@ -431,8 +428,7 @@ async def get_test_data_hygiene_report(
         .limit(10)
     )
     top_owners = {
-        str(owner or ""): int(count)
-        for owner, count in top_owners_result.all()
+        str(owner or ""): int(count) for owner, count in top_owners_result.all()
     }
 
     match_key_prefix_result = await session.execute(
@@ -473,7 +469,9 @@ async def get_test_data_hygiene_report(
     )
     active_total_all = visible_active_total + hidden_active_total
     hidden_active_ratio = (
-        round(hidden_active_total / active_total_all, 4) if active_total_all > 0 else 0.0
+        round(hidden_active_total / active_total_all, 4)
+        if active_total_all > 0
+        else 0.0
     )
     hidden_active_ratio_by_domain = {
         "build": (
@@ -576,7 +574,9 @@ async def get_test_data_hygiene_report(
         TestDataSampleEntry(
             id=str(row.id),
             domain=(
-                row.domain.value if isinstance(row.domain, DomainEnum) else str(row.domain)
+                row.domain.value
+                if isinstance(row.domain, DomainEnum)
+                else str(row.domain)
             ),
             status=str(row.status),
             owner=str(row.owner or ""),

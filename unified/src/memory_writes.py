@@ -997,9 +997,7 @@ async def cleanup_build_test_data(
         try:
             deleted = await delete_memory(session, memory_id, actor=actor)
         except ValueError as exc:
-            skipped.append(
-                BuildTestDataCleanupSkip(id=memory_id, reason=str(exc))
-            )
+            skipped.append(BuildTestDataCleanupSkip(id=memory_id, reason=str(exc)))
             continue
         if deleted:
             deleted_ids.append(memory_id)
