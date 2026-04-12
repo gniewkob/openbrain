@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -12,11 +13,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 MCP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
 MCP_GATEWAY = ROOT / "unified/mcp-gateway/src/main.py"
-
-CHECKED_TOOLS: tuple[str, ...] = (
-    "brain_test_data_report",
-    "brain_cleanup_build_test_data",
-)
+CONTRACT = ROOT / "unified/contracts/admin_endpoint_guardrail_contract.json"
 
 
 def _fail(message: str) -> int:
@@ -29,6 +26,18 @@ def _find_fn(tree: ast.Module, fn_name: str) -> ast.AsyncFunctionDef | ast.Funct
         if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)) and node.name == fn_name:
             return node
     raise ValueError(f"{fn_name} not found")
+
+
+def _load_contract() -> list[str]:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("admin_endpoint_guardrail_contract must be object")
+    checked_tools = payload.get("checked_tools")
+    if not isinstance(checked_tools, list) or not checked_tools:
+        raise ValueError("contract checked_tools must be non-empty list")
+    if any(not isinstance(tool, str) or not tool for tool in checked_tools):
+        raise ValueError("contract checked_tools must contain non-empty strings")
+    return [str(tool) for tool in checked_tools]
 
 
 def _extract_dict_keys(node: ast.expr) -> tuple[str, ...]:
@@ -119,10 +128,12 @@ def _extract_gateway_call_contract(fn: ast.AsyncFunctionDef | ast.FunctionDef) -
     }
 
 
-def _extract_contracts(source: str, *, transport: bool) -> dict[str, dict[str, Any]]:
+def _extract_contracts(
+    source: str, *, transport: bool, checked_tools: list[str]
+) -> dict[str, dict[str, Any]]:
     tree = ast.parse(source)
     contracts: dict[str, dict[str, Any]] = {}
-    for fn_name in CHECKED_TOOLS:
+    for fn_name in checked_tools:
         fn = _find_fn(tree, fn_name)
         contracts[fn_name] = (
             _extract_transport_call_contract(fn)
@@ -133,12 +144,16 @@ def _extract_contracts(source: str, *, transport: bool) -> dict[str, dict[str, A
 
 
 def _check_admin_endpoint_contract_parity(
-    transport_source: str, gateway_source: str
+    transport_source: str, gateway_source: str, checked_tools: list[str]
 ) -> list[str]:
-    transport_contracts = _extract_contracts(transport_source, transport=True)
-    gateway_contracts = _extract_contracts(gateway_source, transport=False)
+    transport_contracts = _extract_contracts(
+        transport_source, transport=True, checked_tools=checked_tools
+    )
+    gateway_contracts = _extract_contracts(
+        gateway_source, transport=False, checked_tools=checked_tools
+    )
     errors: list[str] = []
-    for fn_name in CHECKED_TOOLS:
+    for fn_name in checked_tools:
         if transport_contracts[fn_name] != gateway_contracts[fn_name]:
             errors.append(
                 f"{fn_name} endpoint contract drift: transport={transport_contracts[fn_name]} gateway={gateway_contracts[fn_name]}"
@@ -147,9 +162,12 @@ def _check_admin_endpoint_contract_parity(
 
 
 def main() -> int:
+    checked_tools = _load_contract()
     transport_source = MCP_TRANSPORT.read_text(encoding="utf-8")
     gateway_source = MCP_GATEWAY.read_text(encoding="utf-8")
-    errors = _check_admin_endpoint_contract_parity(transport_source, gateway_source)
+    errors = _check_admin_endpoint_contract_parity(
+        transport_source, gateway_source, checked_tools
+    )
     if errors:
         for error in errors:
             _fail(error)

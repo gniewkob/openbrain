@@ -356,6 +356,17 @@ def test_tool_signature_guardrail_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in checked_tools)
 
 
+def test_admin_endpoint_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "admin_endpoint_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    checked_tools = raw["checked_tools"]
+    assert isinstance(checked_tools, list) and checked_tools
+    assert all(isinstance(item, str) and item for item in checked_tools)
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(

@@ -25,6 +25,7 @@ def test_admin_endpoint_contract_parity_guardrail_passes_for_current_sources() -
 
 def test_admin_endpoint_contract_parity_detects_payload_key_drift() -> None:
     module = _load_admin_endpoint_contract_parity_module()
+    checked_tools = ["brain_cleanup_build_test_data"]
     transport_src = """
 async def brain_cleanup_build_test_data(dry_run: bool = True, limit: int = 100):
     return await _safe_req(
@@ -44,6 +45,23 @@ async def brain_cleanup_build_test_data(dry_run: bool = True, limit: int = 100):
         )
         return r.json()
 """
-    module.CHECKED_TOOLS = ("brain_cleanup_build_test_data",)
-    errors = module._check_admin_endpoint_contract_parity(transport_src, gateway_src)
+    errors = module._check_admin_endpoint_contract_parity(
+        transport_src, gateway_src, checked_tools
+    )
     assert any("brain_cleanup_build_test_data endpoint contract drift" in err for err in errors)
+
+
+def test_admin_endpoint_guardrail_contract_loader_validates_shape(tmp_path: Path) -> None:
+    module = _load_admin_endpoint_contract_parity_module()
+    broken = tmp_path / "admin_endpoint_guardrail_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+    old_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for invalid admin endpoint contract"
+        except ValueError as exc:
+            assert "checked_tools" in str(exc)
+    finally:
+        module.CONTRACT = old_contract
