@@ -268,6 +268,15 @@ def _tenant_filter_expr(tenant_ids: list[str]):
     )
 
 
+def _match_metadata_fields(existing: Memory, rec, metadata: dict) -> bool:
+    """Check that metadata-sourced fields match the record."""
+    return (
+        metadata.get("title") == rec.title
+        and (metadata.get("custom_fields") or {}) == rec.custom_fields
+        and (metadata.get("source") or {}) == rec.source.model_dump()
+    )
+
+
 def _record_matches_existing(existing: Memory, rec, content_hash: str) -> bool:
     metadata = existing.metadata_ or {}
     return (
@@ -279,7 +288,5 @@ def _record_matches_existing(existing: Memory, rec, content_hash: str) -> bool:
         and existing.obsidian_ref == rec.obsidian_ref
         and existing.entity_type == rec.entity_type
         and existing.sensitivity == rec.sensitivity
-        and metadata.get("title") == rec.title
-        and (metadata.get("custom_fields") or {}) == rec.custom_fields
-        and (metadata.get("source") or {}) == rec.source.model_dump()
+        and _match_metadata_fields(existing, rec, metadata)
     )

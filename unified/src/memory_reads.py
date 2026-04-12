@@ -111,6 +111,26 @@ async def get_memory_with_repo(
     return _to_out(memory) if memory else None
 
 
+def _apply_status_filter(stmt, filters: dict[str, Any], default_status_filter: bool):
+    """Apply status filter or default exclusion of superseded/duplicate records."""
+    if "status" in filters:
+        return stmt.where(Memory.status == filters["status"])
+    if default_status_filter:
+        return stmt.where(Memory.status.notin_([STATUS_SUPERSEDED, STATUS_DUPLICATE]))
+    return stmt
+
+
+def _resolve_include_test_data(filters: dict[str, Any]) -> bool:
+    """Validate and return the include_test_data filter value."""
+    raw = filters.get("include_test_data", False)
+    if not isinstance(raw, bool):
+        raise ValueError(
+            "filters.include_test_data must be bool when provided "
+            f"(got {type(raw).__name__})"
+        )
+    return raw
+
+
 def _apply_filters_to_stmt(
     stmt,
     filters: dict[str, Any],
@@ -128,13 +148,7 @@ def _apply_filters_to_stmt(
     Returns:
         Modified statement with filters applied
     """
-    raw_include_test_data = filters.get("include_test_data", False)
-    if not isinstance(raw_include_test_data, bool):
-        raise ValueError(
-            "filters.include_test_data must be bool when provided "
-            f"(got {type(raw_include_test_data).__name__})"
-        )
-    include_test_data = raw_include_test_data
+    include_test_data = _resolve_include_test_data(filters)
     if not include_test_data:
         # Hide explicitly flagged test fixtures from default operational retrieval.
         stmt = stmt.where(
@@ -154,10 +168,7 @@ def _apply_filters_to_stmt(
             stmt = stmt.where(Memory.entity_type.in_(entity_types))
         else:
             stmt = stmt.where(Memory.entity_type == entity_types)
-    if "status" in filters:
-        stmt = stmt.where(Memory.status == filters["status"])
-    elif default_status_filter:
-        stmt = stmt.where(Memory.status.notin_([STATUS_SUPERSEDED, STATUS_DUPLICATE]))
+    stmt = _apply_status_filter(stmt, filters, default_status_filter)
     if "sensitivity" in filters:
         stmt = stmt.where(Memory.sensitivity == filters["sensitivity"])
     if "owner" in filters:
