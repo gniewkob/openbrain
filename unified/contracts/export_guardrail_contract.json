@@ -1,0 +1,25 @@
+{
+  "required_sensitivities": [
+    "public",
+    "internal",
+    "confidential",
+    "restricted"
+  ],
+  "required_policy_keys": [
+    "allow_fields",
+    "redact_content",
+    "allow_tags",
+    "allow_match_key"
+  ],
+  "required_behavior_snippets": [
+    "if role == \"admin\":",
+    "return record",
+    "EXPORT_POLICY[\"restricted\"]",
+    "exported[\"owner\"] = \"[REDACTED]\"",
+    "exported[\"relations\"] = {}",
+    "exported[\"obsidian_ref\"] = None",
+    "exported[\"custom_fields\"] = {}",
+    "exported[\"content_hash\"] = \"\"",
+    "exported[\"tenant_id\"] = None"
+  ]
+}

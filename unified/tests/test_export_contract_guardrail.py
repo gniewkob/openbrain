@@ -23,6 +23,7 @@ def test_export_contract_guardrail_passes_for_current_sources() -> None:
 
 def test_export_contract_guardrail_helpers_detect_missing_restricted_fallback() -> None:
     module = _load_export_contract_module()
+    contract = module._load_contract()
     src = """
 EXPORT_POLICY = {
   "public": {"allow_fields": None, "redact_content": False, "allow_tags": True, "allow_match_key": True},
@@ -35,5 +36,21 @@ def _export_record(record, sensitivity, role):
   policy = EXPORT_POLICY.get(sensitivity)
   return {}
 """
-    errors = module._check_export_policy_semantics(src)
+    errors = module._check_export_policy_semantics(src, contract)
     assert any("fallback to restricted policy" in err for err in errors)
+
+
+def test_export_guardrail_contract_loader_validates_shape(tmp_path: Path) -> None:
+    module = _load_export_contract_module()
+    broken = tmp_path / "export_guardrail_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+    old_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for invalid export guardrail contract"
+        except ValueError as exc:
+            assert "required_sensitivities" in str(exc)
+    finally:
+        module.CONTRACT = old_contract

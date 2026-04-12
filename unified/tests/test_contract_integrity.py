@@ -367,6 +367,23 @@ def test_admin_endpoint_guardrail_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in checked_tools)
 
 
+def test_export_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "export_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    sensitivities = raw["required_sensitivities"]
+    policy_keys = raw["required_policy_keys"]
+    behavior_snippets = raw["required_behavior_snippets"]
+    assert isinstance(sensitivities, list) and sensitivities
+    assert isinstance(policy_keys, list) and policy_keys
+    assert isinstance(behavior_snippets, list) and behavior_snippets
+    assert all(isinstance(item, str) and item for item in sensitivities)
+    assert all(isinstance(item, str) and item for item in policy_keys)
+    assert all(isinstance(item, str) and item for item in behavior_snippets)
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(
