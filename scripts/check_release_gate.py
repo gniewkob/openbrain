@@ -8,19 +8,25 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CONTRACT = ROOT / "unified/contracts/release_gate_contract.json"
 
 
-REQUIRED_CHECKS = (
-    "lint",
-    "test",
-    "security",
-    "contract-integrity",
-    "guardrails",
-    "smoke",
-    "gateway-smoke",
-    "transport-parity",
-    "GitGuardian Security Checks",
-)
+def _load_contract() -> tuple[str, ...]:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("release_gate_contract must be object")
+    required_checks = payload.get("required_checks")
+    if not isinstance(required_checks, list) or not required_checks:
+        raise ValueError("contract required_checks must be non-empty list")
+    if any(not isinstance(check, str) or not check for check in required_checks):
+        raise ValueError("contract required_checks must contain non-empty strings")
+    return tuple(required_checks)
+
+
+REQUIRED_CHECKS = _load_contract()
 
 
 @dataclass(frozen=True)

@@ -404,6 +404,15 @@ def test_http_error_contract_guardrail_contract_shape() -> None:
     )
 
 
+def test_release_gate_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "release_gate_contract.json").read_text(encoding="utf-8")
+    )
+    required_checks = raw["required_checks"]
+    assert isinstance(required_checks, list) and required_checks
+    assert all(isinstance(item, str) and item for item in required_checks)
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(

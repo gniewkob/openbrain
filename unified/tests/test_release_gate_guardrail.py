@@ -59,3 +59,19 @@ def test_evaluate_release_gate_healthy(monkeypatch):
     assert result.protected is True
     assert result.missing_checks == ()
     assert result.healthy is True
+
+
+def test_release_gate_contract_loader_validates_shape(tmp_path: Path):
+    module = _load_release_gate_module()
+    broken = tmp_path / "release_gate_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+    old_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for invalid release gate contract"
+        except ValueError as exc:
+            assert "required_checks" in str(exc)
+    finally:
+        module.CONTRACT = old_contract

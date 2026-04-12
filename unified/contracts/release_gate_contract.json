@@ -1,0 +1,13 @@
+{
+  "required_checks": [
+    "lint",
+    "test",
+    "security",
+    "contract-integrity",
+    "guardrails",
+    "smoke",
+    "gateway-smoke",
+    "transport-parity",
+    "GitGuardian Security Checks"
+  ]
+}
