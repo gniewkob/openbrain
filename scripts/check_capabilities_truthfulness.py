@@ -13,6 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = ROOT / "unified/contracts/capabilities_response_contract.json"
 METADATA = ROOT / "unified/contracts/capabilities_metadata.json"
+GUARDRAIL_CONTRACT = (
+    ROOT / "unified/contracts/capabilities_truthfulness_guardrail_contract.json"
+)
 HTTP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
 STDIO_GATEWAY = ROOT / "unified/mcp-gateway/src/main.py"
 HTTP_CAPABILITIES_HEALTH = ROOT / "unified/src/capabilities_health.py"
@@ -24,7 +27,29 @@ def _fail(message: str) -> int:
     return 1
 
 
-def _check_contract() -> list[str]:
+def _load_guardrail_contract() -> dict[str, object]:
+    payload = json.loads(GUARDRAIL_CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("capabilities_truthfulness_guardrail_contract must be object")
+    required_keys = (
+        "expected_health_required_keys",
+        "expected_health_component_required_keys",
+        "expected_health_overall_values",
+        "expected_tier_required_keys",
+        "expected_tier_status_values",
+    )
+    for key in required_keys:
+        value = payload.get(key)
+        if not isinstance(value, list) or not value:
+            raise ValueError(f"guardrail contract {key} must be non-empty list")
+        if any(not isinstance(item, str) or not item for item in value):
+            raise ValueError(
+                f"guardrail contract {key} must contain non-empty strings"
+            )
+    return payload
+
+
+def _check_contract(guardrail: dict[str, object]) -> list[str]:
     errors: list[str] = []
     payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
     required_top_level = set(payload.get("required_top_level_keys", []))
@@ -32,7 +57,9 @@ def _check_contract() -> list[str]:
         errors.append("contract required_top_level_keys must include 'health'")
 
     required_health = set(payload.get("health_required_keys", []))
-    expected_health = {"overall", "source", "components"}
+    expected_health = {
+        str(item) for item in guardrail["expected_health_required_keys"]
+    }
     if required_health != expected_health:
         errors.append(
             "contract health_required_keys must be exactly "
@@ -40,7 +67,9 @@ def _check_contract() -> list[str]:
         )
 
     required_components = set(payload.get("health_component_required_keys", []))
-    expected_components = {"api", "db", "vector_store", "obsidian"}
+    expected_components = {
+        str(item) for item in guardrail["expected_health_component_required_keys"]
+    }
     if required_components != expected_components:
         errors.append(
             "contract health_component_required_keys must be exactly "
@@ -48,7 +77,9 @@ def _check_contract() -> list[str]:
         )
 
     overall_values = set(payload.get("health_overall_values", []))
-    expected_overall_values = {"healthy", "degraded", "unavailable"}
+    expected_overall_values = {
+        str(item) for item in guardrail["expected_health_overall_values"]
+    }
     if overall_values != expected_overall_values:
         errors.append(
             "contract health_overall_values must be exactly "
@@ -56,7 +87,9 @@ def _check_contract() -> list[str]:
         )
 
     required_tier_keys = set(payload.get("tier_required_keys", []))
-    expected_tier_keys = {"status", "tools"}
+    expected_tier_keys = {
+        str(item) for item in guardrail["expected_tier_required_keys"]
+    }
     if required_tier_keys != expected_tier_keys:
         errors.append(
             "contract tier_required_keys must be exactly "
@@ -64,7 +97,9 @@ def _check_contract() -> list[str]:
         )
 
     tier_status_values = set(payload.get("tier_status_values", []))
-    expected_tier_status_values = {"stable", "active", "guarded"}
+    expected_tier_status_values = {
+        str(item) for item in guardrail["expected_tier_status_values"]
+    }
     if tier_status_values != expected_tier_status_values:
         errors.append(
             "contract tier_status_values must be exactly "
@@ -217,7 +252,8 @@ def _check_capabilities_health_contract(path: Path, label: str) -> list[str]:
 
 def main() -> int:
     errors: list[str] = []
-    errors.extend(_check_contract())
+    guardrail = _load_guardrail_contract()
+    errors.extend(_check_contract(guardrail))
     errors.extend(_check_metadata())
     errors.extend(_check_transport_source(HTTP_TRANSPORT, "HTTP transport"))
     errors.extend(_check_transport_source(STDIO_GATEWAY, "stdio gateway"))

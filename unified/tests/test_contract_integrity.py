@@ -413,6 +413,25 @@ def test_release_gate_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in required_checks)
 
 
+def test_capabilities_truthfulness_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (
+            _contracts_dir() / "capabilities_truthfulness_guardrail_contract.json"
+        ).read_text(encoding="utf-8")
+    )
+    keys = (
+        "expected_health_required_keys",
+        "expected_health_component_required_keys",
+        "expected_health_overall_values",
+        "expected_tier_required_keys",
+        "expected_tier_status_values",
+    )
+    for key in keys:
+        value = raw[key]
+        assert isinstance(value, list) and value
+        assert all(isinstance(item, str) and item for item in value)
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(

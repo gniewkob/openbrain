@@ -1,0 +1,27 @@
+{
+  "expected_health_required_keys": [
+    "overall",
+    "source",
+    "components"
+  ],
+  "expected_health_component_required_keys": [
+    "api",
+    "db",
+    "vector_store",
+    "obsidian"
+  ],
+  "expected_health_overall_values": [
+    "healthy",
+    "degraded",
+    "unavailable"
+  ],
+  "expected_tier_required_keys": [
+    "status",
+    "tools"
+  ],
+  "expected_tier_status_values": [
+    "stable",
+    "active",
+    "guarded"
+  ]
+}
