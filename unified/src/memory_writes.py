@@ -975,10 +975,13 @@ async def _run_maintenance_inner(
         normalize_owners=req.normalize_owners,
         dry_run=req.dry_run,
     )
-    link_actions, links_fixed = await _fix_superseded_links(
-        session=session,
-        dry_run=req.dry_run,
-    )
+    if req.fix_superseded_links:
+        link_actions, links_fixed = await _fix_superseded_links(
+            session=session,
+            dry_run=req.dry_run,
+        )
+    else:
+        link_actions, links_fixed = [], 0
 
     actions = dup_actions + owner_actions + link_actions
     report = MaintenanceReport(
