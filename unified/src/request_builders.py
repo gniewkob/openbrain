@@ -47,6 +47,7 @@ def build_list_filters(
     tenant_id: str | None = None,
     include_test_data: bool | None = None,
 ) -> dict[str, Any]:
+    """Build a filters dict from non-None keyword arguments for list queries."""
     filters: dict[str, Any] = {}
     if domain:
         filters["domain"] = domain
@@ -66,6 +67,7 @@ def build_list_filters(
 
 
 def build_find_list_payload(*, limit: int, filters: dict[str, Any]) -> dict[str, Any]:
+    """Build the POST /find/list request body using contract-defined sort and query."""
     return {
         "query": _CONTRACTS["find_list_query"],
         "filters": filters,
@@ -80,6 +82,7 @@ def build_find_search_payload(
     limit: int,
     filters: dict[str, Any],
 ) -> dict[str, Any]:
+    """Build the POST /find/search request body for semantic search."""
     return {
         "query": query,
         "filters": filters,
@@ -94,6 +97,7 @@ def build_sync_check_payload(
     obsidian_ref: str | None = None,
     file_hash: str | None = None,
 ) -> dict[str, Any]:
+    """Build the sync-check request body from optional lookup fields."""
     return {
         "memory_id": memory_id,
         "match_key": match_key,
@@ -103,6 +107,7 @@ def build_sync_check_payload(
 
 
 def normalize_updated_by(updated_by: str | None) -> str:
+    """Return a non-empty actor string, falling back to the contract default."""
     if isinstance(updated_by, str):
         actor = updated_by.strip()
         if actor:

@@ -317,6 +317,7 @@ async def sync_check(
 
 
 async def get_memory_status_counts(session: AsyncSession) -> dict[str, int]:
+    """Return count of non-test memories grouped by status."""
     result = await session.execute(
         select(Memory.status, func.count(Memory.id))
         .where(func.coalesce(Memory.metadata_["test_data"].astext, "false") != "true")
@@ -334,6 +335,7 @@ async def get_memory_status_counts(session: AsyncSession) -> dict[str, int]:
 async def get_memory_domain_status_counts(
     session: AsyncSession,
 ) -> dict[str, dict[str, int]]:
+    """Return status counts per domain for non-test memories."""
     result = await session.execute(
         select(Memory.domain, Memory.status, func.count(Memory.id))
         .where(func.coalesce(Memory.metadata_["test_data"].astext, "false") != "true")
@@ -653,6 +655,7 @@ async def get_test_data_hygiene_report(
 async def list_maintenance_reports(
     session: AsyncSession, limit: int = 20
 ) -> list[MaintenanceReportEntry]:
+    """Return the most recent maintenance audit log entries as report summaries."""
     result = await session.execute(
         select(AuditLog)
         .where(
@@ -684,6 +687,7 @@ async def list_maintenance_reports(
 async def get_maintenance_report(
     session: AsyncSession, report_id: str
 ) -> MaintenanceReportDetail | None:
+    """Fetch a single maintenance report detail by audit log ID."""
     result = await session.execute(
         select(AuditLog).where(
             AuditLog.id == report_id,
@@ -744,6 +748,7 @@ async def get_grounding_pack(
     owner: str | None = None,
     tenant_id: str | None = None,
 ) -> MemoryGetContextResponse:
+    """Retrieve a grounding context pack for the given query and domain."""
     find_req = MemoryFindRequest(
         query=req.query,
         filters={"domain": req.domain} if req.domain else {},

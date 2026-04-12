@@ -59,6 +59,7 @@ class SyncState:
     last_sync_at: Optional[datetime] = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize SyncState to a JSON-compatible dictionary."""
         return {
             "memory_id": self.memory_id,
             "obsidian_path": self.obsidian_path,
@@ -77,6 +78,7 @@ class SyncState:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SyncState":
+        """Deserialize a SyncState from a dictionary produced by to_dict."""
         return cls(
             memory_id=data["memory_id"],
             obsidian_path=data["obsidian_path"],
@@ -109,6 +111,7 @@ class SyncChange:
     resolution: Optional[str] = None  # How conflict was/will be resolved
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize SyncChange to a JSON-compatible dictionary."""
         return {
             "memory_id": self.memory_id,
             "obsidian_path": self.obsidian_path,
@@ -139,6 +142,7 @@ class SyncResult:
     details: list[SyncChange] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize SyncResult to a JSON-compatible dictionary."""
         return {
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat()

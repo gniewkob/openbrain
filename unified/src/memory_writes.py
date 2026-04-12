@@ -602,6 +602,7 @@ async def store_memory(
 async def store_memories_bulk(
     session: AsyncSession, items: list[MemoryCreate]
 ) -> list[MemoryOut]:
+    """Bulk-write multiple new memories using upsert mode and return their output records."""
     records = [
         MemoryWriteRecord(
             content=item.content,
@@ -669,6 +670,7 @@ def _build_update_write_record(memory: Memory, data: MemoryUpdate) -> MemoryWrit
 async def update_memory(
     session: AsyncSession, memory_id: str, data: MemoryUpdate, actor: str = "agent"
 ) -> MemoryOut | None:
+    """Patch an existing memory record, appending a version for corporate domain."""
     stmt = select(Memory).where(Memory.id == memory_id)
     res = await session.execute(stmt)
     memory = res.scalar_one_or_none()
@@ -698,6 +700,7 @@ async def update_memory(
 async def delete_memory(
     session: AsyncSession, memory_id: str, actor: str = "agent"
 ) -> bool:
+    """Hard-delete a memory; raises ValueError for append-only (corporate) records."""
     stmt = select(Memory).where(Memory.id == memory_id)
     result = await session.execute(stmt)
     memory = result.scalar_one_or_none()
@@ -748,6 +751,7 @@ def _classify_bulk_results(
 async def upsert_memories_bulk(
     session: AsyncSession, items: list[MemoryUpsertItem]
 ) -> BulkUpsertResult:
+    """Upsert a batch of memories keyed by match_key; all items must have match_key set."""
     missing_match_keys = [
         str(index) for index, item in enumerate(items) if not item.match_key
     ]

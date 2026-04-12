@@ -43,16 +43,21 @@ def _uuid() -> str:
 
 
 def compute_hash(content: str) -> str:
+    """Return the SHA-256 hex digest of the UTF-8 encoded content string."""
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 class DomainEnum(str, PyEnum):
+    """Enumeration of supported memory domains."""
+
     corporate = "corporate"
     build = "build"
     personal = "personal"
 
 
 class Memory(Base):
+    """SQLAlchemy ORM model for the memories table."""
+
     __tablename__ = "memories"
 
     id: Mapped[str] = mapped_column(String(), primary_key=True, default=_uuid)

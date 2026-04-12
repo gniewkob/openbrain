@@ -45,10 +45,12 @@ _MEMORY_BASE, _PATHS = _load_contract()
 
 
 def memory_path(name: str) -> str:
+    """Return the relative path for a named memory endpoint from the contract."""
     return _PATHS[name]
 
 
 def memory_item_path(memory_id: str) -> str:
+    """Return the relative item path for a specific memory ID."""
     return f"/{memory_id}"
 
 
