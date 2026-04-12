@@ -384,6 +384,26 @@ def test_export_guardrail_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in behavior_snippets)
 
 
+def test_http_error_contract_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (
+            _contracts_dir() / "http_error_contract_guardrail_contract.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert isinstance(raw["required_root_keys"], list) and raw["required_root_keys"]
+    assert isinstance(raw["required_status_label_keys"], list) and raw[
+        "required_status_label_keys"
+    ]
+    assert isinstance(raw["required_fallbacks"], dict) and raw["required_fallbacks"]
+    assert isinstance(raw["required_missing_session_hint"], dict) and raw[
+        "required_missing_session_hint"
+    ]
+    assert all(isinstance(item, str) and item for item in raw["required_root_keys"])
+    assert all(
+        isinstance(item, str) and item for item in raw["required_status_label_keys"]
+    )
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(

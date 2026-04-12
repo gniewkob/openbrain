@@ -25,6 +25,7 @@ def test_http_error_contract_semantics_guardrail_passes_for_current_contract() -
 
 def test_http_error_contract_semantics_detects_missing_session_hint_drift() -> None:
     module = _load_http_error_contract_semantics_module()
+    guardrail = module._load_guardrail_contract(module.GUARDRAIL_CONTRACT_PATH)
     bad = {
         "status_labels": {
             "401": "Authentication required",
@@ -43,6 +44,17 @@ def test_http_error_contract_semantics_detects_missing_session_hint_drift() -> N
         "fallback_other": "Request failed",
     }
 
-    errors = module._check_contract(bad)
+    errors = module._check_contract(bad, guardrail)
     assert any("detail_hints.missing_session_id.contains drift" in err for err in errors)
     assert any("detail_hints.missing_session_id.message drift" in err for err in errors)
+
+
+def test_http_error_contract_guardrail_loader_validates_shape(tmp_path: Path) -> None:
+    module = _load_http_error_contract_semantics_module()
+    broken = tmp_path / "http_error_contract_guardrail_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+    try:
+        module._load_guardrail_contract(broken)
+        assert False, "expected ValueError for invalid guardrail contract"
+    except ValueError as exc:
+        assert "required_root_keys" in str(exc)
