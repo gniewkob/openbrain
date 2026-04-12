@@ -307,6 +307,21 @@ def test_hidden_test_data_alert_guardrail_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in share_high["allowed_exprs"])
 
 
+def test_dashboard_memory_semantics_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (
+            _contracts_dir() / "dashboard_memory_semantics_guardrail_contract.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert isinstance(raw["dashboard_path"], str) and raw["dashboard_path"]
+    required_panels = raw["required_panels"]
+    assert isinstance(required_panels, list) and required_panels
+    for panel in required_panels:
+        assert isinstance(panel, dict)
+        assert isinstance(panel["title"], str) and panel["title"]
+        assert isinstance(panel["expr"], str) and panel["expr"]
+
+
 def test_capabilities_health_guardrail_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "capabilities_health_guardrail_contract.json").read_text(
