@@ -387,6 +387,135 @@ async def get_hidden_test_data_counts(session: AsyncSession) -> dict[str, int]:
     }
 
 
+def _compute_hidden_ratios(
+    hidden_counts: dict[str, int],
+    visible_status_counts: dict[str, int],
+    visible_domain_status_counts: dict[str, dict[str, int]],
+) -> tuple[float, dict[str, float]]:
+    """Compute hidden-to-active ratios overall and per domain.
+
+    Returns (hidden_active_ratio, hidden_active_ratio_by_domain).
+    """
+    hidden_active_total = int(hidden_counts.get("hidden_test_data_active_total", 0))
+    visible_active_total = int(visible_status_counts.get("active", 0))
+    hidden_build = int(hidden_counts.get("hidden_test_data_build_total", 0))
+    hidden_corporate = int(hidden_counts.get("hidden_test_data_corporate_total", 0))
+    hidden_personal = int(hidden_counts.get("hidden_test_data_personal_total", 0))
+    visible_build_active = int(
+        visible_domain_status_counts.get("build", {}).get("active", 0)
+    )
+    visible_corporate_active = int(
+        visible_domain_status_counts.get("corporate", {}).get("active", 0)
+    )
+    visible_personal_active = int(
+        visible_domain_status_counts.get("personal", {}).get("active", 0)
+    )
+    active_total_all = visible_active_total + hidden_active_total
+    hidden_active_ratio = (
+        round(hidden_active_total / active_total_all, 4)
+        if active_total_all > 0
+        else 0.0
+    )
+    hidden_active_ratio_by_domain = {
+        "build": (
+            round(hidden_build / (visible_build_active + hidden_build), 4)
+            if (visible_build_active + hidden_build) > 0
+            else 0.0
+        ),
+        "corporate": (
+            round(hidden_corporate / (visible_corporate_active + hidden_corporate), 4)
+            if (visible_corporate_active + hidden_corporate) > 0
+            else 0.0
+        ),
+        "personal": (
+            round(hidden_personal / (visible_personal_active + hidden_personal), 4)
+            if (visible_personal_active + hidden_personal) > 0
+            else 0.0
+        ),
+    }
+    return hidden_active_ratio, hidden_active_ratio_by_domain
+
+
+def _build_hygiene_recommendations(
+    hidden_counts: dict[str, int],
+    hidden_active_ratio: float,
+    null_match_key_count: int,
+    top_owners: dict[str, int],
+) -> list[TestDataActionSuggestion]:
+    """Build recommended actions for the hygiene report based on detected issues."""
+    recommended_actions: list[TestDataActionSuggestion] = []
+    hidden_total = int(hidden_counts.get("hidden_test_data_total", 0))
+    hidden_build = int(hidden_counts.get("hidden_test_data_build_total", 0))
+    hidden_corporate = int(hidden_counts.get("hidden_test_data_corporate_total", 0))
+
+    if hidden_total == 0:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="no_action_needed",
+                priority="low",
+                summary="No records flagged as test data were detected.",
+            )
+        )
+        return recommended_actions
+
+    if hidden_build > 0:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="cleanup_build_test_data",
+                priority="high",
+                summary=(
+                    "Build-domain test data detected; schedule controlled delete flow "
+                    "(dry-run list -> approve -> delete)."
+                ),
+            )
+        )
+    if hidden_active_ratio >= 0.25:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="hidden_ratio_elevated",
+                priority="high",
+                summary=(
+                    "Hidden test-data share is elevated (>=25% of active records); "
+                    "prioritize cleanup/quarantine to restore dashboard and retrieval trust."
+                ),
+            )
+        )
+    if hidden_corporate > 0:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="review_corporate_test_data",
+                priority="high",
+                summary=(
+                    "Corporate-domain test data detected; keep append-only constraints and "
+                    "review quarantine-only remediation."
+                ),
+            )
+        )
+    if null_match_key_count > 0:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="normalize_missing_match_keys",
+                priority="medium",
+                summary=(
+                    "Some test-data records have null match_key; add deterministic key policy "
+                    "to improve dedup and cleanup safety."
+                ),
+            )
+        )
+    if top_owners:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="owner_feedback_loop",
+                priority="medium",
+                summary=(
+                    "Top owners are identifiable; align ingestion hygiene with owners to reduce "
+                    "future test-data churn."
+                ),
+            )
+        )
+    return recommended_actions
+
+
 async def get_test_data_hygiene_report(
     session: AsyncSession, sample_limit: int = 20
 ) -> TestDataHygieneReport:
@@ -451,110 +580,15 @@ async def get_test_data_hygiene_report(
     )
     null_match_key_count = int(null_match_key_result.scalar() or 0)
 
-    recommended_actions: list[TestDataActionSuggestion] = []
-    hidden_total = int(hidden_counts.get("hidden_test_data_total", 0))
-    hidden_active_total = int(hidden_counts.get("hidden_test_data_active_total", 0))
-    hidden_build = int(hidden_counts.get("hidden_test_data_build_total", 0))
-    hidden_corporate = int(hidden_counts.get("hidden_test_data_corporate_total", 0))
-    hidden_personal = int(hidden_counts.get("hidden_test_data_personal_total", 0))
-    visible_active_total = int(visible_status_counts.get("active", 0))
-    visible_build_active = int(
-        visible_domain_status_counts.get("build", {}).get("active", 0)
+    hidden_active_ratio, hidden_active_ratio_by_domain = _compute_hidden_ratios(
+        hidden_counts, visible_status_counts, visible_domain_status_counts
     )
-    visible_corporate_active = int(
-        visible_domain_status_counts.get("corporate", {}).get("active", 0)
+    recommended_actions = _build_hygiene_recommendations(
+        hidden_counts=hidden_counts,
+        hidden_active_ratio=hidden_active_ratio,
+        null_match_key_count=null_match_key_count,
+        top_owners=top_owners,
     )
-    visible_personal_active = int(
-        visible_domain_status_counts.get("personal", {}).get("active", 0)
-    )
-    active_total_all = visible_active_total + hidden_active_total
-    hidden_active_ratio = (
-        round(hidden_active_total / active_total_all, 4)
-        if active_total_all > 0
-        else 0.0
-    )
-    hidden_active_ratio_by_domain = {
-        "build": (
-            round(hidden_build / (visible_build_active + hidden_build), 4)
-            if (visible_build_active + hidden_build) > 0
-            else 0.0
-        ),
-        "corporate": (
-            round(hidden_corporate / (visible_corporate_active + hidden_corporate), 4)
-            if (visible_corporate_active + hidden_corporate) > 0
-            else 0.0
-        ),
-        "personal": (
-            round(hidden_personal / (visible_personal_active + hidden_personal), 4)
-            if (visible_personal_active + hidden_personal) > 0
-            else 0.0
-        ),
-    }
-
-    if hidden_total == 0:
-        recommended_actions.append(
-            TestDataActionSuggestion(
-                code="no_action_needed",
-                priority="low",
-                summary="No records flagged as test data were detected.",
-            )
-        )
-    else:
-        if hidden_build > 0:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="cleanup_build_test_data",
-                    priority="high",
-                    summary=(
-                        "Build-domain test data detected; schedule controlled delete flow "
-                        "(dry-run list -> approve -> delete)."
-                    ),
-                )
-            )
-        if hidden_active_ratio >= 0.25:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="hidden_ratio_elevated",
-                    priority="high",
-                    summary=(
-                        "Hidden test-data share is elevated (>=25% of active records); "
-                        "prioritize cleanup/quarantine to restore dashboard and retrieval trust."
-                    ),
-                )
-            )
-        if hidden_corporate > 0:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="review_corporate_test_data",
-                    priority="high",
-                    summary=(
-                        "Corporate-domain test data detected; keep append-only constraints and "
-                        "review quarantine-only remediation."
-                    ),
-                )
-            )
-        if null_match_key_count > 0:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="normalize_missing_match_keys",
-                    priority="medium",
-                    summary=(
-                        "Some test-data records have null match_key; add deterministic key policy "
-                        "to improve dedup and cleanup safety."
-                    ),
-                )
-            )
-        if top_owners:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="owner_feedback_loop",
-                    priority="medium",
-                    summary=(
-                        "Top owners are identifiable; align ingestion hygiene with owners to reduce "
-                        "future test-data churn."
-                    ),
-                )
-            )
 
     sample_result = await session.execute(
         select(
