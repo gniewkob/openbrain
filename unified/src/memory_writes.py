@@ -635,17 +635,10 @@ async def store_memories_bulk(
     ]
 
 
-async def update_memory(
-    session: AsyncSession, memory_id: str, data: MemoryUpdate, actor: str = "agent"
-) -> MemoryOut | None:
-    stmt = select(Memory).where(Memory.id == memory_id)
-    res = await session.execute(stmt)
-    memory = res.scalar_one_or_none()
-    if not memory:
-        return None
-
+def _build_update_write_record(memory: Memory, data: MemoryUpdate) -> MemoryWriteRecord:
+    """Build a MemoryWriteRecord that merges current memory state with patch data."""
     metadata = memory.metadata_ or {}
-    write_record = MemoryWriteRecord(
+    return MemoryWriteRecord(
         match_key=memory.match_key,
         content=data.content if data.content is not None else memory.content,
         domain=memory.domain.value,
@@ -671,13 +664,24 @@ async def update_memory(
         if data.custom_fields is not None
         else (metadata.get("custom_fields") or {}),
     )
+
+
+async def update_memory(
+    session: AsyncSession, memory_id: str, data: MemoryUpdate, actor: str = "agent"
+) -> MemoryOut | None:
+    stmt = select(Memory).where(Memory.id == memory_id)
+    res = await session.execute(stmt)
+    memory = res.scalar_one_or_none()
+    if not memory:
+        return None
+
+    write_record = _build_update_write_record(memory, data)
     write_mode = (
         WriteMode.append_version
         if _requires_append_only(memory.domain, memory.entity_type)
         else WriteMode.upsert
     )
-    write_func = handle_memory_write
-    res_v1 = await write_func(
+    res_v1 = await handle_memory_write(
         session,
         MemoryWriteRequest(record=write_record, write_mode=write_mode),
         actor=actor,
@@ -722,6 +726,25 @@ async def delete_memory(
     return True
 
 
+def _classify_bulk_results(
+    results: list[BatchResultItem],
+    id_to_mem: dict,
+) -> tuple[list, list, list]:
+    """Classify bulk write results into inserted, updated, and skipped lists."""
+    inserted = []
+    updated = []
+    skipped = []
+    for result in results:
+        memory = id_to_mem.get(result.record_id) if result.record_id else None
+        if result.status == "created" and memory:
+            inserted.append(memory)
+        elif result.status in {"updated", "versioned"} and memory:
+            updated.append(memory)
+        elif result.status == "skipped":
+            skipped.append(result.record_id or "")
+    return inserted, updated, skipped
+
+
 async def upsert_memories_bulk(
     session: AsyncSession, items: list[MemoryUpsertItem]
 ) -> BulkUpsertResult:
@@ -764,15 +787,7 @@ async def upsert_memories_bulk(
     else:
         id_to_mem = {}
 
-    inserted, updated, skipped = [], [], []
-    for result in res.results:
-        memory = id_to_mem.get(result.record_id) if result.record_id else None
-        if result.status == "created" and memory:
-            inserted.append(memory)
-        elif result.status in {"updated", "versioned"} and memory:
-            updated.append(memory)
-        elif result.status == "skipped":
-            skipped.append(result.record_id or "")
+    inserted, updated, skipped = _classify_bulk_results(res.results, id_to_mem)
     return BulkUpsertResult(inserted=inserted, updated=updated, skipped=skipped)
 
 
