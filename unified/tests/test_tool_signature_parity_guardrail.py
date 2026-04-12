@@ -25,6 +25,7 @@ def test_tool_signature_parity_guardrail_passes_for_current_sources() -> None:
 
 def test_tool_signature_parity_detects_parameter_order_drift() -> None:
     module = _load_tool_signature_parity_module()
+    checked_tools = ["brain_update"]
     transport_src = """
 async def brain_update(memory_id, content, updated_by="agent", title=None):
     return {}
@@ -33,6 +34,21 @@ async def brain_update(memory_id, content, updated_by="agent", title=None):
 async def brain_update(memory_id, content, title=None, updated_by="agent"):
     return {}
 """
-    module.CHECKED_TOOLS = ("brain_update",)
-    errors = module._check_signature_parity(transport_src, gateway_src)
+    errors = module._check_signature_parity(transport_src, gateway_src, checked_tools)
     assert any("brain_update signature drift" in err for err in errors)
+
+
+def test_tool_signature_guardrail_contract_loader_validates_shape(tmp_path: Path) -> None:
+    module = _load_tool_signature_parity_module()
+    broken = tmp_path / "tool_signature_guardrail_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+    old_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for invalid tool signature contract"
+        except ValueError as exc:
+            assert "checked_tools" in str(exc)
+    finally:
+        module.CONTRACT = old_contract

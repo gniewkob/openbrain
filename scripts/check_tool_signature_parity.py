@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from pathlib import Path
 
@@ -11,13 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MCP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
 MCP_GATEWAY = ROOT / "unified/mcp-gateway/src/main.py"
-
-CHECKED_TOOLS = (
-    "brain_search",
-    "brain_list",
-    "brain_delete",
-    "brain_update",
-)
+CONTRACT = ROOT / "unified/contracts/tool_signature_guardrail_contract.json"
 
 
 def _fail(message: str) -> int:
@@ -41,6 +36,18 @@ def _defaults_map(args: ast.arguments) -> dict[str, str | None]:
     return values
 
 
+def _load_contract() -> list[str]:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("tool_signature_guardrail_contract must be object")
+    checked_tools = payload.get("checked_tools")
+    if not isinstance(checked_tools, list) or not checked_tools:
+        raise ValueError("contract checked_tools must be non-empty list")
+    if any(not isinstance(tool, str) or not tool for tool in checked_tools):
+        raise ValueError("contract checked_tools must contain non-empty strings")
+    return [str(tool) for tool in checked_tools]
+
+
 def _extract_signature(source: str, fn_name: str) -> list[tuple[str, str | None]]:
     tree = ast.parse(source)
     for node in tree.body:
@@ -57,9 +64,11 @@ def _extract_signature(source: str, fn_name: str) -> list[tuple[str, str | None]
     raise ValueError(f"{fn_name} not found")
 
 
-def _check_signature_parity(transport_src: str, gateway_src: str) -> list[str]:
+def _check_signature_parity(
+    transport_src: str, gateway_src: str, checked_tools: list[str]
+) -> list[str]:
     errors: list[str] = []
-    for tool in CHECKED_TOOLS:
+    for tool in checked_tools:
         transport_sig = _extract_signature(transport_src, tool)
         gateway_sig = _extract_signature(gateway_src, tool)
         if transport_sig != gateway_sig:
@@ -70,9 +79,10 @@ def _check_signature_parity(transport_src: str, gateway_src: str) -> list[str]:
 
 
 def main() -> int:
+    checked_tools = _load_contract()
     transport_src = MCP_TRANSPORT.read_text(encoding="utf-8")
     gateway_src = MCP_GATEWAY.read_text(encoding="utf-8")
-    errors = _check_signature_parity(transport_src, gateway_src)
+    errors = _check_signature_parity(transport_src, gateway_src, checked_tools)
     if errors:
         for error in errors:
             _fail(error)

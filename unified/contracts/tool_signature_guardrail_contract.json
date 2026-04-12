@@ -1,0 +1,8 @@
+{
+  "checked_tools": [
+    "brain_search",
+    "brain_list",
+    "brain_delete",
+    "brain_update"
+  ]
+}
