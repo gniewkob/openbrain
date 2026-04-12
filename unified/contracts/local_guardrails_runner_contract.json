@@ -1,0 +1,174 @@
+{
+  "steps": [
+    {
+      "label": "repository hygiene",
+      "script": "scripts/check_repo_hygiene.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "compose guardrails",
+      "script": "scripts/check_compose_guardrails.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "capabilities manifest parity",
+      "script": "scripts/check_capabilities_manifest_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "capabilities metadata parity",
+      "script": "scripts/check_capabilities_metadata_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "capabilities health parity",
+      "script": "scripts/check_capabilities_health_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "capabilities tier status parity",
+      "script": "scripts/check_capabilities_tier_status_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "backend probe contract parity",
+      "script": "scripts/check_backend_probe_contract_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "request/runtime parity",
+      "script": "scripts/check_request_runtime_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "makefile pr-readiness parity",
+      "script": "scripts/check_makefile_pr_readiness_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "shared http client reuse",
+      "script": "scripts/check_shared_http_client_reuse.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "tool signature parity",
+      "script": "scripts/check_tool_signature_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "admin bounds parity",
+      "script": "scripts/check_admin_bounds_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "admin endpoint contract parity",
+      "script": "scripts/check_admin_endpoint_contract_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "tool inventory parity",
+      "script": "scripts/check_tool_inventory_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "mcp transport import scope",
+      "script": "scripts/check_mcp_transport_import_scope.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "mcp transport mount contract",
+      "script": "scripts/check_mcp_transport_mount_contract.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "capabilities tools truthfulness",
+      "script": "scripts/check_capabilities_tools_truthfulness.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "search filter parity",
+      "script": "scripts/check_search_filter_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "list filter parity",
+      "script": "scripts/check_list_filter_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "response normalizers parity",
+      "script": "scripts/check_response_normalizers_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "http error adapter parity",
+      "script": "scripts/check_http_error_adapter_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "http error contract semantics",
+      "script": "scripts/check_http_error_contract_semantics.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "capabilities truthfulness",
+      "script": "scripts/check_capabilities_truthfulness.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "audit semantics",
+      "script": "scripts/check_audit_semantics.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "cleanup actor semantics",
+      "script": "scripts/check_cleanup_actor_semantics.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "update audit semantics parity",
+      "script": "scripts/check_update_audit_semantics_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "delete semantics parity",
+      "script": "scripts/check_delete_semantics_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "export contract",
+      "script": "scripts/check_export_contract.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "obsidian contract",
+      "script": "scripts/check_obsidian_contract.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "mcp http session contract",
+      "script": "scripts/check_mcp_http_session_contract.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "telemetry contract parity",
+      "script": "scripts/check_telemetry_contract_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "dashboard memory semantics",
+      "script": "scripts/check_dashboard_memory_semantics.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "hidden test-data alert parity",
+      "script": "scripts/check_hidden_test_data_alert_parity.py",
+      "timeout_seconds": 60
+    },
+    {
+      "label": "monitoring contract",
+      "script": "scripts/validate_monitoring_contract.py",
+      "timeout_seconds": 90
+    }
+  ]
+}

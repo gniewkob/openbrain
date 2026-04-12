@@ -483,6 +483,24 @@ def test_mcp_http_session_contract_shape() -> None:
     ]
 
 
+def test_local_guardrails_runner_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "local_guardrails_runner_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    steps = raw["steps"]
+    assert isinstance(steps, list) and steps
+    labels: set[str] = set()
+    for step in steps:
+        assert isinstance(step, dict)
+        assert isinstance(step["label"], str) and step["label"]
+        assert isinstance(step["script"], str) and step["script"]
+        assert isinstance(step["timeout_seconds"], int) and step["timeout_seconds"] > 0
+        labels.add(step["label"])
+    assert len(labels) == len(steps)
+
+
 def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
     monkeypatch.setenv("ENV", "production")
     msg = backend_error_message(500, {"detail": "secret"})
