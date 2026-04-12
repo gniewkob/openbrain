@@ -21,11 +21,11 @@ def _fail(message: str) -> int:
     return 1
 
 
-def _load_pr_readiness_contract() -> dict[str, list[str]]:
+def _load_pr_readiness_contract() -> dict[str, object]:
     payload = json.loads(PR_READINESS_CONTRACT.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("pr_readiness_runner_contract must be a JSON object")
-    result: dict[str, list[str]] = {}
+    result: dict[str, object] = {}
     for key in ("guardrail_runner_test_files", "contract_integrity_test_files"):
         value = payload.get(key)
         if not isinstance(value, list) or not value:
@@ -33,6 +33,26 @@ def _load_pr_readiness_contract() -> dict[str, list[str]]:
         if any(not isinstance(item, str) or not item for item in value):
             raise ValueError(f"contract {key} must contain non-empty strings")
         result[key] = [str(item) for item in value]
+
+    mappings = payload.get("makefile_parity_mappings")
+    if not isinstance(mappings, list) or not mappings:
+        raise ValueError("contract makefile_parity_mappings must be a non-empty list")
+    normalized_mappings: list[tuple[str, str]] = []
+    for item in mappings:
+        if not isinstance(item, dict):
+            raise ValueError("contract makefile_parity_mappings items must be objects")
+        step_label = item.get("step_label")
+        make_target = item.get("make_target")
+        if not isinstance(step_label, str) or not step_label:
+            raise ValueError(
+                "contract makefile_parity_mappings.step_label must be non-empty string"
+            )
+        if not isinstance(make_target, str) or not make_target:
+            raise ValueError(
+                "contract makefile_parity_mappings.make_target must be non-empty string"
+            )
+        normalized_mappings.append((step_label, make_target))
+    result["makefile_parity_mappings"] = normalized_mappings
     return result
 
 
@@ -113,10 +133,8 @@ def _extract_make_target_tests(source: str, target_name: str) -> set[str]:
 
 def _check_parity(pr_source: str, make_source: str) -> list[str]:
     errors: list[str] = []
-    mappings = (
-        ("guardrail runner tests", "guardrail-tests"),
-        ("contract integrity smoke", "contract-smoke"),
-    )
+    contract = _load_pr_readiness_contract()
+    mappings = list(contract["makefile_parity_mappings"])
     for step_label, target_name in mappings:
         pr_tests = _extract_pr_step_tests(pr_source, step_label)
         make_tests = _extract_make_target_tests(make_source, target_name)

@@ -79,7 +79,11 @@ def test_makefile_pr_readiness_parity_supports_starred_contract_lists(
     "local guardrails": 180,
     "guardrail runner tests": 300,
     "contract integrity smoke": 300
-  }
+  },
+  "makefile_parity_mappings": [
+    {"step_label": "guardrail runner tests", "make_target": "guardrail-tests"},
+    {"step_label": "contract integrity smoke", "make_target": "contract-smoke"}
+  ]
 }
 """.strip(),
         encoding="utf-8",

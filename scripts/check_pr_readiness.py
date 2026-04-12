@@ -19,7 +19,7 @@ def _test_python() -> str:
         return str(PREFERRED_TEST_PYTHON)
     return sys.executable
 
-def _load_contract() -> tuple[list[str], list[str], dict[str, int]]:
+def _load_contract() -> tuple[list[str], list[str], dict[str, int], list[tuple[str, str]]]:
     payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("pr_readiness_runner_contract must be a JSON object")
@@ -56,10 +56,29 @@ def _load_contract() -> tuple[list[str], list[str], dict[str, int]]:
             raise ValueError("contract step_timeouts_seconds values must be positive ints")
         timeouts[label] = raw_timeout
 
-    return guardrail_tests, contract_smoke_tests, timeouts
+    mappings_raw = payload.get("makefile_parity_mappings")
+    if not isinstance(mappings_raw, list) or not mappings_raw:
+        raise ValueError("contract makefile_parity_mappings must be non-empty list")
+    mappings: list[tuple[str, str]] = []
+    for item in mappings_raw:
+        if not isinstance(item, dict):
+            raise ValueError("contract makefile_parity_mappings items must be objects")
+        step_label = item.get("step_label")
+        make_target = item.get("make_target")
+        if not isinstance(step_label, str) or not step_label:
+            raise ValueError(
+                "contract makefile_parity_mappings.step_label must be non-empty string"
+            )
+        if not isinstance(make_target, str) or not make_target:
+            raise ValueError(
+                "contract makefile_parity_mappings.make_target must be non-empty string"
+            )
+        mappings.append((step_label, make_target))
+
+    return guardrail_tests, contract_smoke_tests, timeouts, mappings
 
 
-_GUARDRAIL_TESTS, _CONTRACT_SMOKE_TESTS, STEP_TIMEOUT_SECONDS = _load_contract()
+_GUARDRAIL_TESTS, _CONTRACT_SMOKE_TESTS, STEP_TIMEOUT_SECONDS, _PARITY_MAPPINGS = _load_contract()
 
 PR_READINESS_STEPS: tuple[tuple[str, list[str]], ...] = (
     ("local guardrails", [sys.executable, "scripts/check_local_guardrails.py"]),
