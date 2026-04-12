@@ -442,8 +442,37 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["backend"]["api"], "reachable")
         self.assertEqual(result["backend"]["db"], "degraded")
         self.assertEqual(result["backend"]["probe"], "readyz")
+        self.assertEqual(result["backend"]["primary_path"], "/readyz")
         self.assertEqual(result["health"]["overall"], "degraded")
         self.assertEqual(result["health"]["components"]["db"], "degraded")
+
+    async def test_brain_capabilities_uses_api_v1_readyz_when_root_readyz_fails(self) -> None:
+        gateway = load_gateway_main()
+
+        readyz_client = AsyncMock()
+        readyz_client.__aenter__.return_value = readyz_client
+        readyz_client.__aexit__.return_value = False
+        readyz_client.get.side_effect = RuntimeError("root readyz unavailable")
+
+        readyz_v1_client = AsyncMock()
+        readyz_v1_client.__aenter__.return_value = readyz_v1_client
+        readyz_v1_client.__aexit__.return_value = False
+        readyz_v1_client.get.return_value = _MockResponse(
+            200,
+            {"status": "ok", "db": "ok", "vector_store": "ok"},
+        )
+
+        with patch(
+            "_gateway_src.main.httpx.AsyncClient",
+            side_effect=[readyz_client, readyz_v1_client],
+        ):
+            result = await gateway.brain_capabilities()
+
+        self.assertEqual(result["backend"]["status"], "ok")
+        self.assertEqual(result["backend"]["api"], "reachable")
+        self.assertEqual(result["backend"]["probe"], "readyz")
+        self.assertEqual(result["backend"]["primary_path"], "/api/v1/readyz")
+        self.assertEqual(result["health"]["overall"], "healthy")
 
     async def test_brain_capabilities_falls_back_to_healthz_before_reporting_outage(self) -> None:
         gateway = load_gateway_main()
@@ -453,6 +482,11 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         readyz_client.__aexit__.return_value = False
         readyz_client.get.side_effect = RuntimeError("connection refused")
 
+        readyz_v1_client = AsyncMock()
+        readyz_v1_client.__aenter__.return_value = readyz_v1_client
+        readyz_v1_client.__aexit__.return_value = False
+        readyz_v1_client.get.side_effect = RuntimeError("connection refused v1")
+
         healthz_client = AsyncMock()
         healthz_client.__aenter__.return_value = healthz_client
         healthz_client.__aexit__.return_value = False
@@ -460,7 +494,7 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
 
         with patch(
             "_gateway_src.main.httpx.AsyncClient",
-            side_effect=[readyz_client, healthz_client],
+            side_effect=[readyz_client, readyz_v1_client, healthz_client],
         ):
             result = await gateway.brain_capabilities()
 
@@ -478,6 +512,11 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         readyz_client.__aexit__.return_value = False
         readyz_client.get.side_effect = RuntimeError("readyz down")
 
+        readyz_v1_client = AsyncMock()
+        readyz_v1_client.__aenter__.return_value = readyz_v1_client
+        readyz_v1_client.__aexit__.return_value = False
+        readyz_v1_client.get.side_effect = RuntimeError("readyz v1 down")
+
         healthz_client = AsyncMock()
         healthz_client.__aenter__.return_value = healthz_client
         healthz_client.__aexit__.return_value = False
@@ -488,7 +527,7 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch(
                 "_gateway_src.main.httpx.AsyncClient",
-                side_effect=[readyz_client, healthz_client],
+                side_effect=[readyz_client, readyz_v1_client, healthz_client],
             ),
             patch("_gateway_src.main._client", return_value=api_client),
         ):

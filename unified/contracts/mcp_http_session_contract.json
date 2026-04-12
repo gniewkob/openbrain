@@ -1,0 +1,15 @@
+{
+  "required_run_kwargs": {
+    "transport": "streamable-http",
+    "path": "/",
+    "stateless_http": "True"
+  },
+  "required_custom_routes": [
+    "/consent",
+    "/.well-known/openid-configuration"
+  ],
+  "require_main_entrypoint_call": true,
+  "runbook_required_snippets": [
+    "Missing session ID"
+  ]
+}

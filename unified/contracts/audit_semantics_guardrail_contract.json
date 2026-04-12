@@ -1,0 +1,11 @@
+{
+  "memory_write_required_patterns": [
+    "created_by\\s*=\\s*actor",
+    "\"updated_by\"\\s*:\\s*actor",
+    "created_by\\s*=\\s*existing\\.created_by"
+  ],
+  "mcp_placeholder_required_patterns": [
+    "normalize_updated_by\\s*\\(\\s*updated_by\\s*\\)",
+    "\"updated_by\"\\s*:\\s*canonical_updated_by\\s*\\(\\s*\\)"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "required_root_keys": [
+    "status_labels",
+    "detail_hints",
+    "fallback_5xx",
+    "fallback_other"
+  ],
+  "required_status_label_keys": [
+    "401",
+    "403",
+    "404",
+    "422"
+  ],
+  "required_fallbacks": {
+    "fallback_5xx": "Internal server error",
+    "fallback_other": "Request failed"
+  },
+  "required_missing_session_hint": {
+    "status_code": 400,
+    "contains": "Missing session ID",
+    "message": "Missing MCP session context; reconnect the MCP HTTP client and retry."
+  }
+}

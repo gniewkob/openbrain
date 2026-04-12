@@ -544,10 +544,42 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "top_k must be 1"):
             await mcp_transport.brain_search(query="x", top_k=0)
 
+    async def test_brain_search_can_include_test_data_filter(self) -> None:
+        response = _FakeResponse(200, payload=[])
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            await mcp_transport.brain_search(
+                query="x",
+                top_k=2,
+                include_test_data=True,
+            )
+        self.assertEqual(
+            fake_client.last_request,
+            (
+                "POST",
+                "/api/v1/memory/find",
+                {
+                    "json": {
+                        "query": "x",
+                        "filters": {"include_test_data": True},
+                        "limit": 2,
+                    }
+                },
+            ),
+        )
+
     async def test_brain_search_top_k_over_limit_raises(self) -> None:
         with self.assertRaisesRegex(ValueError, "top_k must be 1"):
             await mcp_transport.brain_search(
                 query="x", top_k=mcp_transport.MAX_SEARCH_TOP_K + 1
+            )
+
+    async def test_brain_search_include_test_data_non_bool_raises(self) -> None:
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await mcp_transport.brain_search(
+                query="x",
+                top_k=1,
+                include_test_data="true",  # type: ignore[arg-type]
             )
 
     async def test_brain_update_passes_custom_fields(self) -> None:
@@ -618,6 +650,32 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fake_client.last_request[0], "DELETE")
         self.assertEqual(fake_client.last_request[1], "/api/v1/memory/mem-1")
 
+    async def test_brain_delete_maps_missing_session_id_to_actionable_hint(self) -> None:
+        response = _FakeResponse(400, payload={"detail": "Missing session ID"})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            with self.assertRaisesRegex(
+                ValueError,
+                "Missing MCP session context; reconnect the MCP HTTP client and retry.",
+            ):
+                await mcp_transport.brain_delete("mem-1")
+
+    async def test_brain_delete_404_raises_not_found_message(self) -> None:
+        response = _FakeResponse(404, payload={"detail": "not found"})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            with self.assertRaisesRegex(ValueError, "Memory not found: mem-1"):
+                await mcp_transport.brain_delete("mem-1")
+
+    async def test_brain_delete_403_raises_governance_message(self) -> None:
+        response = _FakeResponse(403, payload={"detail": "forbidden"})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            with self.assertRaisesRegex(
+                ValueError, "Cannot delete corporate memories. Use deprecation instead."
+            ):
+                await mcp_transport.brain_delete("mem-1")
+
     async def test_brain_export_uses_v1_export_endpoint(self) -> None:
         response = _FakeResponse(200, payload=[{"id": "mem-1"}])
         fake_client = _FakeClient(response)
@@ -676,6 +734,27 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
+    async def test_brain_list_can_include_test_data_filter(self) -> None:
+        response = _FakeResponse(200, payload=[])
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            await mcp_transport.brain_list(limit=3, include_test_data=True)
+        self.assertEqual(
+            fake_client.last_request,
+            (
+                "POST",
+                "/api/v1/memory/find",
+                {
+                    "json": {
+                        "query": None,
+                        "filters": {"include_test_data": True},
+                        "limit": 3,
+                        "sort": "updated_at_desc",
+                    }
+                },
+            ),
+        )
+
     async def test_brain_list_limit_zero_raises(self) -> None:
         with self.assertRaisesRegex(ValueError, "limit must be 1"):
             await mcp_transport.brain_list(limit=0)
@@ -683,6 +762,13 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     async def test_brain_list_limit_over_max_raises(self) -> None:
         with self.assertRaisesRegex(ValueError, "limit must be 1"):
             await mcp_transport.brain_list(limit=mcp_transport.MAX_LIST_LIMIT + 1)
+
+    async def test_brain_list_include_test_data_non_bool_raises(self) -> None:
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await mcp_transport.brain_list(
+                limit=1,
+                include_test_data="true",  # type: ignore[arg-type]
+            )
 
     async def test_brain_obsidian_sync_limit_bounds_when_tool_enabled(self) -> None:
         if not hasattr(mcp_transport, "brain_obsidian_sync"):
@@ -744,6 +830,60 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             ("POST", "/api/v1/memory/maintain", {"json": {"dry_run": True}}),
         )
 
+    async def test_brain_test_data_report_uses_v1_admin_endpoint(self) -> None:
+        response = _FakeResponse(
+            200,
+            payload={"hidden_counts": {"hidden_test_data_total": 3}, "sample": []},
+        )
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            result = await mcp_transport.brain_test_data_report(sample_limit=5)
+        self.assertEqual(result["hidden_counts"]["hidden_test_data_total"], 3)
+        self.assertEqual(
+            fake_client.last_request,
+            (
+                "GET",
+                "/api/v1/memory/admin/test-data/report",
+                {"params": {"sample_limit": 5}},
+            ),
+        )
+
+    async def test_brain_test_data_report_validates_sample_limit_bounds(self) -> None:
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1–100, got 0"):
+            await mcp_transport.brain_test_data_report(sample_limit=0)
+
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1–100, got 101"):
+            await mcp_transport.brain_test_data_report(sample_limit=101)
+
+    async def test_brain_cleanup_build_test_data_uses_v1_admin_endpoint(self) -> None:
+        response = _FakeResponse(
+            200,
+            payload={"dry_run": True, "candidates_count": 2, "candidate_ids": ["a", "b"]},
+        )
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            result = await mcp_transport.brain_cleanup_build_test_data(
+                dry_run=True,
+                limit=50,
+            )
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["candidates_count"], 2)
+        self.assertEqual(
+            fake_client.last_request,
+            (
+                "POST",
+                "/api/v1/memory/admin/test-data/cleanup-build",
+                {"json": {"dry_run": True, "limit": 50}},
+            ),
+        )
+
+    async def test_brain_cleanup_build_test_data_validates_limit_bounds(self) -> None:
+        with self.assertRaisesRegex(ValueError, "limit must be 1–500, got 0"):
+            await mcp_transport.brain_cleanup_build_test_data(limit=0)
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1–500, got 501"):
+            await mcp_transport.brain_cleanup_build_test_data(limit=501)
+
     async def test_guard_re_raises_as_tool_error(self) -> None:
         @mcp_transport.mcp_tool_guard
         async def broken():
@@ -766,6 +906,32 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["probe"], "readyz")
+        self.assertEqual(result["primary_path"], "/readyz")
+        self.assertEqual(result["api"], "reachable")
+        self.assertEqual(result["db"], "ok")
+        self.assertEqual(result["vector_store"], "ok")
+
+    async def test_get_backend_status_uses_api_v1_readyz_when_root_readyz_fails(self) -> None:
+        with patch.object(
+            mcp_transport,
+            "_client",
+            side_effect=[
+                _ProbeClient({"/readyz": RuntimeError("root readyz unavailable")}),
+                _ProbeClient(
+                    {
+                        "/api/v1/readyz": _FakeResponse(
+                            200,
+                            payload={"status": "ok", "db": "ok", "vector_store": "ok"},
+                        )
+                    }
+                ),
+            ],
+        ):
+            result = await mcp_transport._get_backend_status()
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["probe"], "readyz")
+        self.assertEqual(result["primary_path"], "/api/v1/readyz")
         self.assertEqual(result["api"], "reachable")
         self.assertEqual(result["db"], "ok")
         self.assertEqual(result["vector_store"], "ok")
@@ -776,6 +942,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             "_client",
             side_effect=[
                 _ProbeClient({"/readyz": RuntimeError("timeout")}),
+                _ProbeClient({"/api/v1/readyz": RuntimeError("timeout v1")}),
                 _ProbeClient(
                     {"/healthz": _FakeResponse(200, payload={"status": "ok"})}
                 ),
@@ -796,6 +963,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             "_client",
             side_effect=[
                 _ProbeClient({"/readyz": RuntimeError("readyz down")}),
+                _ProbeClient({"/api/v1/readyz": RuntimeError("readyz v1 down")}),
                 _ProbeClient({"/healthz": RuntimeError("healthz down")}),
                 _ProbeClient({"/api/v1/health": RuntimeError("api health down")}),
             ],
@@ -806,6 +974,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["api"], "unreachable")
         self.assertEqual(result["probe"], "api_health_fallback")
         self.assertIn("readyz down", result["reason"])
+        self.assertIn("readyz v1 down", result["reason"])
         self.assertIn("healthz down", result["reason"])
         self.assertIn("api health down", result["reason"])
 
@@ -817,6 +986,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
             "_client",
             side_effect=[
                 _ProbeClient({"/readyz": RuntimeError("readyz timeout")}),
+                _ProbeClient({"/api/v1/readyz": RuntimeError("readyz v1 timeout")}),
                 _ProbeClient({"/healthz": RuntimeError("healthz timeout")}),
                 _ProbeClient(
                     {"/api/v1/health": _FakeResponse(200, payload={"status": "ok"})}

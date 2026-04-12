@@ -11,8 +11,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "unified/contracts/capabilities_manifest.json"
+DISABLED_REASON_CONTRACT = ROOT / "unified/contracts/obsidian_disabled_reason_contract.json"
+GUARDRAIL_CONTRACT = ROOT / "unified/contracts/obsidian_guardrail_contract.json"
 GATEWAY_MAIN = ROOT / "unified/mcp-gateway/src/main.py"
 HTTP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
+HTTP_TRANSPORT_UTILS = ROOT / "unified/src/mcp_transport_utils.py"
 
 
 def _fail(message: str) -> int:
@@ -42,6 +45,13 @@ def _find_async_function(tree: ast.AST, function_name: str) -> ast.AsyncFunction
     return None
 
 
+def _find_function(tree: ast.AST, function_name: str) -> ast.FunctionDef | None:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == function_name:
+            return node
+    return None
+
+
 def _function_calls_name(func: ast.AsyncFunctionDef, call_name: str) -> bool:
     for node in ast.walk(func):
         if not isinstance(node, ast.Call):
@@ -49,6 +59,39 @@ def _function_calls_name(func: ast.AsyncFunctionDef, call_name: str) -> bool:
         if isinstance(node.func, ast.Name) and node.func.id == call_name:
             return True
     return False
+
+
+def _sync_function_calls_name(func: ast.FunctionDef, call_name: str) -> bool:
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name) and node.func.id == call_name:
+            return True
+    return False
+
+
+def _validate_snippet_list(value: object, field_name: str) -> str | None:
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(not isinstance(snippet, str) or not snippet for snippet in value)
+    ):
+        return f"{field_name} must be non-empty list[str]"
+    return None
+
+
+def _load_obsidian_guardrail_contract() -> tuple[dict[str, object], list[str]]:
+    errors: list[str] = []
+    raw = json.loads(GUARDRAIL_CONTRACT.read_text(encoding="utf-8"))
+    gateway = raw.get("gateway")
+    http = raw.get("http")
+    if not isinstance(gateway, dict):
+        errors.append("obsidian_guardrail_contract gateway must be object")
+        gateway = {}
+    if not isinstance(http, dict):
+        errors.append("obsidian_guardrail_contract http must be object")
+        http = {}
+    return {"gateway": gateway, "http": http}, errors
 
 
 def _http_obsidian_tools_defined_under_flag(text: str, tool_names: list[str]) -> bool:
@@ -74,11 +117,34 @@ def _check_gateway_gating() -> list[str]:
     text = GATEWAY_MAIN.read_text(encoding="utf-8")
     tree = ast.parse(text)
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    contract, contract_errors = _load_obsidian_guardrail_contract()
+    errors.extend(contract_errors)
+    gateway_guardrail = contract["gateway"]
     local_tools = payload.get("local_obsidian_tools", [])
+    required_env_constant = gateway_guardrail.get("required_env_constant_snippet") if isinstance(gateway_guardrail, dict) else None
+    required_guard_function = gateway_guardrail.get("required_guard_function") if isinstance(gateway_guardrail, dict) else None
+    required_caps = gateway_guardrail.get("required_capability_snippets", []) if isinstance(gateway_guardrail, dict) else []
 
-    if 'OBSIDIAN_LOCAL_TOOLS_ENV = "ENABLE_LOCAL_OBSIDIAN_TOOLS"' not in text:
+    if not isinstance(required_env_constant, str) or not required_env_constant:
+        errors.append(
+            "obsidian_guardrail_contract gateway.required_env_constant_snippet must be non-empty string"
+        )
+        required_env_constant = ""
+    if not isinstance(required_guard_function, str) or not required_guard_function:
+        errors.append(
+            "obsidian_guardrail_contract gateway.required_guard_function must be non-empty string"
+        )
+        required_guard_function = ""
+    list_error = _validate_snippet_list(
+        required_caps, "obsidian_guardrail_contract gateway.required_capability_snippets"
+    )
+    if list_error:
+        errors.append(list_error)
+        required_caps = []
+
+    if required_env_constant and required_env_constant not in text:
         errors.append("gateway must define ENABLE_LOCAL_OBSIDIAN_TOOLS env constant")
-    if "_require_obsidian_local_tools_enabled" not in text:
+    if required_guard_function and required_guard_function not in text:
         errors.append("gateway must guard local obsidian tools with _require_obsidian_local_tools_enabled")
     for tool in local_tools:
         fn_name = f"brain_{tool}"
@@ -86,14 +152,8 @@ def _check_gateway_gating() -> list[str]:
         if fn is None:
             errors.append(f"missing function: {fn_name}")
             continue
-        if not _function_calls_name(fn, "_require_obsidian_local_tools_enabled"):
+        if required_guard_function and not _function_calls_name(fn, required_guard_function):
             errors.append(f"{fn_name} must call _require_obsidian_local_tools_enabled()")
-
-    required_caps = (
-        '"obsidian": {',
-        '"obsidian_local": {',
-        '"mode": "local"',
-    )
     for snippet in required_caps:
         if snippet not in text:
             errors.append(f"gateway capabilities missing snippet: {snippet}")
@@ -101,7 +161,9 @@ def _check_gateway_gating() -> list[str]:
 
 
 def _check_disabled_reason_snippets(
-    gateway_text: str | None = None, http_text: str | None = None
+    gateway_text: str | None = None,
+    http_text: str | None = None,
+    http_utils_text: str | None = None,
 ) -> list[str]:
     errors: list[str] = []
     gateway_text = (
@@ -112,23 +174,46 @@ def _check_disabled_reason_snippets(
     http_text = (
         http_text if http_text is not None else HTTP_TRANSPORT.read_text(encoding="utf-8")
     )
-
-    gateway_snippets = (
-        "Local Obsidian tools are disabled by default.",
-        "trusted local stdio gateway",
-        "Set {OBSIDIAN_LOCAL_TOOLS_ENV}=1",
+    http_utils_text = (
+        http_utils_text
+        if http_utils_text is not None
+        else HTTP_TRANSPORT_UTILS.read_text(encoding="utf-8")
     )
+
+    contract = json.loads(DISABLED_REASON_CONTRACT.read_text(encoding="utf-8"))
+    gateway_snippets = contract.get("gateway_snippets", [])
+    http_snippets = contract.get("http_snippets", [])
+    if not isinstance(gateway_snippets, list) or not gateway_snippets:
+        return ["obsidian_disabled_reason_contract gateway_snippets must be non-empty list"]
+    if not isinstance(http_snippets, list) or not http_snippets:
+        return ["obsidian_disabled_reason_contract http_snippets must be non-empty list"]
+    if any(not isinstance(snippet, str) or not snippet for snippet in gateway_snippets):
+        return ["obsidian_disabled_reason_contract gateway_snippets must contain non-empty strings"]
+    if any(not isinstance(snippet, str) or not snippet for snippet in http_snippets):
+        return ["obsidian_disabled_reason_contract http_snippets must contain non-empty strings"]
+
     for snippet in gateway_snippets:
         if snippet not in gateway_text:
             errors.append(f"gateway disabled reason missing snippet: {snippet}")
 
-    http_snippets = (
-        "HTTP Obsidian tools are disabled by default.",
-        "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport.",
-    )
-    for snippet in http_snippets:
-        if snippet not in http_text:
-            errors.append(f"HTTP disabled reason missing snippet: {snippet}")
+    missing_http_snippets = [snippet for snippet in http_snippets if snippet not in http_text]
+    if missing_http_snippets:
+        try:
+            tree = ast.parse(http_text)
+        except SyntaxError:
+            tree = None
+        helper_fn = _find_function(tree, "_http_obsidian_disabled_reason") if tree else None
+        helper_delegates = bool(
+            helper_fn is not None
+            and _sync_function_calls_name(helper_fn, "http_obsidian_disabled_reason")
+        )
+        if helper_delegates:
+            for snippet in http_snippets:
+                if snippet not in http_utils_text:
+                    errors.append(f"HTTP disabled reason missing snippet: {snippet}")
+        else:
+            for snippet in missing_http_snippets:
+                errors.append(f"HTTP disabled reason missing snippet: {snippet}")
     return errors
 
 
@@ -136,22 +221,100 @@ def _check_http_transport_contract() -> list[str]:
     errors: list[str] = []
     text = HTTP_TRANSPORT.read_text(encoding="utf-8")
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    contract, contract_errors = _load_obsidian_guardrail_contract()
+    errors.extend(contract_errors)
+    http_guardrail = contract["http"]
     http_tools = payload.get("http_obsidian_tools", [])
+    required_gate = http_guardrail.get("required_gate_snippet") if isinstance(http_guardrail, dict) else None
+    required_caps = http_guardrail.get("required_capability_snippets", []) if isinstance(http_guardrail, dict) else []
 
-    if "if ENABLE_HTTP_OBSIDIAN_TOOLS:" not in text:
+    if not isinstance(required_gate, str) or not required_gate:
+        errors.append(
+            "obsidian_guardrail_contract http.required_gate_snippet must be non-empty string"
+        )
+        required_gate = ""
+    list_error = _validate_snippet_list(
+        required_caps, "obsidian_guardrail_contract http.required_capability_snippets"
+    )
+    if list_error:
+        errors.append(list_error)
+        required_caps = []
+
+    if required_gate and required_gate not in text:
         errors.append("HTTP transport must gate Obsidian tools with ENABLE_HTTP_OBSIDIAN_TOOLS")
     elif not _http_obsidian_tools_defined_under_flag(text, http_tools):
         errors.append(
             "HTTP transport must define all http_obsidian_tools under ENABLE_HTTP_OBSIDIAN_TOOLS gate"
         )
-    required_caps = (
-        '"obsidian": {',
-        '"obsidian_http": {',
-        '"mode": "http"',
-    )
     for snippet in required_caps:
         if snippet not in text:
             errors.append(f"HTTP capabilities missing snippet: {snippet}")
+    return errors
+
+
+def _dict_value_for_key(node: ast.Dict, key_name: str) -> ast.AST | None:
+    for key, value in zip(node.keys, node.values):
+        if isinstance(key, ast.Constant) and key.value == key_name:
+            return value
+    return None
+
+
+def _is_name(value: ast.AST | None, expected: str) -> bool:
+    return isinstance(value, ast.Name) and value.id == expected
+
+
+def _check_obsidian_capabilities_payload_semantics(
+    text: str,
+    *,
+    label: str,
+    expected_mode: str,
+    expected_secondary_key: str,
+) -> list[str]:
+    errors: list[str] = []
+    tree = ast.parse(text)
+    fn = _find_async_function(tree, "brain_capabilities")
+    if fn is None:
+        return [f"{label} missing brain_capabilities"]
+
+    return_dict: ast.Dict | None = None
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Return) and isinstance(node.value, ast.Dict):
+            return_dict = node.value
+            break
+    if return_dict is None:
+        return [f"{label} brain_capabilities must return a dict payload"]
+
+    obsidian_value = _dict_value_for_key(return_dict, "obsidian")
+    secondary_value = _dict_value_for_key(return_dict, expected_secondary_key)
+    if not isinstance(obsidian_value, ast.Dict):
+        errors.append(f"{label} brain_capabilities must include obsidian object")
+        return errors
+    if not isinstance(secondary_value, ast.Dict):
+        errors.append(
+            f"{label} brain_capabilities must include {expected_secondary_key} object"
+        )
+        return errors
+
+    mode_value = _dict_value_for_key(obsidian_value, "mode")
+    if not (isinstance(mode_value, ast.Constant) and mode_value.value == expected_mode):
+        errors.append(
+            f"{label} obsidian.mode must be constant '{expected_mode}'"
+        )
+
+    for key_name, expected_var in (
+        ("status", "obsidian_status"),
+        ("tools", "obsidian_tools"),
+        ("reason", "obsidian_reason"),
+    ):
+        if not _is_name(_dict_value_for_key(obsidian_value, key_name), expected_var):
+            errors.append(
+                f"{label} obsidian.{key_name} must reference {expected_var}"
+            )
+        if not _is_name(_dict_value_for_key(secondary_value, key_name), expected_var):
+            errors.append(
+                f"{label} {expected_secondary_key}.{key_name} must reference {expected_var}"
+            )
+
     return errors
 
 
@@ -161,6 +324,22 @@ def main() -> int:
     errors.extend(_check_gateway_gating())
     errors.extend(_check_disabled_reason_snippets())
     errors.extend(_check_http_transport_contract())
+    errors.extend(
+        _check_obsidian_capabilities_payload_semantics(
+            GATEWAY_MAIN.read_text(encoding="utf-8"),
+            label="gateway",
+            expected_mode="local",
+            expected_secondary_key="obsidian_local",
+        )
+    )
+    errors.extend(
+        _check_obsidian_capabilities_payload_semantics(
+            HTTP_TRANSPORT.read_text(encoding="utf-8"),
+            label="HTTP transport",
+            expected_mode="http",
+            expected_secondary_key="obsidian_http",
+        )
+    )
     if errors:
         for err in errors:
             _fail(err)

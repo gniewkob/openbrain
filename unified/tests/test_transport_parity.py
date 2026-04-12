@@ -115,11 +115,28 @@ class _GatewayClient:
                     "actions": [],
                 },
             )
+        if path == "/api/v1/memory/admin/test-data/cleanup-build":
+            return _FakeResponse(
+                200,
+                {
+                    "dry_run": json.get("dry_run", True),
+                    "candidates_count": 2,
+                    "candidate_ids": ["mem-a", "mem-b"],
+                },
+            )
         raise AssertionError(f"Unexpected POST path: {path}")
 
     async def get(self, path: str, params=None):
         if path == "/api/memories":
             return _FakeResponse(200, [LEGACY_MEMORY])
+        if path == "/api/v1/memory/admin/test-data/report":
+            return _FakeResponse(
+                200,
+                {
+                    "sample_limit": params.get("sample_limit", 20) if params else 20,
+                    "hidden_counts": {"hidden_test_data_total": 2},
+                },
+            )
         if path.startswith("/api/v1/memory/"):
             return _FakeResponse(200, V1_RECORD)
         raise AssertionError(f"Unexpected GET path: {path}")
@@ -179,6 +196,23 @@ class _TransportClient:
                     "actions": [],
                 },
             )
+        if method == "POST" and path == "/api/v1/memory/admin/test-data/cleanup-build":
+            return _FakeResponse(
+                200,
+                {
+                    "dry_run": kwargs.get("json", {}).get("dry_run", True),
+                    "candidates_count": 2,
+                    "candidate_ids": ["mem-a", "mem-b"],
+                },
+            )
+        if method == "GET" and path == "/api/v1/memory/admin/test-data/report":
+            return _FakeResponse(
+                200,
+                {
+                    "sample_limit": kwargs.get("params", {}).get("sample_limit", 20),
+                    "hidden_counts": {"hidden_test_data_total": 2},
+                },
+            )
         if method == "GET" and path == "/api/v1/memory/mem-1":
             return _FakeResponse(200, V1_RECORD)
         if method == "PUT" and path == "/api/memories/mem-1":
@@ -232,6 +266,21 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             set(gateway_caps["tier_2_advanced"]["tools"]),
             set(transport_caps["tier_2_advanced"]["tools"]),
         )
+        self.assertEqual(
+            gateway_caps["tier_1_core"]["status"],
+            transport_caps["tier_1_core"]["status"],
+        )
+        self.assertEqual(
+            gateway_caps["tier_2_advanced"]["status"],
+            transport_caps["tier_2_advanced"]["status"],
+        )
+        self.assertEqual(
+            gateway_caps["tier_3_admin"]["status"],
+            transport_caps["tier_3_admin"]["status"],
+        )
+        self.assertEqual(gateway_caps["tier_1_core"]["status"], "stable")
+        self.assertEqual(gateway_caps["tier_2_advanced"]["status"], "active")
+        self.assertEqual(gateway_caps["tier_3_admin"]["status"], "guarded")
         self.assertEqual(gateway_caps["obsidian"]["status"], transport_caps["obsidian"]["status"])
         self.assertEqual(gateway_caps["obsidian"]["tools"], transport_caps["obsidian"]["tools"])
 
@@ -308,6 +357,23 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             transport_result = await mcp_transport.brain_list(domain="build", limit=1)
         self.assertEqual(transport_result, gateway_result)
 
+    async def test_list_include_test_data_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_list(
+                domain="build",
+                limit=1,
+                include_test_data=True,
+            )
+            transport_result = await mcp_transport.brain_list(
+                domain="build",
+                limit=1,
+                include_test_data=True,
+            )
+        self.assertEqual(transport_result, gateway_result)
+
     async def test_get_parity_between_stdio_and_http(self) -> None:
         with (
             patch("_gateway_src.main._client", return_value=_GatewayClient()),
@@ -332,6 +398,44 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(transport_result, gateway_result)
 
+    async def test_search_include_test_data_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_search(
+                query="payload",
+                top_k=1,
+                domain="build",
+                include_test_data=True,
+            )
+            transport_result = await mcp_transport.brain_search(
+                query="payload",
+                top_k=1,
+                domain="build",
+                include_test_data=True,
+            )
+        self.assertEqual(transport_result, gateway_result)
+
+    async def test_search_owner_filter_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_search(
+                query="payload",
+                top_k=1,
+                domain="build",
+                owner="alice",
+            )
+            transport_result = await mcp_transport.brain_search(
+                query="payload",
+                top_k=1,
+                domain="build",
+                owner="alice",
+            )
+        self.assertEqual(transport_result, gateway_result)
+
     async def test_search_and_list_validation_parity_between_stdio_and_http(self) -> None:
         with self.assertRaisesRegex(ValueError, "top_k must be 1"):
             await gateway.brain_search(query="payload", top_k=0)
@@ -342,6 +446,20 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             await gateway.brain_list(limit=0)
         with self.assertRaisesRegex(ValueError, "limit must be 1"):
             await mcp_transport.brain_list(limit=0)
+
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await gateway.brain_search(
+                query="payload", top_k=1, include_test_data="true"
+            )
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await mcp_transport.brain_search(
+                query="payload", top_k=1, include_test_data="true"
+            )
+
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await gateway.brain_list(limit=1, include_test_data="true")
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            await mcp_transport.brain_list(limit=1, include_test_data="true")
 
     async def test_update_parity_between_stdio_and_http(self) -> None:
         with (
@@ -386,6 +504,82 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             transport_result = await mcp_transport.brain_delete("mem-1")
         self.assertEqual(transport_result, gateway_result)
 
+    async def test_delete_not_found_error_parity_between_stdio_and_http(self) -> None:
+        class _GatewayDelete404(_GatewayClient):
+            async def delete(self, path: str):
+                if path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(404, {"detail": "not found"})
+                raise AssertionError(f"Unexpected DELETE path: {path}")
+
+        class _TransportDelete404(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if method == "DELETE" and path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(404, {"detail": "not found"})
+                return await super().request(method, path, **kwargs)
+
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayDelete404()),
+            patch.object(mcp_transport, "_client", return_value=_TransportDelete404()),
+        ):
+            with self.assertRaisesRegex(ValueError, "Memory not found: mem-1"):
+                await gateway.brain_delete("mem-1")
+            with self.assertRaisesRegex(ValueError, "Memory not found: mem-1"):
+                await mcp_transport.brain_delete("mem-1")
+
+    async def test_delete_forbidden_error_parity_between_stdio_and_http(self) -> None:
+        class _GatewayDelete403(_GatewayClient):
+            async def delete(self, path: str):
+                if path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(403, {"detail": "forbidden"})
+                raise AssertionError(f"Unexpected DELETE path: {path}")
+
+        class _TransportDelete403(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if method == "DELETE" and path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(403, {"detail": "forbidden"})
+                return await super().request(method, path, **kwargs)
+
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayDelete403()),
+            patch.object(mcp_transport, "_client", return_value=_TransportDelete403()),
+        ):
+            with self.assertRaisesRegex(
+                ValueError, "Cannot delete corporate memories. Use deprecation instead."
+            ):
+                await gateway.brain_delete("mem-1")
+            with self.assertRaisesRegex(
+                ValueError, "Cannot delete corporate memories. Use deprecation instead."
+            ):
+                await mcp_transport.brain_delete("mem-1")
+
+    async def test_delete_missing_session_error_parity_between_stdio_and_http(self) -> None:
+        class _GatewayDelete400(_GatewayClient):
+            async def delete(self, path: str):
+                if path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                raise AssertionError(f"Unexpected DELETE path: {path}")
+
+        class _TransportDelete400(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if method == "DELETE" and path == "/api/v1/memory/mem-1":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().request(method, path, **kwargs)
+
+        expected = (
+            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
+        )
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayDelete400()),
+            patch.object(mcp_transport, "_client", return_value=_TransportDelete400()),
+        ):
+            with self.assertRaisesRegex(ValueError, expected):
+                await gateway.brain_delete("mem-1")
+            with self.assertRaisesRegex(ValueError, expected):
+                await mcp_transport.brain_delete("mem-1")
+
     async def test_sync_check_parity_between_stdio_and_http(self) -> None:
         with (
             patch("_gateway_src.main._client", return_value=_GatewayClient()),
@@ -413,6 +607,112 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             gateway_result = await gateway.brain_maintain(dry_run=True)
             transport_result = await mcp_transport.brain_maintain(dry_run=True)
         self.assertEqual(transport_result, gateway_result)
+
+    async def test_test_data_report_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_test_data_report(sample_limit=11)
+            transport_result = await mcp_transport.brain_test_data_report(
+                sample_limit=11
+            )
+        self.assertEqual(transport_result, gateway_result)
+
+    async def test_admin_tool_parameter_bounds_parity_between_stdio_and_http(self) -> None:
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
+            await gateway.brain_test_data_report(sample_limit=0)
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
+            await mcp_transport.brain_test_data_report(sample_limit=0)
+
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
+            await gateway.brain_test_data_report(sample_limit=101)
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
+            await mcp_transport.brain_test_data_report(sample_limit=101)
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1"):
+            await gateway.brain_cleanup_build_test_data(limit=0)
+        with self.assertRaisesRegex(ValueError, "limit must be 1"):
+            await mcp_transport.brain_cleanup_build_test_data(limit=0)
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1"):
+            await gateway.brain_cleanup_build_test_data(limit=501)
+        with self.assertRaisesRegex(ValueError, "limit must be 1"):
+            await mcp_transport.brain_cleanup_build_test_data(limit=501)
+
+    async def test_cleanup_build_test_data_parity_between_stdio_and_http(self) -> None:
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayClient()),
+            patch.object(mcp_transport, "_client", return_value=_TransportClient()),
+        ):
+            gateway_result = await gateway.brain_cleanup_build_test_data(
+                dry_run=True,
+                limit=5,
+            )
+            transport_result = await mcp_transport.brain_cleanup_build_test_data(
+                dry_run=True,
+                limit=5,
+            )
+        self.assertEqual(transport_result, gateway_result)
+
+    async def test_test_data_report_missing_session_error_parity_between_stdio_and_http(
+        self,
+    ) -> None:
+        class _GatewayReport400(_GatewayClient):
+            async def get(self, path: str, params=None):
+                if path == "/api/v1/memory/admin/test-data/report":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().get(path, params)
+
+        class _TransportReport400(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if method == "GET" and path == "/api/v1/memory/admin/test-data/report":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().request(method, path, **kwargs)
+
+        expected = (
+            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
+        )
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayReport400()),
+            patch.object(mcp_transport, "_client", return_value=_TransportReport400()),
+        ):
+            with self.assertRaisesRegex(ValueError, expected):
+                await gateway.brain_test_data_report(sample_limit=10)
+            with self.assertRaisesRegex(ValueError, expected):
+                await mcp_transport.brain_test_data_report(sample_limit=10)
+
+    async def test_cleanup_build_test_data_missing_session_error_parity_between_stdio_and_http(
+        self,
+    ) -> None:
+        class _GatewayCleanup400(_GatewayClient):
+            async def post(self, path: str, json=None):
+                if path == "/api/v1/memory/admin/test-data/cleanup-build":
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().post(path, json)
+
+        class _TransportCleanup400(_TransportClient):
+            async def request(self, method: str, path: str, **kwargs):
+                self.last_request = (method, path, kwargs)
+                if (
+                    method == "POST"
+                    and path == "/api/v1/memory/admin/test-data/cleanup-build"
+                ):
+                    return _FakeResponse(400, {"detail": "Missing session ID"})
+                return await super().request(method, path, **kwargs)
+
+        expected = (
+            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
+        )
+        with (
+            patch("_gateway_src.main._client", return_value=_GatewayCleanup400()),
+            patch.object(mcp_transport, "_client", return_value=_TransportCleanup400()),
+        ):
+            with self.assertRaisesRegex(ValueError, expected):
+                await gateway.brain_cleanup_build_test_data(dry_run=True, limit=10)
+            with self.assertRaisesRegex(ValueError, expected):
+                await mcp_transport.brain_cleanup_build_test_data(dry_run=True, limit=10)
 
     async def test_actor_normalization_parity_between_stdio_and_http(self) -> None:
         hits = [

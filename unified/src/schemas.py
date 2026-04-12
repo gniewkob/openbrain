@@ -579,6 +579,62 @@ class MaintenanceReportDetail(BaseModel):
     links_fixed: int = 0
 
 
+class TestDataSampleEntry(BaseModel):
+    id: str
+    domain: str
+    status: str
+    owner: str
+    match_key: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TestDataActionSuggestion(BaseModel):
+    code: str
+    priority: Literal["low", "medium", "high"]
+    summary: str
+
+
+class BuildTestDataCleanupRequest(BaseModel):
+    dry_run: bool = True
+    limit: int = Field(default=100, ge=1, le=500)
+
+
+class BuildTestDataCleanupSkip(BaseModel):
+    id: str
+    reason: str
+
+
+class BuildTestDataCleanupResponse(BaseModel):
+    dry_run: bool
+    scanned: int = 0
+    candidates_count: int = 0
+    deleted_count: int = 0
+    skipped_count: int = 0
+    candidate_ids: list[str] = Field(default_factory=list)
+    deleted_ids: list[str] = Field(default_factory=list)
+    skipped: list[BuildTestDataCleanupSkip] = Field(default_factory=list)
+
+
+class TestDataHygieneReport(BaseModel):
+    generated_at: datetime
+    sample_limit: int
+    visible_status_counts: dict[str, int] = Field(default_factory=dict)
+    visible_domain_status_counts: dict[str, dict[str, int]] = Field(
+        default_factory=dict
+    )
+    hidden_counts: dict[str, int] = Field(default_factory=dict)
+    hidden_active_ratio: float = 0.0
+    hidden_active_ratio_by_domain: dict[str, float] = Field(default_factory=dict)
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    domain_status_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
+    top_owners: dict[str, int] = Field(default_factory=dict)
+    match_key_prefix_counts: dict[str, int] = Field(default_factory=dict)
+    null_match_key_count: int = 0
+    recommended_actions: list[TestDataActionSuggestion] = Field(default_factory=list)
+    sample: list[TestDataSampleEntry] = Field(default_factory=list)
+
+
 class PolicyScopeEntry(BaseModel):
     allowed_domains: list[Literal["corporate", "build", "personal"]] = Field(
         default_factory=list

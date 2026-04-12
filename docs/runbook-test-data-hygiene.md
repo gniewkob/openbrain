@@ -23,6 +23,39 @@ curl -sS http://127.0.0.1:7010/metrics | grep -E '^active_memories_(total|build_
 curl -sS http://127.0.0.1:7010/metrics | grep -E '^hidden_test_data_(total|active_total|build_total|corporate_total|personal_total) '
 ```
 
+```bash
+# Wymaga auth/admin:
+curl -sS "http://127.0.0.1:7010/api/v1/memory/admin/test-data/report?sample_limit=20"
+```
+
+Raport zawiera dodatkowo:
+- `visible_status_counts` oraz `visible_domain_status_counts` — widok produkcyjny (bez `metadata.test_data=true`) dla szybkiego porównania visible vs hidden
+- `hidden_active_ratio` oraz `hidden_active_ratio_by_domain` — udział ukrytych test-data w aktywnym zbiorze (globalnie i per domena)
+- `top_owners` — najwięksi producenci test-data
+- `match_key_prefix_counts` — najczęstsze prefiksy `match_key` (np. `test`, `openbrain-bulk-test`)
+- `null_match_key_count` — liczba rekordów testowych bez `match_key`
+- `recommended_actions` — gotowe rekomendacje operacyjne (code + priority + summary) do sekwencji: dry-run → decyzja → wykonanie
+
+Interpretacja:
+- `hidden_active_ratio >= 0.25` traktuj jako sygnał wysokiego ryzyka operacyjnego (dashboard/retrieval mogą wyglądać na „puste” mimo istniejących danych testowych).
+
+## Controlled cleanup (build domain)
+```bash
+# 1) Dry-run (default behavior)
+curl -sS -X POST "http://127.0.0.1:7010/api/v1/memory/admin/test-data/cleanup-build" \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": true, "limit": 100}'
+
+# 2) Execute (after approval)
+curl -sS -X POST "http://127.0.0.1:7010/api/v1/memory/admin/test-data/cleanup-build" \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": false, "limit": 100}'
+```
+
+Zasada bezpieczeństwa:
+- endpoint działa tylko dla `domain=build` i tylko dla rekordów z `metadata.test_data=true`
+- `dry_run=true` nie wykonuje mutacji
+
 ## Wykrywanie kandydatów testowych (SQL)
 ```sql
 SELECT id, domain, status, match_key, left(content, 120)
@@ -53,12 +86,14 @@ WHERE domain='corporate'
 ```
 
 ## Debug: `Missing session ID` przy `brain_delete`
-Ten błąd zwykle pochodzi z warstwy transportu MCP HTTP (sesja streamable), nie z backendowego `DELETE /api/v1/memory/{id}`.
+Ten błąd pochodzi z warstwy transportu MCP HTTP (sesja streamable), nie z backendowego `DELETE /api/v1/memory/{id}`.
+Od `mcp_http` z `stateless_http=True` nie powinien już występować w normalnym flow ChatGPT/Claude.
+Jeśli się pojawia, najczęściej oznacza stary proces `mcp-http` albo klienta działającego na starej sesji.
 
 Checklist:
 1. Sprawdź backend direct API (z `X-Internal-Key`) — jeśli działa, problem jest w session/transport.
-2. Sprawdź flow MCP HTTP: auth -> session start -> tool call.
-3. Zrestartuj `mcp-http` i klienta MCP, aby odnowić sesję.
+2. Zweryfikuj, że `unified/mcp-gateway/src/mcp_http.py` uruchamia `mcp.run(..., stateless_http=True, ...)`.
+3. Zrestartuj `mcp-http` i klienta MCP, aby wymusić nowe połączenie.
 4. Jeśli błąd wraca tylko dla `delete`, zbierz request/response z gatewaya i porównaj z `store/get`.
 
 ## Kontrola końcowa

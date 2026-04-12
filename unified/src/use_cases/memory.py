@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..memory_reads import find_memories_v1, get_grounding_pack
 from ..memory_writes import (
+    cleanup_build_test_data as cleanup_build_test_data_write,
     delete_memory as delete_memory_write,
     handle_memory_write,
     handle_memory_write_many,
@@ -18,6 +19,7 @@ from ..memory_writes import (
     update_memory as update_memory_write,
 )
 from ..schemas import (
+    BuildTestDataCleanupResponse,
     BulkUpsertResult,
     MaintenanceReport,
     MaintenanceRequest,
@@ -83,6 +85,22 @@ async def run_maintenance(
 ) -> MaintenanceReport:
     """Run maintenance via the canonical write-side maintenance engine."""
     return await run_maintenance_write(session, req, actor=actor)
+
+
+async def cleanup_build_test_data(
+    session: AsyncSession,
+    *,
+    dry_run: bool,
+    limit: int,
+    actor: str,
+) -> BuildTestDataCleanupResponse:
+    """Run controlled cleanup for build-domain records flagged as test data."""
+    return await cleanup_build_test_data_write(
+        session,
+        dry_run=dry_run,
+        limit=limit,
+        actor=actor,
+    )
 
 
 async def upsert_memories_bulk(

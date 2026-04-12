@@ -215,6 +215,11 @@ class BrainMemory(BaseModel):
 
 
 _http_client: httpx.AsyncClient | None = None
+_http_client_config_key: tuple[str, float, str] | None = None
+
+
+def _current_http_client_config_key() -> tuple[str, float, str]:
+    return (BRAIN_URL, BACKEND_TIMEOUT, INTERNAL_API_KEY)
 
 
 class _SharedClient:
@@ -225,7 +230,24 @@ class _SharedClient:
     """
 
     async def __aenter__(self) -> httpx.AsyncClient:
-        global _http_client
+        global _http_client, _http_client_config_key
+        current_key = _current_http_client_config_key()
+        if _http_client is not None and _http_client_config_key != current_key:
+            old_key = _http_client_config_key
+            try:
+                await _http_client.aclose()
+            except Exception as exc:  # pragma: no cover - defensive logging path
+                _gateway_logger.warning("mcp_client_close_failed", extra={"error": str(exc)})
+            _gateway_logger.info(
+                "mcp_client_refreshed_due_to_config_drift",
+                extra={
+                    "old_base_url": (old_key[0] if old_key else None),
+                    "new_base_url": current_key[0],
+                },
+            )
+            _http_client = None
+            _http_client_config_key = None
+
         if _http_client is None:
             headers: dict[str, str] = {}
             if INTERNAL_API_KEY:
@@ -235,6 +257,7 @@ class _SharedClient:
                 timeout=BACKEND_TIMEOUT,
                 headers=headers,
             )
+            _http_client_config_key = current_key
         return _http_client
 
     async def __aexit__(self, *_: object) -> None:
@@ -316,26 +339,33 @@ def _require_obsidian_local_tools_enabled() -> None:
 
 async def _get_backend_status() -> dict:
     """Probe backend readiness without conflating degradation with outage."""
-    try:
-        async with httpx.AsyncClient(timeout=HEALTH_PROBE_TIMEOUT) as client:
-            r = await client.get(f"{BRAIN_URL}/readyz")
-        data = r.json()
-        if r.status_code in {200, 503} and isinstance(data, dict):
-            return {
-                "status": data.get(
-                    "status",
-                    "ok" if r.status_code == 200 else "degraded",
-                ),
-                "url": BRAIN_URL,
-                "api": "reachable",
-                "db": data.get("db", "unknown"),
-                "vector_store": data.get("vector_store", "unknown"),
-                "readyz_status_code": r.status_code,
-                "probe": "readyz",
-            }
-        readyz_error = f"Unexpected /readyz response ({r.status_code})"
-    except Exception as exc:
-        readyz_error = str(exc)
+    readyz_paths = ("/readyz", "/api/v1/readyz")
+    readyz_failures: list[str] = []
+    for readyz_path in readyz_paths:
+        try:
+            async with httpx.AsyncClient(timeout=HEALTH_PROBE_TIMEOUT) as client:
+                r = await client.get(f"{BRAIN_URL}{readyz_path}")
+            data = r.json()
+            if r.status_code in {200, 503} and isinstance(data, dict):
+                return {
+                    "status": data.get(
+                        "status",
+                        "ok" if r.status_code == 200 else "degraded",
+                    ),
+                    "url": BRAIN_URL,
+                    "api": "reachable",
+                    "db": data.get("db", "unknown"),
+                    "vector_store": data.get("vector_store", "unknown"),
+                    "readyz_status_code": r.status_code,
+                    "probe": "readyz",
+                    "primary_path": readyz_path,
+                }
+            readyz_failures.append(
+                f"{readyz_path}: Unexpected response ({r.status_code})"
+            )
+        except Exception as exc:
+            readyz_failures.append(f"{readyz_path}: {exc}")
+    readyz_error = "; ".join(readyz_failures)
 
     try:
         async with httpx.AsyncClient(timeout=HEALTH_PROBE_TIMEOUT) as client:
@@ -521,6 +551,7 @@ async def brain_list(
     sensitivity: str | None = None,
     owner: str | None = None,
     tenant_id: str | None = None,
+    include_test_data: bool = False,
     limit: int = 20,
 ) -> list[dict]:
     """
@@ -528,7 +559,12 @@ async def brain_list(
 
     status options: active | superseded (default: active only)
     domain options: corporate | build | personal
+    include_test_data: include records marked with metadata.test_data=true
     """
+    if not isinstance(include_test_data, bool):
+        raise ValueError(
+            f"include_test_data must be bool, got {type(include_test_data).__name__}"
+        )
     if not 1 <= limit <= MAX_LIST_LIMIT:
         raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
     filters = build_list_filters(
@@ -538,6 +574,7 @@ async def brain_list(
         sensitivity=sensitivity,
         owner=owner,
         tenant_id=tenant_id,
+        include_test_data=include_test_data,
     )
     payload = build_find_list_payload(limit=limit, filters=filters)
 
@@ -570,19 +607,28 @@ async def brain_search(
     top_k: int = 5,
     domain: str | None = None,
     entity_type: str | None = None,
+    owner: str | None = None,
     sensitivity: str | None = None,
+    include_test_data: bool = False,
 ) -> list[dict]:
     """
     Semantic search across the unified knowledge base.
     Returns top-k memories most relevant to the query.
-    Optionally filter by domain (corporate|build|personal), entity_type, sensitivity.
+    Optionally filter by domain (corporate|build|personal), entity_type, owner, sensitivity.
+    include_test_data: include records marked with metadata.test_data=true
     """
+    if not isinstance(include_test_data, bool):
+        raise ValueError(
+            f"include_test_data must be bool, got {type(include_test_data).__name__}"
+        )
     if not 1 <= top_k <= MAX_SEARCH_TOP_K:
         raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
     filters = build_list_filters(
         domain=domain,
         entity_type=entity_type,
+        owner=owner,
         sensitivity=sensitivity,
+        include_test_data=include_test_data,
     )
     payload = build_find_search_payload(query=query, limit=top_k, filters=filters)
 
@@ -600,14 +646,14 @@ async def brain_search(
 async def brain_update(
     memory_id: str,
     content: str,
-    title: str | None = None,
     updated_by: str = "agent",
-    sensitivity: str | None = None,
+    title: str | None = None,
     owner: str | None = None,
     tenant_id: str | None = None,
     tags: list[str] | None = None,
     custom_fields: dict[str, Any] | None = None,
     obsidian_ref: str | None = None,
+    sensitivity: str | None = None,
 ) -> BrainMemory:
     """
     Update a memory by ID.
@@ -691,6 +737,39 @@ async def brain_maintain(
                 "retype_rules": [],
                 "fix_superseded_links": fix_superseded_links,
             },
+        )
+        return r.json()
+
+
+@mcp.tool()
+async def brain_test_data_report(sample_limit: int = 20) -> dict[str, Any]:
+    """Return admin diagnostic report for hidden test-data records."""
+    if not 1 <= sample_limit <= 100:
+        raise ValueError(f"sample_limit must be 1–100, got {sample_limit}")
+    async with _client() as c:
+        r = await _request_or_raise(
+            c,
+            "GET",
+            memory_absolute_path("test_data_report"),
+            params={"sample_limit": sample_limit},
+        )
+        return r.json()
+
+
+@mcp.tool()
+async def brain_cleanup_build_test_data(
+    dry_run: bool = True,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """Controlled cleanup for build-domain test-data records."""
+    if not 1 <= limit <= 500:
+        raise ValueError(f"limit must be 1–500, got {limit}")
+    async with _client() as c:
+        r = await _request_or_raise(
+            c,
+            "POST",
+            memory_absolute_path("cleanup_build_test_data"),
+            json={"dry_run": dry_run, "limit": limit},
         )
         return r.json()
 

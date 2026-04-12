@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from .schemas import (
+    BuildTestDataCleanupResponse,
     MemoryGetContextResponse,
     MemoryRecord,
     MemoryWriteManyResponse,
@@ -13,6 +14,7 @@ from .schemas import (
     ObsidianNoteResponse,
     ObsidianSyncResponse,
     ObsidianWriteResponse,
+    TestDataHygieneReport,
 )
 
 
@@ -46,6 +48,18 @@ def register_v1_routes(app: FastAPI, handlers) -> None:
         handlers.v1_get,
         methods=["GET"],
         response_model=MemoryRecord,
+    )
+    app.add_api_route(
+        "/api/v1/memory/admin/test-data/report",
+        handlers.test_data_hygiene_report,
+        methods=["GET"],
+        response_model=TestDataHygieneReport,
+    )
+    app.add_api_route(
+        "/api/v1/memory/admin/test-data/cleanup-build",
+        handlers.cleanup_build_test_data,
+        methods=["POST"],
+        response_model=BuildTestDataCleanupResponse,
     )
     app.add_api_route(
         "/api/v1/obsidian/vaults",

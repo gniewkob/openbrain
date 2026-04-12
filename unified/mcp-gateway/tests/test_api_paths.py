@@ -174,6 +174,31 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             json={"query": None, "limit": 1, "filters": {}, "sort": "updated_at_desc"},
         )
 
+    async def test_brain_list_can_include_test_data_filter(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = []
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_list(limit=1, include_test_data=True)
+
+        client.post.assert_awaited_once_with(
+            "/api/v1/memory/find",
+            json={
+                "query": None,
+                "limit": 1,
+                "filters": {"include_test_data": True},
+                "sort": "updated_at_desc",
+            },
+        )
+
     async def test_brain_search_calls_api_search_path(self) -> None:
         gateway = load_gateway_main()
         response = Mock()
@@ -192,6 +217,50 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
         client.post.assert_awaited_once_with(
             "/api/v1/memory/find",
             json={"query": "test", "limit": 1, "filters": {}},
+        )
+
+    async def test_brain_search_can_include_test_data_filter(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = []
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_search(
+                query="test",
+                top_k=1,
+                include_test_data=True,
+            )
+
+        client.post.assert_awaited_once_with(
+            "/api/v1/memory/find",
+            json={"query": "test", "limit": 1, "filters": {"include_test_data": True}},
+        )
+
+    async def test_brain_search_can_include_owner_filter(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = []
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_search(query="test", top_k=1, owner="alice")
+
+        client.post.assert_awaited_once_with(
+            "/api/v1/memory/find",
+            json={"query": "test", "limit": 1, "filters": {"owner": "alice"}},
         )
 
     async def test_brain_sync_check_calls_api_sync_check_path_with_json_body(
@@ -240,6 +309,64 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             "/api/v1/memory/bulk-upsert",
             json=[{"match_key": "mk-1", "content": "x"}],
         )
+
+    async def test_brain_test_data_report_calls_admin_report_endpoint(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = {"hidden_counts": {"hidden_test_data_total": 2}}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.get.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_test_data_report(sample_limit=7)
+
+        client.get.assert_awaited_once_with(
+            "/api/v1/memory/admin/test-data/report",
+            params={"sample_limit": 7},
+        )
+
+    async def test_brain_test_data_report_validates_sample_limit_bounds(self) -> None:
+        gateway = load_gateway_main()
+
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1–100, got 0"):
+            await gateway.brain_test_data_report(sample_limit=0)
+
+        with self.assertRaisesRegex(ValueError, "sample_limit must be 1–100, got 101"):
+            await gateway.brain_test_data_report(sample_limit=101)
+
+    async def test_brain_cleanup_build_test_data_calls_admin_cleanup_endpoint(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = {"dry_run": True, "candidates_count": 1}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_cleanup_build_test_data(dry_run=True, limit=12)
+
+        client.post.assert_awaited_once_with(
+            "/api/v1/memory/admin/test-data/cleanup-build",
+            json={"dry_run": True, "limit": 12},
+        )
+
+    async def test_brain_cleanup_build_test_data_validates_limit_bounds(self) -> None:
+        gateway = load_gateway_main()
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1–500, got 0"):
+            await gateway.brain_cleanup_build_test_data(limit=0)
+
+        with self.assertRaisesRegex(ValueError, "limit must be 1–500, got 501"):
+            await gateway.brain_cleanup_build_test_data(limit=501)
 
     async def test_brain_update_uses_canonical_updated_by_placeholder(self) -> None:
         gateway = load_gateway_main()
@@ -404,6 +531,81 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             "/api/v1/memory/corp-1",
             json={"content": "policy v2", "updated_by": "agent"},
         )
+
+    async def test_brain_delete_calls_api_delete_path(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.status_code = 204
+        response.json.return_value = {}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.delete.return_value = response
+            mock_client.return_value = client
+
+            result = await gateway.brain_delete("mem-1")
+
+        self.assertEqual(result, {"deleted": True, "id": "mem-1"})
+        client.delete.assert_awaited_once_with("/api/v1/memory/mem-1")
+
+    async def test_brain_delete_404_raises_not_found(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = True
+        response.status_code = 404
+        response.json.return_value = {"detail": "not found"}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.delete.return_value = response
+            mock_client.return_value = client
+
+            with self.assertRaisesRegex(ValueError, "Memory not found: mem-1"):
+                await gateway.brain_delete("mem-1")
+
+    async def test_brain_delete_403_raises_governance_message(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = True
+        response.status_code = 403
+        response.json.return_value = {"detail": "forbidden"}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.delete.return_value = response
+            mock_client.return_value = client
+
+            with self.assertRaisesRegex(
+                ValueError, "Cannot delete corporate memories. Use deprecation instead."
+            ):
+                await gateway.brain_delete("mem-1")
+
+    async def test_brain_delete_400_missing_session_id_is_actionable(self) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = True
+        response.status_code = 400
+        response.json.return_value = {"detail": "Missing session ID"}
+
+        with patch("_gateway_src.main._client") as mock_client:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.delete.return_value = response
+            mock_client.return_value = client
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Missing MCP session context; reconnect the MCP HTTP client and retry.",
+            ):
+                await gateway.brain_delete("mem-1")
 
 
 if __name__ == "__main__":

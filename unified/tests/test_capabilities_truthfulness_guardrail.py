@@ -33,6 +33,7 @@ async def _get_backend_status():
         "probe": "readyz",
         "readyz_status_code": 200,
         "primary_path": "/readyz",
+        "compat_path": "/api/v1/readyz",
         "secondary_probe": "healthz_fallback",
         "secondary_path": "/healthz",
         "fallback_probe": "api_health_fallback",
@@ -59,6 +60,7 @@ async def _get_backend_status():
     errors = module._check_health_probe_fallback_semantics(src_missing_fallback, "x")
     assert any("api_health_fallback" in err for err in errors)
     assert any("/api/v1/health" in err for err in errors)
+    assert any("/api/v1/readyz" in err for err in errors)
     assert any("healthz_fallback" in err for err in errors)
     assert any("/healthz" in err for err in errors)
     assert any("readyz_status_code" in err for err in errors)
@@ -111,3 +113,102 @@ def test_capabilities_truthfulness_metadata_check_requires_health_entry(tmp_path
     finally:
         module.METADATA = original
     assert any("health semantics entry" in err for err in errors)
+
+
+def test_capabilities_truthfulness_contract_requires_tier_keys(tmp_path) -> None:
+    module = _load_capabilities_truthfulness_module()
+    contract_path = tmp_path / "capabilities_response_contract.json"
+    contract_path.write_text(
+        json.dumps(
+            {
+                "required_top_level_keys": ["health"],
+                "health_required_keys": ["overall", "source", "components"],
+                "health_component_required_keys": [
+                    "api",
+                    "db",
+                    "vector_store",
+                    "obsidian",
+                ],
+                "health_overall_values": ["healthy", "degraded", "unavailable"],
+                "tier_required_keys": ["status"],
+                "tier_status_values": ["stable", "active", "guarded"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    original = module.CONTRACT
+    module.CONTRACT = contract_path
+    try:
+        errors = module._check_contract()
+    finally:
+        module.CONTRACT = original
+    assert any("tier_required_keys" in err for err in errors)
+
+
+def test_capabilities_truthfulness_contract_requires_tier_status_values(tmp_path) -> None:
+    module = _load_capabilities_truthfulness_module()
+    contract_path = tmp_path / "capabilities_response_contract.json"
+    contract_path.write_text(
+        json.dumps(
+            {
+                "required_top_level_keys": ["health"],
+                "health_required_keys": ["overall", "source", "components"],
+                "health_component_required_keys": [
+                    "api",
+                    "db",
+                    "vector_store",
+                    "obsidian",
+                ],
+                "health_overall_values": ["healthy", "degraded", "unavailable"],
+                "tier_required_keys": ["status", "tools"],
+                "tier_status_values": ["stable", "active"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    original = module.CONTRACT
+    module.CONTRACT = contract_path
+    try:
+        errors = module._check_contract()
+    finally:
+        module.CONTRACT = original
+    assert any("tier_status_values" in err for err in errors)
+
+
+def test_capabilities_truthfulness_checks_health_source_and_obsidian_mapping(
+    tmp_path,
+) -> None:
+    module = _load_capabilities_truthfulness_module()
+    ok_path = tmp_path / "capabilities_health_ok.py"
+    ok_path.write_text(
+        """
+def build_capabilities_health(backend, obsidian_status):
+    return {
+        "overall": "healthy",
+        "source": backend.get("probe", "unknown"),
+        "components": {
+            "obsidian": "enabled" if obsidian_status == "enabled" else "disabled",
+        },
+    }
+""",
+        encoding="utf-8",
+    )
+    assert module._check_capabilities_health_contract(ok_path, "x") == []
+
+    bad_path = tmp_path / "capabilities_health_bad.py"
+    bad_path.write_text(
+        """
+def build_capabilities_health(backend, obsidian_status):
+    return {
+        "overall": "healthy",
+        "source": "healthz_fallback",
+        "components": {
+            "obsidian": obsidian_status,
+        },
+    }
+""",
+        encoding="utf-8",
+    )
+    errors = module._check_capabilities_health_contract(bad_path, "x")
+    assert any("health.source" in err for err in errors)
+    assert any("obsidian component" in err for err in errors)

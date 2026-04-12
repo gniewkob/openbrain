@@ -66,6 +66,10 @@ class TestBrainSearchValidation(unittest.TestCase):
         except Exception:
             pass
 
+    def test_search_include_test_data_non_bool_raises(self):
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            _run(_gateway.brain_search(query="test", top_k=1, include_test_data="true"))
+
 
 @_skip_if_no_gateway
 class TestBrainListValidation(unittest.TestCase):
@@ -94,6 +98,10 @@ class TestBrainListValidation(unittest.TestCase):
                 self.fail("limit=max should not raise validation ValueError")
         except Exception:
             pass
+
+    def test_list_include_test_data_non_bool_raises(self):
+        with self.assertRaisesRegex(ValueError, "include_test_data"):
+            _run(_gateway.brain_list(limit=1, include_test_data="true"))
 
 
 @_skip_if_no_gateway

@@ -59,3 +59,13 @@ def test_request_failure_message_parity_in_development() -> None:
     gateway_msg = gateway_http_error.backend_request_failure_message(err)
     assert transport_msg == gateway_msg
 
+
+def test_missing_session_id_hint_parity_and_shape() -> None:
+    os.environ.pop("ENV", None)
+    detail = {"detail": "Missing session ID"}
+    transport_msg = transport_backend_error_message(400, detail)
+    gateway_msg = gateway_http_error.backend_error_message(400, detail)
+    assert transport_msg == gateway_msg
+    assert transport_msg == (
+        "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
+    )

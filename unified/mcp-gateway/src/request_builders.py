@@ -43,6 +43,7 @@ def build_list_filters(
     sensitivity: str | None = None,
     owner: str | None = None,
     tenant_id: str | None = None,
+    include_test_data: bool | None = None,
 ) -> dict[str, Any]:
     filters: dict[str, Any] = {}
     if domain:
@@ -57,6 +58,8 @@ def build_list_filters(
         filters["owner"] = owner
     if tenant_id:
         filters["tenant_id"] = tenant_id
+    if include_test_data is True:
+        filters["include_test_data"] = True
     return filters
 
 

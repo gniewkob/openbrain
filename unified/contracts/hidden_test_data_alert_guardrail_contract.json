@@ -1,0 +1,19 @@
+{
+  "runtime_alerts_path": "monitoring/prometheus/openbrain-alerts.yml",
+  "docs_alerts_path": "docs/prometheus-alerts.yml",
+  "alerts": {
+    "present": {
+      "name": "OpenBrainHiddenTestDataPresent",
+      "allowed_exprs": [
+        "hidden_test_data_active_total > 0"
+      ]
+    },
+    "share_high": {
+      "name": "OpenBrainHiddenTestDataShareHigh",
+      "allowed_exprs": [
+        "openbrain_hidden_test_data_share_active >= 0.25",
+        "hidden_test_data_active_total / clamp_min(active_memories_all_total, 1) >= 0.25"
+      ]
+    }
+  }
+}

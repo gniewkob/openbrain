@@ -58,6 +58,20 @@ class RaiseProductionModeTests(unittest.TestCase):
         msg = self._call_raise(422)
         self.assertIn("422", msg)
 
+    def test_400_missing_session_id_uses_actionable_hint(self) -> None:
+        gateway = load_gateway_main()
+        response = httpx.Response(
+            400,
+            json={"detail": "Missing session ID"},
+            request=httpx.Request("DELETE", "http://backend/api/v1/memory/mem-1"),
+        )
+        with self.assertRaises(ValueError) as ctx:
+            gateway._raise(response)
+        self.assertEqual(
+            str(ctx.exception),
+            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry.",
+        )
+
     def test_200_does_not_raise(self) -> None:
         gateway = load_gateway_main()
 
@@ -134,6 +148,20 @@ class RaiseDevelopmentModeTests(unittest.TestCase):
         msg = str(ctx.exception)
         self.assertIn("Backend request failed", msg)
         self.assertIn("connect timeout", msg)
+
+    def test_dev_mode_400_missing_session_id_uses_actionable_hint(self) -> None:
+        gateway = load_gateway_main()
+        response = httpx.Response(
+            400,
+            json={"detail": "Missing session ID"},
+            request=httpx.Request("DELETE", "http://backend/api/v1/memory/mem-1"),
+        )
+        with self.assertRaises(ValueError) as ctx:
+            gateway._raise(response)
+        self.assertEqual(
+            str(ctx.exception),
+            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry.",
+        )
 
 
 class _FailingClient:

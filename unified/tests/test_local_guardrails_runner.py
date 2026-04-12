@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -37,9 +38,51 @@ def test_local_guardrails_runner_stops_on_first_failure(monkeypatch) -> None:
     assert seen == [module.GUARDRAIL_STEPS[0][0], module.GUARDRAIL_STEPS[1][0]]
 
 
+def test_local_guardrails_step_timeouts_defined_for_all_steps() -> None:
+    module = _load_local_guardrails_module()
+    labels = {label for label, _ in module.GUARDRAIL_STEPS}
+    missing = [label for label in labels if label not in module.STEP_TIMEOUT_SECONDS]
+    # A missing explicit timeout falls back to default 60s, but we pin all known steps.
+    assert missing == []
+
+
+def test_local_guardrails_run_step_returns_124_on_timeout(monkeypatch) -> None:
+    module = _load_local_guardrails_module()
+
+    def _timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd=["python"], timeout=1)
+
+    monkeypatch.setattr(module.subprocess, "run", _timeout)
+    assert module.run_step("repository hygiene", "scripts/check_repo_hygiene.py") == 124
+
+
 def test_local_guardrails_includes_monitoring_contract_step() -> None:
     module = _load_local_guardrails_module()
     assert ("monitoring contract", "scripts/validate_monitoring_contract.py") in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_telemetry_contract_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "telemetry contract parity",
+        "scripts/check_telemetry_contract_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_dashboard_memory_semantics_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "dashboard memory semantics",
+        "scripts/check_dashboard_memory_semantics.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_hidden_test_data_alert_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "hidden test-data alert parity",
+        "scripts/check_hidden_test_data_alert_parity.py",
+    ) in module.GUARDRAIL_STEPS
 
 
 def test_local_guardrails_includes_export_contract_step() -> None:
@@ -71,6 +114,22 @@ def test_local_guardrails_includes_capabilities_health_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_capabilities_tier_status_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "capabilities tier status parity",
+        "scripts/check_capabilities_tier_status_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_backend_probe_contract_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "backend probe contract parity",
+        "scripts/check_backend_probe_contract_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_request_runtime_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (
@@ -79,9 +138,137 @@ def test_local_guardrails_includes_request_runtime_parity_step() -> None:
     ) in module.GUARDRAIL_STEPS
 
 
+def test_local_guardrails_includes_makefile_pr_readiness_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "makefile pr-readiness parity",
+        "scripts/check_makefile_pr_readiness_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_shared_http_client_reuse_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "shared http client reuse",
+        "scripts/check_shared_http_client_reuse.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_tool_signature_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "tool signature parity",
+        "scripts/check_tool_signature_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_admin_bounds_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "admin bounds parity",
+        "scripts/check_admin_bounds_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_admin_endpoint_contract_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "admin endpoint contract parity",
+        "scripts/check_admin_endpoint_contract_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_tool_inventory_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "tool inventory parity",
+        "scripts/check_tool_inventory_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_mcp_transport_import_scope_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "mcp transport import scope",
+        "scripts/check_mcp_transport_import_scope.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_mcp_transport_mount_contract_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "mcp transport mount contract",
+        "scripts/check_mcp_transport_mount_contract.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_capabilities_tools_truthfulness_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "capabilities tools truthfulness",
+        "scripts/check_capabilities_tools_truthfulness.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_search_filter_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "search filter parity",
+        "scripts/check_search_filter_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_list_filter_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "list filter parity",
+        "scripts/check_list_filter_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
 def test_local_guardrails_includes_response_normalizers_parity_step() -> None:
     module = _load_local_guardrails_module()
     assert (
         "response normalizers parity",
         "scripts/check_response_normalizers_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_http_error_adapter_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "http error adapter parity",
+        "scripts/check_http_error_adapter_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_http_error_contract_semantics_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "http error contract semantics",
+        "scripts/check_http_error_contract_semantics.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_delete_semantics_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "delete semantics parity",
+        "scripts/check_delete_semantics_parity.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_cleanup_actor_semantics_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "cleanup actor semantics",
+        "scripts/check_cleanup_actor_semantics.py",
+    ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_includes_update_audit_semantics_parity_step() -> None:
+    module = _load_local_guardrails_module()
+    assert (
+        "update audit semantics parity",
+        "scripts/check_update_audit_semantics_parity.py",
     ) in module.GUARDRAIL_STEPS

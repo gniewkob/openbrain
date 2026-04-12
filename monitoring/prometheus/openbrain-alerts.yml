@@ -31,6 +31,9 @@ groups:
       - record: openbrain_telemetry_backend_fallback_1h
         expr: increase(telemetry_counter_backend_fallback_total{job="openbrain-unified"}[1h])
 
+      - record: openbrain_hidden_test_data_share_active
+        expr: hidden_test_data_active_total{job="openbrain-unified"} / clamp_min(active_memories_all_total{job="openbrain-unified"}, 1)
+
   - name: openbrain-alerts
     rules:
       - alert: OpenBrainTargetDown
@@ -102,3 +105,13 @@ groups:
         annotations:
           summary: "Hidden test data present in active memory set"
           description: "There are active records flagged as metadata.test_data=true; verify cleanup/quarantine posture and retrieval filters."
+
+      - alert: OpenBrainHiddenTestDataShareHigh
+        expr: openbrain_hidden_test_data_share_active >= 0.25
+        for: 15m
+        labels:
+          severity: warning
+          service: openbrain-unified
+        annotations:
+          summary: "Hidden test-data share is elevated"
+          description: "Hidden test-data active share is at or above 25%. Prioritize test-data hygiene cleanup to preserve dashboard and retrieval trust."

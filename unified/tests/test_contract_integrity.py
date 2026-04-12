@@ -160,11 +160,298 @@ def test_memory_paths_contract_is_loaded() -> None:
     assert memory_absolute_path("write") == f'{raw["memory_base"]}{raw["paths"]["write"]}'
 
 
+def test_mcp_transport_import_scope_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "mcp_transport_import_scope_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["scan_dirs"], list) and raw["scan_dirs"]
+    assert isinstance(raw["required_runtime_importers"], list) and raw[
+        "required_runtime_importers"
+    ]
+    assert isinstance(raw["allowed_runtime_importers"], list) and raw[
+        "allowed_runtime_importers"
+    ]
+    assert isinstance(raw["allowed_test_importer_prefix"], str)
+    assert raw["allowed_test_importer_prefix"]
+
+
+def test_obsidian_disabled_reason_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "obsidian_disabled_reason_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["gateway_snippets"], list) and raw["gateway_snippets"]
+    assert isinstance(raw["http_snippets"], list) and raw["http_snippets"]
+    assert all(isinstance(item, str) and item for item in raw["gateway_snippets"])
+    assert all(isinstance(item, str) and item for item in raw["http_snippets"])
+
+
+def test_obsidian_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "obsidian_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    gateway = raw["gateway"]
+    http = raw["http"]
+    assert isinstance(gateway["required_env_constant_snippet"], str) and gateway[
+        "required_env_constant_snippet"
+    ]
+    assert isinstance(gateway["required_guard_function"], str) and gateway[
+        "required_guard_function"
+    ]
+    assert isinstance(gateway["required_capability_snippets"], list) and gateway[
+        "required_capability_snippets"
+    ]
+    assert all(
+        isinstance(item, str) and item for item in gateway["required_capability_snippets"]
+    )
+    assert isinstance(http["required_gate_snippet"], str) and http["required_gate_snippet"]
+    assert isinstance(http["required_capability_snippets"], list) and http[
+        "required_capability_snippets"
+    ]
+    assert all(
+        isinstance(item, str) and item for item in http["required_capability_snippets"]
+    )
+
+
+def test_compose_guardrails_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "compose_guardrails_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_snippets"], list) and raw["required_snippets"]
+    assert isinstance(raw["forbidden_snippets"], list) and raw["forbidden_snippets"]
+    assert isinstance(raw["required_public_transport_snippets"], list) and raw[
+        "required_public_transport_snippets"
+    ]
+    assert all(isinstance(item, str) and item for item in raw["required_snippets"])
+    assert all(isinstance(item, str) and item for item in raw["forbidden_snippets"])
+    assert all(
+        isinstance(item, str) and item
+        for item in raw["required_public_transport_snippets"]
+    )
+
+
+def test_shared_http_client_reuse_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "shared_http_client_reuse_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_globals"], list) and raw["required_globals"]
+    assert isinstance(raw["required_refresh_snippets"], list) and raw[
+        "required_refresh_snippets"
+    ]
+    assert isinstance(raw["required_client_factory_name"], str) and raw[
+        "required_client_factory_name"
+    ]
+    assert isinstance(raw["required_client_factory_return_call"], str) and raw[
+        "required_client_factory_return_call"
+    ]
+    assert isinstance(raw["required_shared_client_class_name"], str) and raw[
+        "required_shared_client_class_name"
+    ]
+    assert all(isinstance(item, str) and item for item in raw["required_globals"])
+    assert all(
+        isinstance(item, str) and item for item in raw["required_refresh_snippets"]
+    )
+
+
+def test_backend_probe_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "backend_probe_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["readyz_paths"], list) and raw["readyz_paths"]
+    assert isinstance(raw["fallback_paths"], list) and raw["fallback_paths"]
+    assert isinstance(raw["probe_labels"], list) and raw["probe_labels"]
+    assert isinstance(raw["reason_fragments"], list) and raw["reason_fragments"]
+    assert all(isinstance(item, str) and item for item in raw["readyz_paths"])
+    assert all(isinstance(item, str) and item for item in raw["fallback_paths"])
+    assert all(isinstance(item, str) and item for item in raw["probe_labels"])
+    assert all(isinstance(item, str) and item for item in raw["reason_fragments"])
+
+
+def test_http_error_adapter_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "http_error_adapter_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_defaults_keys"], list) and raw["required_defaults_keys"]
+    assert all(isinstance(item, str) and item for item in raw["required_defaults_keys"])
+
+
+def test_hidden_test_data_alert_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "hidden_test_data_alert_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["runtime_alerts_path"], str) and raw["runtime_alerts_path"]
+    assert isinstance(raw["docs_alerts_path"], str) and raw["docs_alerts_path"]
+    assert isinstance(raw["alerts"], dict)
+    present = raw["alerts"]["present"]
+    share_high = raw["alerts"]["share_high"]
+    assert isinstance(present["name"], str) and present["name"]
+    assert isinstance(share_high["name"], str) and share_high["name"]
+    assert isinstance(present["allowed_exprs"], list) and present["allowed_exprs"]
+    assert isinstance(share_high["allowed_exprs"], list) and share_high["allowed_exprs"]
+    assert all(isinstance(item, str) and item for item in present["allowed_exprs"])
+    assert all(isinstance(item, str) and item for item in share_high["allowed_exprs"])
+
+
+def test_capabilities_health_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "capabilities_health_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_function_names"], list) and raw["required_function_names"]
+    assert all(isinstance(item, str) and item for item in raw["required_function_names"])
+
+
+def test_admin_bounds_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "admin_bounds_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    checked_bounds = raw["checked_bounds"]
+    assert isinstance(checked_bounds, list) and checked_bounds
+    for item in checked_bounds:
+        assert isinstance(item, dict)
+        assert isinstance(item["function"], str) and item["function"]
+        assert isinstance(item["parameter"], str) and item["parameter"]
+
+
+def test_audit_semantics_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "audit_semantics_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    write_patterns = raw["memory_write_required_patterns"]
+    mcp_patterns = raw["mcp_placeholder_required_patterns"]
+    assert isinstance(write_patterns, list) and write_patterns
+    assert isinstance(mcp_patterns, list) and mcp_patterns
+    assert all(isinstance(item, str) and item for item in write_patterns)
+    assert all(isinstance(item, str) and item for item in mcp_patterns)
+
+
+def test_tool_signature_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "tool_signature_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    checked_tools = raw["checked_tools"]
+    assert isinstance(checked_tools, list) and checked_tools
+    assert all(isinstance(item, str) and item for item in checked_tools)
+
+
+def test_admin_endpoint_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "admin_endpoint_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    checked_tools = raw["checked_tools"]
+    assert isinstance(checked_tools, list) and checked_tools
+    assert all(isinstance(item, str) and item for item in checked_tools)
+
+
+def test_export_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "export_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    sensitivities = raw["required_sensitivities"]
+    policy_keys = raw["required_policy_keys"]
+    behavior_snippets = raw["required_behavior_snippets"]
+    assert isinstance(sensitivities, list) and sensitivities
+    assert isinstance(policy_keys, list) and policy_keys
+    assert isinstance(behavior_snippets, list) and behavior_snippets
+    assert all(isinstance(item, str) and item for item in sensitivities)
+    assert all(isinstance(item, str) and item for item in policy_keys)
+    assert all(isinstance(item, str) and item for item in behavior_snippets)
+
+
+def test_http_error_contract_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (
+            _contracts_dir() / "http_error_contract_guardrail_contract.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert isinstance(raw["required_root_keys"], list) and raw["required_root_keys"]
+    assert isinstance(raw["required_status_label_keys"], list) and raw[
+        "required_status_label_keys"
+    ]
+    assert isinstance(raw["required_fallbacks"], dict) and raw["required_fallbacks"]
+    assert isinstance(raw["required_missing_session_hint"], dict) and raw[
+        "required_missing_session_hint"
+    ]
+    assert all(isinstance(item, str) and item for item in raw["required_root_keys"])
+    assert all(
+        isinstance(item, str) and item for item in raw["required_status_label_keys"]
+    )
+
+
+def test_mcp_transport_mount_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_import_name"], str) and raw["required_import_name"]
+    assert isinstance(raw["required_import_level"], int)
+    assert isinstance(raw["required_mount_target"], str) and raw["required_mount_target"]
+    assert isinstance(raw["required_mount_attr_chain"], list) and raw[
+        "required_mount_attr_chain"
+    ]
+    assert isinstance(raw["required_redirect_target"], str) and raw[
+        "required_redirect_target"
+    ]
+    assert isinstance(raw["required_redirect_attr_chain"], list) and raw[
+        "required_redirect_attr_chain"
+    ]
+
+
+def test_mcp_http_session_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "mcp_http_session_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert isinstance(raw["required_run_kwargs"], dict) and raw["required_run_kwargs"]
+    assert isinstance(raw["required_custom_routes"], list) and raw[
+        "required_custom_routes"
+    ]
+    assert isinstance(raw["require_main_entrypoint_call"], bool)
+    assert isinstance(raw["runbook_required_snippets"], list) and raw[
+        "runbook_required_snippets"
+    ]
+
+
 def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
     monkeypatch.setenv("ENV", "production")
     msg = backend_error_message(500, {"detail": "secret"})
     assert "500" in msg
     assert "secret" not in msg
+
+
+def test_http_error_contract_maps_missing_session_id_hint() -> None:
+    msg = backend_error_message(400, {"detail": "Missing session ID"})
+    assert msg == (
+        "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
+    )
 
 
 def test_capabilities_tools_map_to_real_http_transport_functions() -> None:

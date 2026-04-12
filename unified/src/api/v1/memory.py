@@ -22,11 +22,13 @@ from ...memory_reads import (
     get_memory_as_record,
     export_memories,
     get_memory,
+    get_test_data_hygiene_report,
     list_maintenance_reports,
     get_maintenance_report,
     sync_check,
 )
 from ...use_cases.memory import (
+    cleanup_build_test_data as cleanup_build_test_data_use_case,
     store_memory as handle_memory_write,
     store_memories_many as handle_memory_write_many,
     search_memories as find_memories_v1,
@@ -56,6 +58,9 @@ from ...schemas import (
     MemoryUpdate,
     MemoryUpsertItem,
     BulkUpsertResult,
+    BuildTestDataCleanupRequest,
+    BuildTestDataCleanupResponse,
+    TestDataHygieneReport,
 )
 from ...telemetry import incr_metric
 
@@ -133,7 +138,10 @@ async def v1_find(
 ) -> list[dict[str, Any]]:
     """Find memories with filters."""
     req.filters = apply_owner_scope(_user, req.filters)
-    hits = await find_memories_v1(session, req)
+    try:
+        hits = await find_memories_v1(session, req)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     incr_metric("search_requests_total")
     if not hits:
         incr_metric("search_zero_hit_total")
@@ -247,6 +255,37 @@ async def maintain_report_detail(
     if report is None:
         raise HTTPException(status_code=404, detail="Maintenance report not found")
     return report
+
+
+@router.get("/admin/test-data/report", response_model=TestDataHygieneReport)
+async def test_data_hygiene_report(
+    sample_limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> TestDataHygieneReport:
+    """Return diagnostic report for records hidden by test-data policy."""
+    require_admin(_user)
+    return await get_test_data_hygiene_report(session, sample_limit=sample_limit)
+
+
+@router.post(
+    "/admin/test-data/cleanup-build",
+    response_model=BuildTestDataCleanupResponse,
+)
+async def cleanup_build_test_data(
+    req: BuildTestDataCleanupRequest,
+    session: AsyncSession = Depends(get_session),
+    _user: dict = Depends(require_auth),
+) -> BuildTestDataCleanupResponse:
+    """Cleanup build-domain test data with explicit dry-run by default."""
+    require_admin(_user)
+    actor = get_subject(_user) or "agent"
+    return await cleanup_build_test_data_use_case(
+        session,
+        dry_run=req.dry_run,
+        limit=req.limit,
+        actor=actor,
+    )
 
 
 @router.post("/export")

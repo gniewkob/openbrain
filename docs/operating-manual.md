@@ -21,9 +21,10 @@ The "Industrial Wrapper" in `combined.py` provides stable ASGI routing:
 2. **API + Docs**: `/api/*`, `/docs`, `/openapi.json`, `/redoc`, and health endpoints all route to FastAPI.
 3. **Root Redirect (307)**: Root path `/` requests are automatically redirected to the configured streamable transport path (default: `/sse`, override: `MCP_STREAMABLE_HTTP_PATH`). The 307 status code ensures that the `POST` method and JSON-RPC payload are preserved. `MCP_STREAMABLE_HTTP_PATH` must start with `/`, cannot be exactly `/`, cannot exceed 128 chars, and cannot include query/fragment/spaces/backslashes/double-slashes or `.`/`..` segments (guardrails against redirect/routing drift).
 4. **Internal Auth**: MCP communicates with the internal REST API using the `X-Internal-Key` header, bypassing OIDC/Auth0 for system processes. The comparison uses `hmac.compare_digest` to prevent timing-based key guessing. In `PUBLIC_MODE=true`, this key must be explicitly configured and must not use the dev default.
-5. **Health Probe Timeout**: transport readiness fallback probes use `MCP_HEALTH_PROBE_TIMEOUT_S` (default `5.0`) for `/readyz`, `/healthz`, and `/api/v1/health`. Allowed range: finite `(0, 30]`, and it must not exceed `BACKEND_TIMEOUT_S` in both unified transport and stdio gateway startup.
+5. **Health Probe Timeout**: transport readiness fallback probes use `MCP_HEALTH_PROBE_TIMEOUT_S` (default `5.0`) for `/readyz`, `/api/v1/readyz`, `/healthz`, and `/api/v1/health`. Allowed range: finite `(0, 30]`, and it must not exceed `BACKEND_TIMEOUT_S` in both unified transport and stdio gateway startup.
 6. **Backend Timeout Validation**: MCP backend timeout (`BACKEND_TIMEOUT_S`) must stay in finite `(0, 120]`; invalid values fail fast at config load in both unified transport and stdio gateway startup.
 7. **Backend URL Validation**: MCP backend URL (`BRAIN_URL`) must be a valid `http(s)` URL and must not include credentials/path/query/fragment or internal whitespace, to avoid silent runtime misrouting. Surrounding whitespace and trailing `/` are normalized away in both unified transport and stdio gateway startup paths.
+8. **Streamable HTTP Session Independence**: `mcp_http` runs `streamable-http` with `stateless_http=True`, so tool calls are not coupled to transport session headers (`Mcp-Session-Id`) and remain robust across client reconnects.
 
 ## Security Hardening (v2.3)
 The following security improvements were applied:
@@ -59,10 +60,15 @@ Capabilities payload note:
 - `brain_capabilities` now includes a transport-agnostic `obsidian` object (`mode`, `status`, `tools`, `reason`).
 - `brain_capabilities` now includes `health.overall` plus `health.components` (`api`, `db`, `vector_store`, `obsidian`) for component-level truthfulness.
 - `brain_capabilities` metadata contract is strict: `api_version` must follow `MAJOR.MINOR.PATCH` and must be present as a key in `schema_changelog`.
+- current capabilities metadata version is `2.5.0` (tier status semantics explicitly versioned in changelog).
 - capabilities manifest contract is strict: each tool tier list must contain non-empty string names only and must not contain duplicates (no silent fallback defaults).
 - request/runtime contracts are strict too: `request_contracts.json` and `runtime_limits.json` must be valid and complete (no silent fallback to baked-in defaults).
 - this strict contract loading is enforced in both transports (HTTP + stdio gateway), so drift is caught early at startup/tests.
 - request contract string fields are canonicalized (`trim`) at load time to keep audit placeholders deterministic (`updated_by_default`).
+- MCP tool flag `include_test_data` is strict boolean input on `brain_list` / `brain_search`; non-boolean values are rejected (no silent coercion).
+- V1 backend `/api/v1/memory/find` also enforces strict boolean typing for `filters.include_test_data`; invalid types return HTTP 422 (no silent truthy/falsy coercion).
+- Admin diagnostics endpoint `/api/v1/memory/admin/test-data/report` provides a read-only hygiene snapshot (hidden test-data counts, status/domain breakdown, sanitized sample IDs/owners/match_keys) to support controlled cleanup decisions.
+- Admin execution endpoint `/api/v1/memory/admin/test-data/cleanup-build` provides controlled cleanup for `build` test-data with explicit `dry_run` default and bounded `limit`.
 - response normalizers canonicalize actor fields (`created_by`, `updated_by`) in transport output for legacy-hit resilience.
 - Legacy transport-specific keys (`obsidian_http`, `obsidian_local`) remain for backward compatibility.
 
@@ -138,45 +144,97 @@ RELEASE_GATE_ENFORCE=1 python scripts/check_release_gate.py # fail on policy dri
 CI guardrail:
 - `Unified Smoke Tests / guardrails` enforces release-gate policy via `scripts/check_release_gate.py` with `RELEASE_GATE_ENFORCE=1`.
 - `Unified Smoke Tests / guardrails` also enforces repository hygiene via `scripts/check_repo_hygiene.py` (known debug artifacts deny-list).
+- `Unified Smoke Tests / guardrails` enforces compose safety via `scripts/check_compose_guardrails.py` (no hardcoded DB defaults + required public MCP transport snippets such as `http://mcp-http:7011` and `--url=${NGROK_DOMAIN}`).
 - `Unified Smoke Tests / guardrails` enforces capabilities manifest parity via `scripts/check_capabilities_manifest_parity.py` (HTTP transport and stdio gateway loaders must stay contract-equivalent).
 - `Unified Smoke Tests / guardrails` enforces capabilities metadata parity via `scripts/check_capabilities_metadata_parity.py` (`api_version`/changelog loader semantics must stay contract-equivalent across transports).
 - `Unified Smoke Tests / guardrails` enforces capabilities health parity via `scripts/check_capabilities_health_parity.py` (`build_capabilities_health` and component mapping logic must stay contract-equivalent across transports).
+- `Unified Smoke Tests / guardrails` enforces capabilities tier status parity via `scripts/check_capabilities_tier_status_parity.py` (`brain_capabilities` must keep aligned tier status values in stdio and HTTP and stay inside contract `tier_status_values`).
+- `Unified Smoke Tests / guardrails` enforces backend probe contract parity via `scripts/check_backend_probe_contract_parity.py` (`_get_backend_status` must keep aligned probe order `/readyz` -> `/api/v1/readyz` plus fallback probes `/healthz` and `/api/v1/health`, with stable probe labels/reason fragments).
 - `Unified Smoke Tests / guardrails` enforces request/runtime contract parity via `scripts/check_request_runtime_parity.py` (`request_contracts` and `runtime_limits` loader/validator semantics must stay contract-equivalent across transports).
+- `Unified Smoke Tests / guardrails` enforces Makefile vs PR-readiness parity via `scripts/check_makefile_pr_readiness_parity.py` (`make guardrail-tests` and `make contract-smoke` test lists must match `check_pr_readiness.py` bundles).
+- `Unified Smoke Tests / guardrails` enforces shared backend HTTP client reuse via `scripts/check_shared_http_client_reuse.py` (both transports must keep module-level shared `httpx.AsyncClient` pooling semantics).
+- `Unified Smoke Tests / guardrails` enforces selected MCP tool signature parity via `scripts/check_tool_signature_parity.py` (`brain_search`, `brain_list`, `brain_delete`, `brain_update` argument contract must stay transport-equivalent).
+- `Unified Smoke Tests / guardrails` enforces admin parameter bounds parity via `scripts/check_admin_bounds_parity.py` (`brain_test_data_report.sample_limit` and `brain_cleanup_build_test_data.limit` ranges/defaults must stay transport-equivalent).
+- `Unified Smoke Tests / guardrails` enforces admin endpoint contract parity via `scripts/check_admin_endpoint_contract_parity.py` (`brain_test_data_report` and `brain_cleanup_build_test_data` must keep aligned method/path-alias/payload-key mapping across stdio and HTTP transports).
+- `Unified Smoke Tests / guardrails` enforces MCP tool inventory parity via `scripts/check_tool_inventory_parity.py` (all non-Obsidian tools must match across canonical/compatibility transports; compatibility transport keeps only the approved Obsidian subset).
+- `Unified Smoke Tests / guardrails` enforces MCP transport import scope via `scripts/check_mcp_transport_import_scope.py` (`mcp_transport` may be imported only by `unified/src/combined.py` in runtime code; all other importers must stay in `unified/tests/*`). Rules are contract-driven via `unified/contracts/mcp_transport_import_scope_contract.json`.
+- `Unified Smoke Tests / guardrails` enforces MCP transport mount contract via `scripts/check_mcp_transport_mount_contract.py` (`combined.py` must keep importing `mcp_transport`, mount `mcp_transport.mcp.streamable_http_app()`, and read `mcp_transport.STREAMABLE_HTTP_PATH` for root redirect). Rules are contract-driven via `unified/contracts/mcp_transport_mount_contract.json`.
+- `Unified Smoke Tests / guardrails` enforces MCP HTTP session contract via `scripts/check_mcp_http_session_contract.py` (`mcp_http.py` must keep required `mcp.run` kwargs, required custom routes, and `__main__` entrypoint call; runbook must document required session-failure snippet). Rules are contract-driven via `unified/contracts/mcp_http_session_contract.json`.
+- `Unified Smoke Tests / guardrails` enforces capabilities tools truthfulness via `scripts/check_capabilities_tools_truthfulness.py` (manifest-declared tools must map to real `@mcp.tool` functions in both transports).
+- `Unified Smoke Tests / guardrails` enforces `brain_search` filter parity via `scripts/check_search_filter_parity.py` (`owner` and `include_test_data` wiring to backend filters must stay transport-equivalent).
+- `Unified Smoke Tests / guardrails` enforces `brain_list` filter parity via `scripts/check_list_filter_parity.py` (`status`, `owner`, `tenant_id`, `include_test_data` wiring to backend filters must stay transport-equivalent).
 - `Unified Smoke Tests / guardrails` enforces response normalizers parity via `scripts/check_response_normalizers_parity.py` (actor normalization and legacy hit-shape normalization must stay contract-equivalent across transports).
+- `Unified Smoke Tests / guardrails` enforces HTTP error adapter parity via `scripts/check_http_error_adapter_parity.py` (shared status labels + detail-hint mapping + production-safe request-failure fallback must stay transport-equivalent).
+- `Unified Smoke Tests / guardrails` enforces HTTP error contract semantics via `scripts/check_http_error_contract_semantics.py` (`http_error_contracts.json` must retain required status labels, fallback labels, and `missing_session_id` hint semantics).
 - `Unified Smoke Tests / guardrails` enforces capabilities status truthfulness via `scripts/check_capabilities_truthfulness.py` (health contract + fallback probe invariants).
+  - contract now pins tier status semantics via `tier_status_values` (`stable`, `active`, `guarded`) to prevent capability-level drift.
 - `Unified Smoke Tests / guardrails` enforces audit semantics via `scripts/check_audit_semantics.py` (`created_by/updated_by` invariants at schema/API/write boundaries).
+- `Unified Smoke Tests / guardrails` enforces cleanup actor semantics via `scripts/check_cleanup_actor_semantics.py` (`cleanup_build_test_data` must preserve `actor = get_subject(_user) or "agent"` and forward `actor` to use-case layer for auditable deletes).
+- `Unified Smoke Tests / guardrails` enforces update actor semantics parity via `scripts/check_update_audit_semantics_parity.py` (`brain_update` must normalize compatibility `updated_by` input and persist canonical server-side audit actor).
+- `Unified Smoke Tests / guardrails` enforces `brain_delete` error parity via `scripts/check_delete_semantics_parity.py` (403/404 mappings must stay aligned between stdio gateway and HTTP transport).
 - `Unified Smoke Tests / guardrails` enforces export redaction contract semantics via `scripts/check_export_contract.py` (`EXPORT_POLICY` coverage + restricted fallback + required redactions).
-- `Unified Smoke Tests / guardrails` enforces Obsidian gating/contract semantics via `scripts/check_obsidian_contract.py` (feature-flag + capabilities + manifest subset checks).
+- `Unified Smoke Tests / guardrails` enforces Obsidian gating/contract semantics via `scripts/check_obsidian_contract.py` (feature-flag + capabilities + manifest subset checks). Disabled-reason snippets are contract-driven via `unified/contracts/obsidian_disabled_reason_contract.json`.
+- `Unified Smoke Tests / guardrails` enforces telemetry/monitoring contract parity via `scripts/check_telemetry_contract_parity.py` (all gauge metrics emitted by `telemetry_gauges` must be listed in the monitoring metrics contract).
+- `Unified Smoke Tests / guardrails` enforces dashboard memory panel semantics via `scripts/check_dashboard_memory_semantics.py` (visible/all/hidden memory panels and hidden-share panel must keep canonical PromQL expressions).
+- `Unified Smoke Tests / guardrails` enforces hidden test-data alert parity via `scripts/check_hidden_test_data_alert_parity.py` (runtime alert rules and docs alert rules must keep aligned alert names and threshold semantics).
 - `Unified Smoke Tests / guardrails` enforces monitoring contract via `scripts/validate_monitoring_contract.py` (dashboard + alert-rule metric references must remain inside the declared contract).
-- `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
+- `Unified Smoke Tests / guardrails` executes the consolidated static bundle via `scripts/check_local_guardrails.py` (hygiene + compose safety + capabilities truthfulness + audit semantics + Obsidian contract + monitoring contract).
+- `check_local_guardrails.py` enforces per-step timeouts (default 60s, monitoring contract 90s) and fails with exit code `124` on timeout.
 - `Unified Smoke Tests / guardrails` runs lightweight pytest coverage for guardrail runners:
   - `unified/tests/test_local_guardrails_runner.py`
+  - `unified/tests/test_pr_readiness_runner.py`
   - `unified/tests/test_repo_hygiene_guardrail.py`
   - `unified/tests/test_compose_guardrails.py`
   - `unified/tests/test_secret_scan_guardrail.py`
   - `unified/tests/test_capabilities_manifest_parity_guardrail.py`
   - `unified/tests/test_capabilities_metadata_parity_guardrail.py`
   - `unified/tests/test_capabilities_health_parity_guardrail.py`
+  - `unified/tests/test_capabilities_tier_status_parity_guardrail.py`
+  - `unified/tests/test_backend_probe_contract_parity_guardrail.py`
   - `unified/tests/test_request_runtime_parity_guardrail.py`
+  - `unified/tests/test_makefile_pr_readiness_parity_guardrail.py`
+  - `unified/tests/test_shared_http_client_reuse_guardrail.py`
+  - `unified/tests/test_tool_signature_parity_guardrail.py`
+  - `unified/tests/test_admin_bounds_parity_guardrail.py`
+  - `unified/tests/test_admin_endpoint_contract_parity_guardrail.py`
+  - `unified/tests/test_tool_inventory_parity_guardrail.py`
+  - `unified/tests/test_mcp_transport_import_scope_guardrail.py`
+  - `unified/tests/test_mcp_transport_mount_contract_guardrail.py`
+  - `unified/tests/test_capabilities_tools_truthfulness_guardrail.py`
   - `unified/tests/test_response_normalizers_parity_guardrail.py`
+  - `unified/tests/test_http_error_adapter_parity_guardrail.py`
+  - `unified/tests/test_http_error_contract_semantics_guardrail.py`
   - `unified/tests/test_capabilities_truthfulness_guardrail.py`
   - `unified/tests/test_audit_semantics_guardrail.py`
+  - `unified/tests/test_cleanup_actor_semantics_guardrail.py`
+  - `unified/tests/test_update_audit_semantics_parity_guardrail.py`
   - `unified/tests/test_export_contract_guardrail.py`
   - `unified/tests/test_obsidian_contract_guardrail.py`
+  - `unified/tests/test_mcp_http_session_contract_guardrail.py`
   - `unified/tests/test_monitoring_contract_guardrail.py`
+  - `unified/tests/test_telemetry_contract_parity_guardrail.py`
+  - `unified/tests/test_dashboard_memory_semantics_guardrail.py`
+  - `unified/tests/test_hidden_test_data_alert_parity_guardrail.py`
+  - `unified/mcp-gateway/tests/test_shared_client_reuse.py`
 
 Local PR readiness:
 - `python3 scripts/check_pr_readiness.py`
 - or `make pr-readiness`
+- local static guardrails only: `make local-guardrails`
+- guardrail runner pytest bundle only: `make guardrail-tests`
+- contract integrity smoke pytest bundle only: `make contract-smoke`
+- step-level timeouts are enforced (`local guardrails`: 180s, test steps: 300s) to prevent indefinite hangs.
 - bundle includes:
   - `check_local_guardrails.py`
   - guardrail runner unit tests
-  - contract integrity smoke (`test_contract_integrity.py`, `test_capabilities_response_contract.py`)
+  - contract integrity smoke (`test_contract_integrity.py`, `test_capabilities_response_contract.py`, `test_health_route_alias_contract.py`, `test_admin_openapi_contract.py`, `test_transport_parity.py`)
 
 Local monitoring contract check:
 - `make monitoring-check`
 - optional live-mode validation: `python3 scripts/validate_monitoring_contract.py --check-live --metrics-url http://127.0.0.1:9180/metrics`
 - default mode forbids `vector(0)` in monitoring PromQL expressions (dashboards and alert rules; opt-out for migration only: `--allow-vector-zero`)
+- `active_memories_all_total` now exposes all active rows including hidden test fixtures (`active_memories_total + hidden_test_data_active_total`) for dashboard truthfulness.
+- Grafana memory diagnostics now include `Active Memories (Visible Excl Test Data)`, `Active Memories (All incl Test Data)`, `Hidden Test Data (Active Only)`, and `Hidden Test Data Share (Active)`.
 
 Branch protection policy (recommended):
 - Require pull request before merging.
@@ -199,6 +257,7 @@ Backup branch inventory note (2026-04-08):
 - `tenant_id` is now available as a first-class indexed column and remains mirrored in `metadata_` only for compatibility with older records and tools. New code should treat the column as the source of truth.
 - Telemetry gauges and histograms remain process-local. Counter metrics can now be shared across workers by setting `TELEMETRY_BACKEND=redis`.
 - MCP transport and stdio gateway now reuse shared backend `httpx.AsyncClient` instances to preserve connection pooling under sustained tool traffic.
+- stdio gateway now refreshes shared backend `httpx.AsyncClient` automatically when runtime backend config drifts (`BRAIN_URL` / timeout / internal key), mirroring HTTP transport behavior.
 - The metrics bridge still uses Python's basic `HTTPServer`, which is sufficient for the current single-scrape local topology but not intended as a hardened multi-client ingress component.
 
 ## Operational Thresholds

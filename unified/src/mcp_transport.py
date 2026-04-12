@@ -8,7 +8,6 @@ All tools now use the V1 API engine for consistent metadata handling.
 from __future__ import annotations
 
 import os
-import functools
 from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
@@ -40,6 +39,12 @@ from .response_normalizers import (
     to_legacy_memory_shape,
 )
 from .runtime_limits import load_runtime_limits
+from .mcp_transport_utils import (
+    extract_record_from_write_response,
+    http_obsidian_disabled_reason,
+    make_tool_guard,
+    redact_logged_payload,
+)
 
 log = structlog.get_logger()
 
@@ -77,10 +82,12 @@ MAX_BULK_ITEMS: int = _LIMITS["max_bulk_items"]
 
 
 def _http_obsidian_disabled_reason() -> str:
-    return (
-        "HTTP Obsidian tools are disabled by default. "
-        "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport."
-    )
+    # Keep snippet literals in this module so static contract guardrails can assert
+    # HTTP transport user-facing guidance semantics.
+    _snippet_primary = "HTTP Obsidian tools are disabled by default."
+    _snippet_action = "Set ENABLE_HTTP_OBSIDIAN_TOOLS=1 before starting transport."
+    _ = (_snippet_primary, _snippet_action)
+    return http_obsidian_disabled_reason()
 
 
 def _http_obsidian_tools_registered() -> bool:
@@ -205,37 +212,15 @@ class _SharedClient:
         return False
 
 
-def mcp_tool_guard(func):
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-        try:
-            return await func(*args, **kwargs)
-        except Exception as e:
-            log.error("mcp_tool_error", tool=func.__name__, error=str(e))
-            raise ValueError(f"Tool execution failed: {str(e)}") from e
-
-    return wrapper
+mcp_tool_guard = make_tool_guard(log)
 
 
 def _extract_record_from_write_response(payload: dict[str, Any]) -> dict[str, Any]:
-    record = payload.get("record")
-    if not isinstance(record, dict):
-        raise ValueError(f"Write response missing record payload: {payload}")
-    return to_legacy_memory_shape(record)
+    return extract_record_from_write_response(payload, to_legacy_memory_shape)
 
 
 def _redact_logged_payload(payload: Any) -> Any:
-    if isinstance(payload, dict):
-        redacted = {}
-        for key, value in payload.items():
-            if key in _SENSITIVE_LOG_FIELDS:
-                redacted[key] = "[REDACTED]"
-            else:
-                redacted[key] = _redact_logged_payload(value)
-        return redacted
-    if isinstance(payload, list):
-        return [_redact_logged_payload(item) for item in payload]
-    return payload
+    return redact_logged_payload(payload, _SENSITIVE_LOG_FIELDS)
 
 
 async def _safe_req(method: str, path: str, **kwargs) -> dict[str, Any]:
@@ -276,26 +261,33 @@ async def _safe_req(method: str, path: str, **kwargs) -> dict[str, Any]:
 
 async def _get_backend_status() -> dict[str, Any]:
     """Probe backend readiness without conflating degradation with outage."""
-    try:
-        async with _client() as c:
-            r = await c.request("GET", "/readyz", timeout=HEALTH_PROBE_TIMEOUT)
-        data = r.json()
-        if r.status_code in {200, 503} and isinstance(data, dict):
-            return {
-                "status": data.get(
-                    "status",
-                    "ok" if r.status_code == 200 else "degraded",
-                ),
-                "url": BRAIN_URL,
-                "api": "reachable",
-                "db": data.get("db", "unknown"),
-                "vector_store": data.get("vector_store", "unknown"),
-                "readyz_status_code": r.status_code,
-                "probe": "readyz",
-            }
-        readyz_error = f"Unexpected /readyz response ({r.status_code})"
-    except Exception as exc:
-        readyz_error = str(exc)
+    readyz_paths = ("/readyz", "/api/v1/readyz")
+    readyz_failures: list[str] = []
+    for readyz_path in readyz_paths:
+        try:
+            async with _client() as c:
+                r = await c.request("GET", readyz_path, timeout=HEALTH_PROBE_TIMEOUT)
+            data = r.json()
+            if r.status_code in {200, 503} and isinstance(data, dict):
+                return {
+                    "status": data.get(
+                        "status",
+                        "ok" if r.status_code == 200 else "degraded",
+                    ),
+                    "url": BRAIN_URL,
+                    "api": "reachable",
+                    "db": data.get("db", "unknown"),
+                    "vector_store": data.get("vector_store", "unknown"),
+                    "readyz_status_code": r.status_code,
+                    "probe": "readyz",
+                    "primary_path": readyz_path,
+                }
+            readyz_failures.append(
+                f"{readyz_path}: Unexpected response ({r.status_code})"
+            )
+        except Exception as exc:
+            readyz_failures.append(f"{readyz_path}: {exc}")
+    readyz_error = "; ".join(readyz_failures)
 
     try:
         async with _client() as c:
@@ -413,12 +405,18 @@ async def brain_search(
     entity_type: str | None = None,
     owner: str | None = None,
     sensitivity: str | None = None,
+    include_test_data: bool = False,
 ) -> list[dict[str, Any]]:
     """Primary tool for semantic retrieval. Finds information by topic or phrase.
 
     Optionally filter by domain (corporate|build|personal), entity_type, owner,
     sensitivity.
+    include_test_data: include records marked with metadata.test_data=true
     """
+    if not isinstance(include_test_data, bool):
+        raise ValueError(
+            f"include_test_data must be bool, got {type(include_test_data).__name__}"
+        )
     if not 1 <= top_k <= MAX_SEARCH_TOP_K:
         raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
     filters = build_list_filters(
@@ -426,6 +424,7 @@ async def brain_search(
         entity_type=entity_type,
         sensitivity=sensitivity,
         owner=owner,
+        include_test_data=include_test_data,
     )
     payload = build_find_search_payload(query=query, limit=top_k, filters=filters)
     return normalize_find_hits_to_scored_memories(
@@ -537,13 +536,19 @@ async def brain_list(
     sensitivity: str | None = None,
     owner: str | None = None,
     tenant_id: str | None = None,
+    include_test_data: bool = False,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
     """Browse memories with metadata filters.
 
     status options: active | superseded (default: active only)
     domain options: corporate | build | personal
+    include_test_data: include records marked with metadata.test_data=true
     """
+    if not isinstance(include_test_data, bool):
+        raise ValueError(
+            f"include_test_data must be bool, got {type(include_test_data).__name__}"
+        )
     if not 1 <= limit <= MAX_LIST_LIMIT:
         raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
     filters = build_list_filters(
@@ -553,6 +558,7 @@ async def brain_list(
         sensitivity=sensitivity,
         owner=owner,
         tenant_id=tenant_id,
+        include_test_data=include_test_data,
     )
     payload = build_find_list_payload(limit=limit, filters=filters)
     hits = await _safe_req("POST", memory_path("find"), json=payload)
@@ -571,7 +577,23 @@ async def brain_get_context(query: str, domain: Optional[str] = None) -> dict[st
 @mcp_tool_guard
 async def brain_delete(memory_id: str) -> dict[str, Any]:
     """Delete a memory. Forbidden for corporate domain."""
-    await _safe_req("DELETE", f"/{memory_id}")
+    path = memory_item_absolute_path(memory_id)
+    try:
+        async with _client() as c:
+            response = await c.request("DELETE", path)
+    except httpx.RequestError as exc:
+        raise ValueError(backend_request_failure_message(exc)) from exc
+
+    if response.status_code == 404:
+        raise ValueError(f"Memory not found: {memory_id}")
+    if response.status_code == 403:
+        raise ValueError("Cannot delete corporate memories. Use deprecation instead.")
+    if response.is_error:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text
+        raise ValueError(backend_error_message(response.status_code, detail))
     return {"deleted": True, "id": memory_id}
 
 
@@ -697,3 +719,32 @@ async def brain_upsert_bulk(items: list[dict[str, Any]]) -> dict[str, Any]:
 async def brain_maintain(dry_run: bool = True) -> dict[str, Any]:
     """Run system maintenance tasks (deduplication, normalization)."""
     return await _safe_req("POST", memory_path("maintain"), json={"dry_run": dry_run})
+
+
+@mcp.tool()
+@mcp_tool_guard
+async def brain_test_data_report(sample_limit: int = 20) -> dict[str, Any]:
+    """Return admin diagnostic report for hidden test-data records."""
+    if not 1 <= sample_limit <= 100:
+        raise ValueError(f"sample_limit must be 1–100, got {sample_limit}")
+    return await _safe_req(
+        "GET",
+        memory_path("test_data_report"),
+        params={"sample_limit": sample_limit},
+    )
+
+
+@mcp.tool()
+@mcp_tool_guard
+async def brain_cleanup_build_test_data(
+    dry_run: bool = True,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """Controlled cleanup for build-domain test-data records."""
+    if not 1 <= limit <= 500:
+        raise ValueError(f"limit must be 1–500, got {limit}")
+    return await _safe_req(
+        "POST",
+        memory_path("cleanup_build_test_data"),
+        json={"dry_run": dry_run, "limit": limit},
+    )

@@ -17,6 +17,9 @@ def build_memory_gauges(
 ) -> dict[str, float]:
     """Build gauge payload from canonical memory status counts."""
     active_total = int(status_counts.get("active", 0))
+    hidden_active_total = int(
+        (hidden_test_data_counts or {}).get("hidden_test_data_active_total", 0)
+    )
 
     build_active = int(domain_status_counts.get("build", {}).get("active", 0))
     corporate_active = int(domain_status_counts.get("corporate", {}).get("active", 0))
@@ -24,6 +27,7 @@ def build_memory_gauges(
 
     gauges = {
         "active_memories_total": float(active_total),
+        "active_memories_all_total": float(active_total + hidden_active_total),
         "active_memories_build_total": float(build_active),
         "active_memories_corporate_total": float(corporate_active),
         "active_memories_personal_total": float(personal_active),

@@ -78,11 +78,22 @@ for t in d['data']['activeTargets']:
 # expect: openbrain-unified  up
 
 # 4. Metric data in Prometheus
+curl -s 'http://127.0.0.1:9090/api/v1/query?query=active_memories_all_total'
+# expect: value >= 0 (all active, including hidden test data)
 curl -s 'http://127.0.0.1:9090/api/v1/query?query=active_memories_total'
-# expect: value != 0
+# expect: value >= 0 (visible active only)
+curl -s 'http://127.0.0.1:9090/api/v1/query?query=hidden_test_data_active_total'
+# expect: if > 0 then visible counters can stay near zero by design
+curl -s 'http://127.0.0.1:9090/api/v1/query?query=hidden_test_data_active_total%20%2F%20clamp_min(active_memories_all_total%2C1)'
+# expect: ratio in [0,1], >=0.25 means elevated hidden test-data share
 
 # 5. Dashboard
-# Open http://127.0.0.1:3001 → OpenBrain Overview → panels show real data
+# Open http://127.0.0.1:3001 → OpenBrain Overview.
+# Memory sanity: compare three stat panels together:
+# - Active Memories (Visible Excl Test Data)
+# - Active Memories (All incl Test Data)
+# - Hidden Test Data (Active Only)
+# - Hidden Test Data Share (Active)
 ```
 
 ---
@@ -95,7 +106,12 @@ curl -s 'http://127.0.0.1:9090/api/v1/query?query=active_memories_total'
 | Bridge returns `502` | OpenBrain container not running | `docker compose ... up -d unified-server` |
 | Prometheus target `down` | Bridge not running | `launchctl load ... com.openbrain.metrics.bridge.plist` |
 | Dashboard `No data` | Prometheus can't reach bridge | Check port 9180 is bound: `lsof -i :9180` |
+| Dashboard active count is `0` but search works | Visible metric excludes `metadata.test_data=true` | Compare `active_memories_total` vs `active_memories_all_total` and `hidden_test_data_active_total` |
 | After Mac restart, bridge not up | LaunchAgent not loaded | Load the plist once: `launchctl load ~/Library/LaunchAgents/com.openbrain.metrics.bridge.plist` |
+
+Alerting note:
+- `OpenBrainHiddenTestDataPresent` firing means hidden active test-data exists; use `admin/test-data/report` and `cleanup-build` flow before tuning dashboard thresholds.
+- `OpenBrainHiddenTestDataShareHigh` firing means hidden share is >= 25% of active set; treat as elevated data-quality incident (P1 hygiene).
 
 ---
 

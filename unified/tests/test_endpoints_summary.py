@@ -99,6 +99,16 @@ class TestEndpointsV1Core:
         # Returns 401/403 without auth or 404/503 with auth but no DB
         assert response.status_code in [200, 401, 403, 404, 500, 503]
 
+    def test_v1_test_data_hygiene_report_requires_auth(self, client: TestClient) -> None:
+        """V1 admin test-data report is protected by auth/admin policy."""
+        response = client.get("/api/v1/memory/admin/test-data/report")
+        assert response.status_code in [200, 401, 403, 500, 503]
+
+    def test_v1_cleanup_build_test_data_validation(self, client: TestClient) -> None:
+        """V1 cleanup-build endpoint validates request/auth."""
+        response = client.post("/api/v1/memory/admin/test-data/cleanup-build", json={})
+        assert response.status_code in [200, 401, 403, 422, 500, 503]
+
 
 class TestEndpointsV1Obsidian:
     """V1 Obsidian API endpoints."""
@@ -163,6 +173,8 @@ class TestAllRoutesRegistered:
             "/api/v1/memory/find",
             "/api/v1/memory/get-context",
             "/api/v1/memory/{memory_id}",
+            "/api/v1/memory/admin/test-data/report",
+            "/api/v1/memory/admin/test-data/cleanup-build",
         ]
         for path in expected:
             assert path in paths, f"Missing: {path}"
@@ -195,9 +207,81 @@ class TestAllRoutesRegistered:
             "/api/v1/memory/maintain",
             "/api/v1/memory/export",
             "/api/v1/memory/sync-check",
+            "/api/v1/memory/admin/test-data/report",
+            "/api/v1/memory/admin/test-data/cleanup-build",
         ]
         for path in expected:
             assert path in paths, f"Missing: {path}"
+
+    def test_test_data_hygiene_report_schema_includes_visibility_ratio_fields(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI schema for TestDataHygieneReport includes visibility/ratio fields."""
+        response = client.get("/openapi.json")
+        data = response.json()
+        schemas = data.get("components", {}).get("schemas", {})
+        report_schema = schemas.get("TestDataHygieneReport", {})
+        properties = report_schema.get("properties", {})
+
+        assert "visible_status_counts" in properties
+        assert "visible_domain_status_counts" in properties
+        assert "hidden_active_ratio" in properties
+        assert "hidden_active_ratio_by_domain" in properties
+        assert "recommended_actions" in properties
+
+    def test_cleanup_build_test_data_schema_includes_result_fields(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI schema for cleanup endpoint includes deterministic result fields."""
+        response = client.get("/openapi.json")
+        data = response.json()
+        schemas = data.get("components", {}).get("schemas", {})
+        cleanup_schema = schemas.get("BuildTestDataCleanupResponse", {})
+        properties = cleanup_schema.get("properties", {})
+
+        assert "dry_run" in properties
+        assert "scanned" in properties
+        assert "candidates_count" in properties
+        assert "deleted_count" in properties
+        assert "skipped_count" in properties
+        assert "candidate_ids" in properties
+        assert "deleted_ids" in properties
+        assert "skipped" in properties
+
+    def test_test_data_hygiene_report_query_bounds_in_openapi(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI keeps sample_limit bounds/default stable for admin report."""
+        response = client.get("/openapi.json")
+        data = response.json()
+        get_op = data["paths"]["/api/v1/memory/admin/test-data/report"]["get"]
+        parameters = get_op.get("parameters", [])
+        sample_param = next(
+            (item for item in parameters if item.get("name") == "sample_limit"),
+            {},
+        )
+        schema = sample_param.get("schema", {})
+
+        assert schema.get("default") == 20
+        assert schema.get("minimum") == 1
+        assert schema.get("maximum") == 100
+
+    def test_cleanup_build_request_bounds_in_openapi(
+        self, client: TestClient
+    ) -> None:
+        """OpenAPI keeps cleanup request body bounds/defaults stable."""
+        response = client.get("/openapi.json")
+        data = response.json()
+        schemas = data.get("components", {}).get("schemas", {})
+        request_schema = schemas.get("BuildTestDataCleanupRequest", {})
+        properties = request_schema.get("properties", {})
+        limit_schema = properties.get("limit", {})
+        dry_run_schema = properties.get("dry_run", {})
+
+        assert limit_schema.get("default") == 100
+        assert limit_schema.get("minimum") == 1
+        assert limit_schema.get("maximum") == 500
+        assert dry_run_schema.get("default") is True
 
 
 if __name__ == "__main__":

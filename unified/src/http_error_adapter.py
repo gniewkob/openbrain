@@ -14,6 +14,7 @@ _DEFAULTS = {
     },
     "fallback_5xx": "Internal server error",
     "fallback_other": "Request failed",
+    "detail_hints": {},
 }
 
 
@@ -34,6 +35,26 @@ _CONTRACT = _load_contract()
 
 
 def backend_error_message(status_code: int, detail: Any) -> str:
+    detail_text = (
+        json.dumps(detail, ensure_ascii=False)
+        if isinstance(detail, (dict, list))
+        else str(detail)
+    )
+    detail_hints = _CONTRACT.get("detail_hints", {})
+    for hint in detail_hints.values():
+        if not isinstance(hint, dict):
+            continue
+        if hint.get("status_code") != status_code:
+            continue
+        needle = str(hint.get("contains", "")).strip()
+        if not needle:
+            continue
+        if needle in detail_text:
+            message = (
+                str(hint.get("message", "")).strip() or _CONTRACT["fallback_other"]
+            )
+            return f"Backend {status_code}: {message}"
+
     is_production = os.environ.get("ENV", "development").lower() == "production"
     if is_production:
         labels = _CONTRACT["status_labels"]
@@ -45,10 +66,6 @@ def backend_error_message(status_code: int, detail: Any) -> str:
         )
         return f"Backend {status_code}: {label}"
 
-    if isinstance(detail, (dict, list)):
-        detail_text = json.dumps(detail, ensure_ascii=False)
-    else:
-        detail_text = str(detail)
     return f"Backend {status_code}: {detail_text}"
 
 

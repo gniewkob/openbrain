@@ -12,29 +12,83 @@ ROOT = Path(__file__).resolve().parent.parent
 
 GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
     ("repository hygiene", "scripts/check_repo_hygiene.py"),
+    ("compose guardrails", "scripts/check_compose_guardrails.py"),
     ("capabilities manifest parity", "scripts/check_capabilities_manifest_parity.py"),
     ("capabilities metadata parity", "scripts/check_capabilities_metadata_parity.py"),
     ("capabilities health parity", "scripts/check_capabilities_health_parity.py"),
+    (
+        "capabilities tier status parity",
+        "scripts/check_capabilities_tier_status_parity.py",
+    ),
+    (
+        "backend probe contract parity",
+        "scripts/check_backend_probe_contract_parity.py",
+    ),
     ("request/runtime parity", "scripts/check_request_runtime_parity.py"),
+    (
+        "makefile pr-readiness parity",
+        "scripts/check_makefile_pr_readiness_parity.py",
+    ),
+    ("shared http client reuse", "scripts/check_shared_http_client_reuse.py"),
+    ("tool signature parity", "scripts/check_tool_signature_parity.py"),
+    ("admin bounds parity", "scripts/check_admin_bounds_parity.py"),
+    (
+        "admin endpoint contract parity",
+        "scripts/check_admin_endpoint_contract_parity.py",
+    ),
+    ("tool inventory parity", "scripts/check_tool_inventory_parity.py"),
+    (
+        "mcp transport import scope",
+        "scripts/check_mcp_transport_import_scope.py",
+    ),
+    (
+        "mcp transport mount contract",
+        "scripts/check_mcp_transport_mount_contract.py",
+    ),
+    ("capabilities tools truthfulness", "scripts/check_capabilities_tools_truthfulness.py"),
+    ("search filter parity", "scripts/check_search_filter_parity.py"),
+    ("list filter parity", "scripts/check_list_filter_parity.py"),
     ("response normalizers parity", "scripts/check_response_normalizers_parity.py"),
+    ("http error adapter parity", "scripts/check_http_error_adapter_parity.py"),
+    ("http error contract semantics", "scripts/check_http_error_contract_semantics.py"),
     ("capabilities truthfulness", "scripts/check_capabilities_truthfulness.py"),
     ("audit semantics", "scripts/check_audit_semantics.py"),
+    ("cleanup actor semantics", "scripts/check_cleanup_actor_semantics.py"),
+    ("update audit semantics parity", "scripts/check_update_audit_semantics_parity.py"),
+    ("delete semantics parity", "scripts/check_delete_semantics_parity.py"),
     ("export contract", "scripts/check_export_contract.py"),
     ("obsidian contract", "scripts/check_obsidian_contract.py"),
     ("mcp http session contract", "scripts/check_mcp_http_session_contract.py"),
+    ("telemetry contract parity", "scripts/check_telemetry_contract_parity.py"),
+    ("dashboard memory semantics", "scripts/check_dashboard_memory_semantics.py"),
+    (
+        "hidden test-data alert parity",
+        "scripts/check_hidden_test_data_alert_parity.py",
+    ),
     ("monitoring contract", "scripts/validate_monitoring_contract.py"),
 )
+
+STEP_TIMEOUT_SECONDS: dict[str, int] = {
+    label: 60 for label, _ in GUARDRAIL_STEPS
+}
+STEP_TIMEOUT_SECONDS["monitoring contract"] = 90
 
 
 def run_step(label: str, rel_script: str) -> int:
     script = ROOT / rel_script
-    proc = subprocess.run(
-        [sys.executable, str(script)],
-        cwd=str(ROOT),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    timeout_s = STEP_TIMEOUT_SECONDS[label]
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=str(ROOT),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"[FAIL] {label}: timed out after {timeout_s}s", file=sys.stderr)
+        return 124
     if proc.stdout.strip():
         print(proc.stdout.strip())
     if proc.returncode != 0:

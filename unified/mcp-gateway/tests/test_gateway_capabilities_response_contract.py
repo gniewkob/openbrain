@@ -23,10 +23,19 @@ class GatewayCapabilitiesResponseContractTests(unittest.IsolatedAsyncioTestCase)
         )
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def _manifest(self) -> dict:
+        path = (
+            Path(__file__).resolve().parents[2]
+            / "contracts"
+            / "capabilities_manifest.json"
+        )
+        return json.loads(path.read_text(encoding="utf-8"))
+
     async def test_gateway_capabilities_follow_response_contract(self) -> None:
         gateway = load_gateway_main()
         contract = self._contract()
         metadata = self._metadata()
+        manifest = self._manifest()
         backend = {
             "status": "ok",
             "api": "reachable",
@@ -53,8 +62,16 @@ class GatewayCapabilitiesResponseContractTests(unittest.IsolatedAsyncioTestCase)
             self.assertIn(key, caps["health"]["components"])
         for key in contract["obsidian_required_keys"]:
             self.assertIn(key, caps["obsidian"])
+        for tier in ("tier_1_core", "tier_2_advanced", "tier_3_admin"):
+            for key in contract["tier_required_keys"]:
+                self.assertIn(key, caps[tier])
 
         self.assertIn(caps["health"]["overall"], contract["health_overall_values"])
         self.assertIn(caps["obsidian"]["mode"], contract["obsidian_modes"])
         self.assertIn(caps["obsidian"]["status"], contract["obsidian_statuses"])
         self.assertIsInstance(caps["obsidian"]["tools"], list)
+        self.assertEqual(caps["tier_1_core"]["tools"], manifest["core_tools"])
+        self.assertEqual(caps["tier_2_advanced"]["tools"], manifest["advanced_tools"])
+        self.assertEqual(caps["tier_3_admin"]["tools"], manifest["admin_tools"])
+        self.assertIn("test_data_report", caps["tier_3_admin"]["tools"])
+        self.assertIn("cleanup_build_test_data", caps["tier_3_admin"]["tools"])

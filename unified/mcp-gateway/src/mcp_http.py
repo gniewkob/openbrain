@@ -452,10 +452,10 @@ def main() -> None:
         host="0.0.0.0",
         port=port,
         path="/",
+        stateless_http=True,
         log_level="info",
     )
 
 
 if __name__ == "__main__":
     main()
-

@@ -43,6 +43,50 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 32
+      },
+      "id": 104,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "active_memories_total{job=\"openbrain-unified\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Memories (Visible Excl Test Data)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openbrain-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
             "mode": "thresholds"
           },
           "mappings": [
@@ -145,11 +189,11 @@
       },
       "targets": [
         {
-          "expr": "active_memories_total{job=\"openbrain-unified\"}",
+          "expr": "active_memories_all_total{job=\"openbrain-unified\"}",
           "refId": "A"
         }
       ],
-      "title": "Active Memories (DB Truth)",
+      "title": "Active Memories (All incl Test Data)",
       "type": "stat"
     },
     {
@@ -683,7 +727,69 @@
           "refId": "A"
         }
       ],
-      "title": "Hidden Test Data (Active)",
+      "title": "Hidden Test Data (Active Only)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openbrain-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.25
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 32
+      },
+      "id": 105,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "hidden_test_data_active_total{job=\"openbrain-unified\"} / clamp_min(active_memories_all_total{job=\"openbrain-unified\"}, 1)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Hidden Test Data Share (Active)",
       "type": "stat"
     }
   ],
