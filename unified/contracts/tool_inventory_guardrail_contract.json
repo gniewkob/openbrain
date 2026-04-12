@@ -1,0 +1,6 @@
+{
+  "manifest_obsidian_tools_key": "http_obsidian_tools",
+  "tool_name_prefix": "brain_",
+  "obsidian_tool_prefix": "brain_obsidian_",
+  "require_gateway_obsidian_tools": true
+}

@@ -371,6 +371,21 @@ def test_tool_signature_guardrail_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in checked_tools)
 
 
+def test_tool_inventory_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "tool_inventory_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert (
+        isinstance(raw["manifest_obsidian_tools_key"], str)
+        and raw["manifest_obsidian_tools_key"]
+    )
+    assert isinstance(raw["tool_name_prefix"], str) and raw["tool_name_prefix"]
+    assert isinstance(raw["obsidian_tool_prefix"], str) and raw["obsidian_tool_prefix"]
+    assert isinstance(raw["require_gateway_obsidian_tools"], bool)
+
+
 def test_admin_endpoint_guardrail_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "admin_endpoint_guardrail_contract.json").read_text(

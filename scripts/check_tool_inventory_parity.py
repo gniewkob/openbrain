@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MCP_TRANSPORT = ROOT / "unified/src/mcp_transport.py"
 MCP_GATEWAY = ROOT / "unified/mcp-gateway/src/main.py"
 MANIFEST = ROOT / "unified/contracts/capabilities_manifest.json"
+CONTRACT = ROOT / "unified/contracts/tool_inventory_guardrail_contract.json"
 
 
 def _fail(message: str) -> int:
@@ -39,27 +40,51 @@ def _extract_mcp_tools(source: str) -> set[str]:
     return tools
 
 
-def _obsidian_tools(tool_names: set[str]) -> set[str]:
-    return {name for name in tool_names if name.startswith("brain_obsidian_")}
+def _load_contract() -> dict[str, object]:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("tool_inventory_guardrail_contract must be a JSON object")
+
+    manifest_key = payload.get("manifest_obsidian_tools_key")
+    if not isinstance(manifest_key, str) or not manifest_key:
+        raise ValueError("contract manifest_obsidian_tools_key must be non-empty string")
+
+    tool_name_prefix = payload.get("tool_name_prefix")
+    if not isinstance(tool_name_prefix, str) or not tool_name_prefix:
+        raise ValueError("contract tool_name_prefix must be non-empty string")
+
+    obsidian_prefix = payload.get("obsidian_tool_prefix")
+    if not isinstance(obsidian_prefix, str) or not obsidian_prefix:
+        raise ValueError("contract obsidian_tool_prefix must be non-empty string")
+
+    require_gateway_obsidian = payload.get("require_gateway_obsidian_tools")
+    if not isinstance(require_gateway_obsidian, bool):
+        raise ValueError("contract require_gateway_obsidian_tools must be bool")
+
+    return payload
 
 
-def _load_expected_http_obsidian_tools() -> tuple[set[str], list[str]]:
+def _load_expected_http_obsidian_tools(contract: dict[str, object]) -> tuple[set[str], list[str]]:
     errors: list[str] = []
     raw = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    tools = raw.get("http_obsidian_tools")
+    manifest_key = str(contract["manifest_obsidian_tools_key"])
+    tool_prefix = str(contract["tool_name_prefix"])
+    tools = raw.get(manifest_key)
     if not isinstance(tools, list) or not tools:
-        return set(), ["capabilities_manifest http_obsidian_tools must be non-empty list"]
+        return set(), [f"capabilities_manifest {manifest_key} must be non-empty list"]
     if any(not isinstance(tool, str) or not tool for tool in tools):
         return (
             set(),
-            ["capabilities_manifest http_obsidian_tools must contain non-empty strings"],
+            [f"capabilities_manifest {manifest_key} must contain non-empty strings"],
         )
-    return {f"brain_{tool}" for tool in tools}, errors
+    return {f"{tool_prefix}{tool}" for tool in tools}, errors
 
 
 def _check_tool_inventory_parity(http_src: str, gateway_src: str) -> list[str]:
     errors: list[str] = []
-    expected_http_obsidian, manifest_errors = _load_expected_http_obsidian_tools()
+    contract = _load_contract()
+    obsidian_prefix = str(contract["obsidian_tool_prefix"])
+    expected_http_obsidian, manifest_errors = _load_expected_http_obsidian_tools(contract)
     errors.extend(manifest_errors)
     if manifest_errors:
         return errors
@@ -67,9 +92,9 @@ def _check_tool_inventory_parity(http_src: str, gateway_src: str) -> list[str]:
     http_tools = _extract_mcp_tools(http_src)
     gateway_tools = _extract_mcp_tools(gateway_src)
 
-    http_obsidian = _obsidian_tools(http_tools)
-    gateway_obsidian = _obsidian_tools(gateway_tools)
-    if not gateway_obsidian:
+    http_obsidian = {name for name in http_tools if name.startswith(obsidian_prefix)}
+    gateway_obsidian = {name for name in gateway_tools if name.startswith(obsidian_prefix)}
+    if bool(contract["require_gateway_obsidian_tools"]) and not gateway_obsidian:
         errors.append("gateway must expose obsidian MCP tools")
     if http_obsidian != expected_http_obsidian:
         errors.append(
