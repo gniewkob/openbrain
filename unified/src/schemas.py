@@ -61,6 +61,8 @@ PathStr = Annotated[str, Field(max_length=MAX_PATH_LEN)]
 
 
 class WriteMode(str, Enum):
+    """Determines how a write operation behaves when a matching record exists."""
+
     create_only = "create_only"  # Fail if match_key exists
     update_only = "update_only"  # Fail if ID/match_key missing
     upsert = "upsert"  # Create or update in-place
@@ -73,6 +75,8 @@ class WriteMode(str, Enum):
 
 
 class SourceMetadata(BaseModel):
+    """Origin metadata describing how and where a memory was created."""
+
     type: Literal["manual", "agent", "sync", "import", "api"] = "agent"
     system: Literal["chatgpt", "obsidian", "notion", "slack", "github", "other"] = (
         "chatgpt"
@@ -81,12 +85,16 @@ class SourceMetadata(BaseModel):
 
 
 class GovernanceMetadata(BaseModel):
+    """Governance flags controlling mutability and retention of a memory record."""
+
     mutable: bool = True
     append_only: bool = False
     retention_class: Literal["default", "audit", "temporary"] = "default"
 
 
 class MemoryRelations(BaseModel):
+    """Graph edges linking a memory to related records by role."""
+
     parent: list[str] = Field(default_factory=list)
     related: list[str] = Field(default_factory=list)
     depends_on: list[str] = Field(default_factory=list)
@@ -99,6 +107,8 @@ class MemoryRelations(BaseModel):
 
 
 class MemoryRecord(BaseModel):
+    """Full canonical memory record as stored and returned by the platform."""
+
     id: str
     match_key: Optional[MatchKeyStr] = None
     tenant_id: Optional[TenantIdStr] = None
@@ -160,18 +170,24 @@ class MemoryWriteRecord(BaseModel):
 
 
 class MemoryWriteRequest(BaseModel):
+    """Request to write a single memory record with a specified write mode."""
+
     record: MemoryWriteRecord
     write_mode: WriteMode = WriteMode.upsert
     idempotency_key: Optional[str] = None
 
 
 class MemoryWriteManyRequest(BaseModel):
+    """Request to write multiple memory records in a single batch operation."""
+
     records: list[MemoryWriteRecord] = Field(max_length=MAX_BULK_RECORDS)
     write_mode: WriteMode = WriteMode.upsert
     atomic: bool = False
 
 
 class MemoryFindRequest(BaseModel):
+    """Request to search or filter memories with optional semantic query and filters."""
+
     query: Optional[QueryStr] = None
     filters: dict[str, Any] = Field(default_factory=dict)
     limit: int = Field(default=10, ge=1, le=MAX_FILTER_LIMIT)
@@ -179,6 +195,8 @@ class MemoryFindRequest(BaseModel):
 
 
 class MemoryGetContextRequest(BaseModel):
+    """Request to retrieve a grounding context pack for a given query."""
+
     query: QueryStr
     domain: Optional[str] = None
     max_items: int = Field(default=10, ge=1, le=MAX_CONTEXT_ITEMS)
@@ -186,11 +204,15 @@ class MemoryGetContextRequest(BaseModel):
 
 
 class ObsidianReadRequest(BaseModel):
+    """Request to read a single note from an Obsidian vault."""
+
     vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
     path: PathStr
 
 
 class ObsidianNoteResponse(BaseModel):
+    """Response containing the content and metadata of a read Obsidian note."""
+
     vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)]
     path: PathStr
     title: TitleStr
@@ -201,6 +223,8 @@ class ObsidianNoteResponse(BaseModel):
 
 
 class ObsidianSyncRequest(BaseModel):
+    """Request to import Obsidian notes into OpenBrain as memories."""
+
     vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
     paths: list[PathStr] = Field(default_factory=list, max_length=MAX_SYNC_LIMIT)
     folder: Optional[PathStr] = None
@@ -212,6 +236,8 @@ class ObsidianSyncRequest(BaseModel):
 
 
 class ObsidianSyncResponse(BaseModel):
+    """Response summarizing the result of an Obsidian-to-OpenBrain sync operation."""
+
     vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)]
     resolved_paths: list[PathStr] = Field(
         default_factory=list, max_length=MAX_SYNC_LIMIT
@@ -356,6 +382,8 @@ class ObsidianSyncStatus(BaseModel):
 
 
 class SyncCheckRequest(BaseModel):
+    """Request to check sync status between OpenBrain and Obsidian for a single record."""
+
     memory_id: Optional[str] = Field(default=None, max_length=64)
     match_key: Optional[MatchKeyStr] = None
     obsidian_ref: Optional[PathStr] = None
@@ -363,6 +391,7 @@ class SyncCheckRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_identifier_count(self) -> "SyncCheckRequest":
+        """Ensure exactly one identifier field is provided."""
         identifiers = [self.memory_id, self.match_key, self.obsidian_ref]
         provided = [value for value in identifiers if value]
         if len(provided) != 1:
@@ -373,6 +402,8 @@ class SyncCheckRequest(BaseModel):
 
 
 class SyncCheckResponse(BaseModel):
+    """Response reporting whether a record is in sync between OpenBrain and Obsidian."""
+
     status: Literal["synced", "outdated", "missing", "exists"]
     message: str
     memory_id: Optional[str] = None
@@ -388,6 +419,8 @@ class SyncCheckResponse(BaseModel):
 
 
 class MemoryWriteResponse(BaseModel):
+    """Response envelope for a single memory write operation."""
+
     status: Literal["created", "updated", "versioned", "skipped", "failed"]
     record: Optional[MemoryRecord] = None
     warnings: list[str] = Field(default_factory=list)
@@ -395,6 +428,8 @@ class MemoryWriteResponse(BaseModel):
 
 
 class BatchResultItem(BaseModel):
+    """Result for a single item within a batch write operation."""
+
     input_index: int
     status: Literal["created", "updated", "versioned", "skipped", "failed"]
     record_id: Optional[str] = None
@@ -405,6 +440,8 @@ class BatchResultItem(BaseModel):
 
 
 class MemoryWriteManyResponse(BaseModel):
+    """Response envelope for a batch write operation with per-record results."""
+
     status: Literal["success", "partial_success", "failed"]
     summary: dict[str, int]
     results: list[BatchResultItem]
@@ -412,6 +449,8 @@ class MemoryWriteManyResponse(BaseModel):
 
 
 class MemoryGetContextResponse(BaseModel):
+    """Response containing a synthesized context pack for grounding an AI response."""
+
     query: str
     summary: str
     records: list[dict[str, Any]]
@@ -425,6 +464,8 @@ class MemoryGetContextResponse(BaseModel):
 
 
 class MemoryCreate(BaseModel):
+    """Legacy create request schema; use MemoryWriteRecord for new integrations."""
+
     content: ContentStr
     domain: Literal["corporate", "build", "personal"] = "corporate"
     entity_type: EntityTypeStr = Field(
@@ -444,6 +485,8 @@ class MemoryCreate(BaseModel):
 
 
 class MemoryUpdate(BaseModel):
+    """Partial update payload; only provided fields are applied to the existing record."""
+
     content: Optional[ContentStr] = None
     title: Optional[TitleStr] = None
     updated_by: str = "agent"
@@ -457,6 +500,8 @@ class MemoryUpdate(BaseModel):
 
 
 class MemoryUpsertItem(BaseModel):
+    """Single item in a bulk upsert request; requires match_key for idempotent writes."""
+
     content: ContentStr
     domain: Literal["corporate", "build", "personal"] = "corporate"
     entity_type: EntityTypeStr = Field(
@@ -474,17 +519,23 @@ class MemoryUpsertItem(BaseModel):
 
 
 class SearchRequest(BaseModel):
+    """Request for semantic vector search over memories."""
+
     query: QueryStr
     top_k: int = Field(default=5, ge=1, le=MAX_FILTER_LIMIT)
     filters: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExportRequest(BaseModel):
+    """Request to export specific memory records by ID."""
+
     ids: list[Annotated[str, Field(max_length=64)]] = Field(max_length=MAX_EXPORT_IDS)
     format: Literal["jsonl", "json"] = "json"
 
 
 class MaintenanceRequest(BaseModel):
+    """Request to run a maintenance pass (dedup, owner normalization, link repair)."""
+
     dry_run: bool = True
     dedup_threshold: float = Field(default=0.05, ge=0.0, le=1.0)
     normalize_owners: dict[str, str] = Field(
@@ -501,6 +552,8 @@ class MaintenanceRequest(BaseModel):
 
 
 class MemoryOut(BaseModel):
+    """Flattened memory record returned to API clients."""
+
     id: str
     tenant_id: Optional[TenantIdStr] = None
     domain: str
@@ -529,23 +582,31 @@ class MemoryOut(BaseModel):
 
 
 class SearchResult(BaseModel):
+    """A single search result pairing a memory record with its relevance score."""
+
     memory: MemoryOut
     score: float
 
 
 class BulkUpsertResult(BaseModel):
+    """Result of a bulk upsert operation categorized by outcome."""
+
     inserted: list[MemoryOut] = Field(default_factory=list)
     updated: list[MemoryOut] = Field(default_factory=list)
     skipped: list[str] = Field(default_factory=list)
 
 
 class MaintenanceAction(BaseModel):
+    """Single action taken or proposed during a maintenance run."""
+
     action: str
     memory_id: str
     detail: str
 
 
 class MaintenanceReport(BaseModel):
+    """Summary report produced at the end of a maintenance run."""
+
     report_id: Optional[str] = None
     dry_run: bool
     actions: list[MaintenanceAction] = Field(default_factory=list)
@@ -556,6 +617,8 @@ class MaintenanceReport(BaseModel):
 
 
 class MaintenanceReportEntry(BaseModel):
+    """Lightweight maintenance report entry for listing past runs."""
+
     report_id: str
     created_at: datetime
     actor: str
@@ -568,6 +631,8 @@ class MaintenanceReportEntry(BaseModel):
 
 
 class MaintenanceReportDetail(BaseModel):
+    """Full maintenance report with individual action log for a single run."""
+
     report_id: str
     created_at: datetime
     actor: str
@@ -580,6 +645,8 @@ class MaintenanceReportDetail(BaseModel):
 
 
 class TestDataSampleEntry(BaseModel):
+    """A single sampled record from the test data hygiene report."""
+
     id: str
     domain: str
     status: str
@@ -590,22 +657,30 @@ class TestDataSampleEntry(BaseModel):
 
 
 class TestDataActionSuggestion(BaseModel):
+    """A recommended remediation action from the test data hygiene report."""
+
     code: str
     priority: Literal["low", "medium", "high"]
     summary: str
 
 
 class BuildTestDataCleanupRequest(BaseModel):
+    """Request to delete build-domain test data records."""
+
     dry_run: bool = True
     limit: int = Field(default=100, ge=1, le=500)
 
 
 class BuildTestDataCleanupSkip(BaseModel):
+    """A record that was skipped during cleanup with the reason it was excluded."""
+
     id: str
     reason: str
 
 
 class BuildTestDataCleanupResponse(BaseModel):
+    """Response from a build-domain test data cleanup operation."""
+
     dry_run: bool
     scanned: int = 0
     candidates_count: int = 0
@@ -617,6 +692,8 @@ class BuildTestDataCleanupResponse(BaseModel):
 
 
 class TestDataHygieneReport(BaseModel):
+    """Read-only hygiene report for records flagged as test data."""
+
     generated_at: datetime
     sample_limit: int
     visible_status_counts: dict[str, int] = Field(default_factory=dict)
@@ -636,6 +713,8 @@ class TestDataHygieneReport(BaseModel):
 
 
 class PolicyScopeEntry(BaseModel):
+    """Domain-access policy for a single tenant or subject."""
+
     allowed_domains: list[Literal["corporate", "build", "personal"]] = Field(
         default_factory=list
     )
@@ -651,6 +730,8 @@ class PolicyScopeEntry(BaseModel):
 
 
 class PolicyRegistry(BaseModel):
+    """Access control registry mapping tenants and subjects to their domain policies."""
+
     tenants: dict[str, PolicyScopeEntry] = Field(default_factory=dict)
     subjects: dict[str, PolicyScopeEntry] = Field(default_factory=dict)
 
@@ -661,6 +742,8 @@ class PolicyRegistry(BaseModel):
 
 
 class ErrorDetail(BaseModel):
+    """Structured error information returned in error responses."""
+
     code: str
     message: str
     details: Optional[dict[str, Any]] = None
@@ -668,4 +751,6 @@ class ErrorDetail(BaseModel):
 
 
 class ErrorEnvelope(BaseModel):
+    """Top-level error response envelope wrapping a structured error detail."""
+
     error: ErrorDetail
