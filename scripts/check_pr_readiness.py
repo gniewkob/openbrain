@@ -19,7 +19,9 @@ def _test_python() -> str:
         return str(PREFERRED_TEST_PYTHON)
     return sys.executable
 
-def _load_contract() -> tuple[list[str], list[str], dict[str, int], list[tuple[str, str]]]:
+def _load_contract() -> tuple[
+    list[str], list[str], dict[str, int], dict[str, str], list[tuple[str, str]]
+]:
     payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("pr_readiness_runner_contract must be a JSON object")
@@ -56,6 +58,27 @@ def _load_contract() -> tuple[list[str], list[str], dict[str, int], list[tuple[s
             raise ValueError("contract step_timeouts_seconds values must be positive ints")
         timeouts[label] = raw_timeout
 
+    source_map_raw = payload.get("step_contract_sources")
+    if not isinstance(source_map_raw, dict) or not source_map_raw:
+        raise ValueError("contract step_contract_sources must be non-empty object")
+    required_contract_fields = {
+        "guardrail_runner_test_files",
+        "contract_integrity_test_files",
+    }
+    source_map: dict[str, str] = {}
+    for step_label, contract_field in source_map_raw.items():
+        if not isinstance(step_label, str) or not step_label:
+            raise ValueError("contract step_contract_sources keys must be non-empty strings")
+        if not isinstance(contract_field, str) or not contract_field:
+            raise ValueError(
+                "contract step_contract_sources values must be non-empty strings"
+            )
+        if contract_field not in required_contract_fields:
+            raise ValueError(
+                "contract step_contract_sources values must reference known test list fields"
+            )
+        source_map[step_label] = contract_field
+
     mappings_raw = payload.get("makefile_parity_mappings")
     if not isinstance(mappings_raw, list) or not mappings_raw:
         raise ValueError("contract makefile_parity_mappings must be non-empty list")
@@ -75,10 +98,16 @@ def _load_contract() -> tuple[list[str], list[str], dict[str, int], list[tuple[s
             )
         mappings.append((step_label, make_target))
 
-    return guardrail_tests, contract_smoke_tests, timeouts, mappings
+    return guardrail_tests, contract_smoke_tests, timeouts, source_map, mappings
 
 
-_GUARDRAIL_TESTS, _CONTRACT_SMOKE_TESTS, STEP_TIMEOUT_SECONDS, _PARITY_MAPPINGS = _load_contract()
+(
+    _GUARDRAIL_TESTS,
+    _CONTRACT_SMOKE_TESTS,
+    STEP_TIMEOUT_SECONDS,
+    _STEP_CONTRACT_SOURCES,
+    _PARITY_MAPPINGS,
+) = _load_contract()
 
 PR_READINESS_STEPS: tuple[tuple[str, list[str]], ...] = (
     ("local guardrails", [sys.executable, "scripts/check_local_guardrails.py"]),

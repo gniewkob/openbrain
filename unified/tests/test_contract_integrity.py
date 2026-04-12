@@ -510,6 +510,7 @@ def test_pr_readiness_runner_contract_shape() -> None:
     guardrail_tests = raw["guardrail_runner_test_files"]
     contract_smoke_tests = raw["contract_integrity_test_files"]
     timeouts = raw["step_timeouts_seconds"]
+    step_contract_sources = raw["step_contract_sources"]
     mappings = raw["makefile_parity_mappings"]
     assert isinstance(guardrail_tests, list) and guardrail_tests
     assert isinstance(contract_smoke_tests, list) and contract_smoke_tests
@@ -519,6 +520,14 @@ def test_pr_readiness_runner_contract_shape() -> None:
     for label in ("local guardrails", "guardrail runner tests", "contract integrity smoke"):
         assert label in timeouts
         assert isinstance(timeouts[label], int) and timeouts[label] > 0
+    assert isinstance(step_contract_sources, dict) and step_contract_sources
+    for step_label, contract_field in step_contract_sources.items():
+        assert isinstance(step_label, str) and step_label
+        assert isinstance(contract_field, str) and contract_field
+        assert contract_field in {
+            "guardrail_runner_test_files",
+            "contract_integrity_test_files",
+        }
     assert isinstance(mappings, list) and mappings
     for mapping in mappings:
         assert isinstance(mapping, dict)

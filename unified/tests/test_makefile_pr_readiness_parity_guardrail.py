@@ -80,6 +80,10 @@ def test_makefile_pr_readiness_parity_supports_starred_contract_lists(
     "guardrail runner tests": 300,
     "contract integrity smoke": 300
   },
+  "step_contract_sources": {
+    "guardrail runner tests": "guardrail_runner_test_files",
+    "contract integrity smoke": "contract_integrity_test_files"
+  },
   "makefile_parity_mappings": [
     {"step_label": "guardrail runner tests", "make_target": "guardrail-tests"},
     {"step_label": "contract integrity smoke", "make_target": "contract-smoke"}
@@ -92,6 +96,56 @@ def test_makefile_pr_readiness_parity_supports_starred_contract_lists(
 PR_READINESS_STEPS = (
     ("guardrail runner tests", ["x", *_GUARDRAIL_TESTS]),
     ("contract integrity smoke", ["x", *_CONTRACT_SMOKE_TESTS]),
+)
+"""
+    make_source = """
+guardrail-tests: check-unified-venv
+\t"$(UNIFIED_PYTHON)" -m pytest -q \\
+\t\tunified/tests/a.py
+
+contract-smoke: check-unified-venv
+\t"$(UNIFIED_PYTHON)" -m pytest -q \\
+\t\tunified/tests/b.py
+"""
+    old_contract = module.PR_READINESS_CONTRACT
+    module.PR_READINESS_CONTRACT = contract
+    try:
+        assert module._check_parity(pr_source, make_source) == []
+    finally:
+        module.PR_READINESS_CONTRACT = old_contract
+
+
+def test_makefile_pr_readiness_parity_uses_step_contract_sources_not_var_names(
+    tmp_path: Path,
+) -> None:
+    module = _load_makefile_pr_readiness_parity_module()
+    contract = tmp_path / "pr_readiness_runner_contract.json"
+    contract.write_text(
+        """
+{
+  "guardrail_runner_test_files": ["unified/tests/a.py"],
+  "contract_integrity_test_files": ["unified/tests/b.py"],
+  "step_timeouts_seconds": {
+    "local guardrails": 180,
+    "guardrail runner tests": 300,
+    "contract integrity smoke": 300
+  },
+  "step_contract_sources": {
+    "guardrail runner tests": "guardrail_runner_test_files",
+    "contract integrity smoke": "contract_integrity_test_files"
+  },
+  "makefile_parity_mappings": [
+    {"step_label": "guardrail runner tests", "make_target": "guardrail-tests"},
+    {"step_label": "contract integrity smoke", "make_target": "contract-smoke"}
+  ]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    pr_source = """
+PR_READINESS_STEPS = (
+    ("guardrail runner tests", ["x", *custom_guardrail_list_name]),
+    ("contract integrity smoke", ["x", *custom_contract_list_name]),
 )
 """
     make_source = """

@@ -34,6 +34,25 @@ def _load_pr_readiness_contract() -> dict[str, object]:
             raise ValueError(f"contract {key} must contain non-empty strings")
         result[key] = [str(item) for item in value]
 
+    source_map_raw = payload.get("step_contract_sources")
+    if not isinstance(source_map_raw, dict) or not source_map_raw:
+        raise ValueError("contract step_contract_sources must be a non-empty object")
+    source_map: dict[str, str] = {}
+    for step_label, contract_field in source_map_raw.items():
+        if not isinstance(step_label, str) or not step_label:
+            raise ValueError("contract step_contract_sources keys must be non-empty strings")
+        if not isinstance(contract_field, str) or not contract_field:
+            raise ValueError("contract step_contract_sources values must be non-empty strings")
+        if contract_field not in {
+            "guardrail_runner_test_files",
+            "contract_integrity_test_files",
+        }:
+            raise ValueError(
+                "contract step_contract_sources must reference known test list fields"
+            )
+        source_map[step_label] = contract_field
+    result["step_contract_sources"] = source_map
+
     mappings = payload.get("makefile_parity_mappings")
     if not isinstance(mappings, list) or not mappings:
         raise ValueError("contract makefile_parity_mappings must be a non-empty list")
@@ -59,10 +78,10 @@ def _load_pr_readiness_contract() -> dict[str, object]:
 def _extract_pr_step_tests(source: str, step_label: str) -> set[str]:
     tree = ast.parse(source)
     contract = _load_pr_readiness_contract()
-    starred_contract_map = {
-        "_GUARDRAIL_TESTS": "guardrail_runner_test_files",
-        "_CONTRACT_SMOKE_TESTS": "contract_integrity_test_files",
-    }
+    source_map = contract["step_contract_sources"]
+    if step_label not in source_map:
+        raise ValueError(f"step_contract_sources missing mapping for {step_label!r}")
+    contract_key = source_map[step_label]
     for node in tree.body:
         value: ast.expr | None = None
         if isinstance(node, ast.Assign):
@@ -95,9 +114,6 @@ def _extract_pr_step_tests(source: str, step_label: str) -> set[str]:
                     if value.startswith("unified/") and value.endswith(".py"):
                         tests.add(value)
                 elif isinstance(elt, ast.Starred) and isinstance(elt.value, ast.Name):
-                    contract_key = starred_contract_map.get(elt.value.id)
-                    if contract_key is None:
-                        continue
                     for item in contract[contract_key]:
                         if item.startswith("unified/") and item.endswith(".py"):
                             tests.add(item)
