@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import re
 import sys
 from pathlib import Path
@@ -12,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PR_READINESS = ROOT / "scripts" / "check_pr_readiness.py"
 MAKEFILE = ROOT / "Makefile"
+PR_READINESS_CONTRACT = ROOT / "unified/contracts/pr_readiness_runner_contract.json"
 
 
 def _fail(message: str) -> int:
@@ -19,8 +21,28 @@ def _fail(message: str) -> int:
     return 1
 
 
+def _load_pr_readiness_contract() -> dict[str, list[str]]:
+    payload = json.loads(PR_READINESS_CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("pr_readiness_runner_contract must be a JSON object")
+    result: dict[str, list[str]] = {}
+    for key in ("guardrail_runner_test_files", "contract_integrity_test_files"):
+        value = payload.get(key)
+        if not isinstance(value, list) or not value:
+            raise ValueError(f"contract {key} must be a non-empty list")
+        if any(not isinstance(item, str) or not item for item in value):
+            raise ValueError(f"contract {key} must contain non-empty strings")
+        result[key] = [str(item) for item in value]
+    return result
+
+
 def _extract_pr_step_tests(source: str, step_label: str) -> set[str]:
     tree = ast.parse(source)
+    contract = _load_pr_readiness_contract()
+    starred_contract_map = {
+        "_GUARDRAIL_TESTS": "guardrail_runner_test_files",
+        "_CONTRACT_SMOKE_TESTS": "contract_integrity_test_files",
+    }
     for node in tree.body:
         value: ast.expr | None = None
         if isinstance(node, ast.Assign):
@@ -52,6 +74,13 @@ def _extract_pr_step_tests(source: str, step_label: str) -> set[str]:
                     value = elt.value
                     if value.startswith("unified/") and value.endswith(".py"):
                         tests.add(value)
+                elif isinstance(elt, ast.Starred) and isinstance(elt.value, ast.Name):
+                    contract_key = starred_contract_map.get(elt.value.id)
+                    if contract_key is None:
+                        continue
+                    for item in contract[contract_key]:
+                        if item.startswith("unified/") and item.endswith(".py"):
+                            tests.add(item)
             return tests
     raise ValueError(f"{step_label} not found in PR_READINESS_STEPS")
 

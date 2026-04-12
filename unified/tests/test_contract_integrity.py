@@ -501,6 +501,25 @@ def test_local_guardrails_runner_contract_shape() -> None:
     assert len(labels) == len(steps)
 
 
+def test_pr_readiness_runner_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "pr_readiness_runner_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    guardrail_tests = raw["guardrail_runner_test_files"]
+    contract_smoke_tests = raw["contract_integrity_test_files"]
+    timeouts = raw["step_timeouts_seconds"]
+    assert isinstance(guardrail_tests, list) and guardrail_tests
+    assert isinstance(contract_smoke_tests, list) and contract_smoke_tests
+    assert all(isinstance(item, str) and item for item in guardrail_tests)
+    assert all(isinstance(item, str) and item for item in contract_smoke_tests)
+    assert isinstance(timeouts, dict) and timeouts
+    for label in ("local guardrails", "guardrail runner tests", "contract integrity smoke"):
+        assert label in timeouts
+        assert isinstance(timeouts[label], int) and timeouts[label] > 0
+
+
 def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:
     monkeypatch.setenv("ENV", "production")
     msg = backend_error_message(500, {"detail": "secret"})
