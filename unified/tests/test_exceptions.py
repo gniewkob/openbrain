@@ -27,8 +27,12 @@ from src.exceptions import (
     ValidationError,
     create_error_response,
     generic_exception_handler,
+    http_exception_handler,
     is_production,
     openbrain_exception_handler,
+    register_exception_handlers,
+    safe_operation,
+    value_error_handler,
 )
 
 
@@ -248,6 +252,73 @@ class TestExceptionHandlers(unittest.IsolatedAsyncioTestCase):
         response = await generic_exception_handler(mock_request, exc)
         
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TestHttpExceptionHandlerBranches(unittest.IsolatedAsyncioTestCase):
+    """Cover uncovered branches in http_exception_handler."""
+
+    async def test_string_detail_sets_message(self) -> None:
+        """detail is str → message = detail (lines 282-283)."""
+        mock_request = MagicMock()
+        exc = HTTPException(status_code=400, detail="bad request string")
+        response = await http_exception_handler(mock_request, exc)
+        import json
+        body = json.loads(response.body)
+        assert body["error"]["message"] == "bad request string"
+
+    async def test_non_dict_non_str_detail_uses_status_code(self) -> None:
+        """detail is neither dict nor str → message = str(exc.status_code) (line 287)."""
+        mock_request = MagicMock()
+        exc = HTTPException(status_code=404, detail=["list", "detail"])
+        response = await http_exception_handler(mock_request, exc)
+        import json
+        body = json.loads(response.body)
+        assert body["error"]["message"] == "404"
+
+
+class TestValueErrorHandler(unittest.IsolatedAsyncioTestCase):
+    """Cover value_error_handler (lines 307-308)."""
+
+    async def test_value_error_handler_returns_422(self) -> None:
+        mock_request = MagicMock()
+        exc = ValueError("bad value")
+        response = await value_error_handler(mock_request, exc)
+        assert response.status_code == 422
+
+    async def test_value_error_handler_production_uses_generic_message(self) -> None:
+        mock_request = MagicMock()
+        exc = ValueError("sensitive detail")
+        with patch("src.exceptions.is_production", return_value=True):
+            response = await value_error_handler(mock_request, exc)
+        import json
+        body = json.loads(response.body)
+        assert body["error"]["message"] == "Invalid request"
+
+
+class TestRegisterExceptionHandlers(unittest.TestCase):
+    """Cover register_exception_handlers type check (line 343)."""
+
+    def test_raises_type_error_for_non_fastapi(self) -> None:
+        with self.assertRaises(TypeError, msg="app must be a FastAPI instance"):
+            register_exception_handlers("not-a-fastapi-app")
+
+
+class TestSafeOperation(unittest.TestCase):
+    """Cover safe_operation decorator (lines 373-385)."""
+
+    def test_safe_operation_re_raises_openbrain_error(self) -> None:
+        """OpenBrainError is re-raised as-is, not wrapped."""
+        with self.assertRaises(ValidationError):
+            safe_operation("test op", ValidationError)(
+                lambda: (_ for _ in ()).throw(ValidationError("already specific"))
+            )()
+
+    def test_safe_operation_converts_generic_exception(self) -> None:
+        """Generic exception is wrapped in the specified error_class."""
+        with self.assertRaises(DatabaseError):
+            safe_operation("db op", DatabaseError)(
+                lambda: (_ for _ in ()).throw(RuntimeError("db fail"))
+            )()
 
 
 if __name__ == "__main__":
