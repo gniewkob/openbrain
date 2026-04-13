@@ -503,13 +503,45 @@ def is_privileged_user(claims: dict[str, Any]) -> bool:
 
 # ---------------------------------------------------------------------------
 # Rate limiting for X-Internal-Key requests (audit 1.2)
-# Sliding-window counter per client IP; no Redis required.
+# Sliding-window counter per client IP.
+# Backend: Redis sorted set when REDIS_URL is configured; in-memory deque otherwise.
 # ---------------------------------------------------------------------------
 _rate_limit_store: dict[str, collections.deque] = {}
 _rate_limit_lock = threading.Lock()
 # Cap on tracked IPs to prevent unbounded memory growth (e.g. bot scans).
 # When exceeded, stale entries (empty windows) are purged.
 _MAX_RATE_LIMIT_IPS = 10_000
+
+_redis_client = None
+_redis_client_lock = threading.Lock()
+
+
+def _get_redis_client():
+    """Return a Redis client if REDIS_URL is configured, else None.
+
+    Uses a lazy singleton so the connection is created once and reused.
+    Falls back to None (in-memory limiter) if Redis is unavailable or URL is
+    the sentinel 'memory://'.
+    """
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    with _redis_client_lock:
+        if _redis_client is not None:
+            return _redis_client
+        redis_url = os.environ.get("REDIS_URL", "memory://")
+        if redis_url == "memory://":
+            return None
+        try:
+            import redis as _redis_lib
+
+            client = _redis_lib.Redis.from_url(redis_url, socket_timeout=1.0)
+            client.ping()
+            _redis_client = client
+        except Exception:
+            # Redis unavailable — silently fall back to in-memory limiter.
+            pass
+    return _redis_client
 
 
 def _get_rate_limit_rpm() -> int:
@@ -519,12 +551,34 @@ def _get_rate_limit_rpm() -> int:
         return 100
 
 
-def check_internal_key_rate_limit(client_ip: str) -> None:
-    """Sliding-window rate limiter for internal key requests.
+def _rate_limit_redis(client, client_ip: str, limit: int) -> None:
+    """Sliding-window rate limit using a Redis sorted set.
 
-    Raises HTTP 429 if client exceeds AUTH_RATE_LIMIT_RPM per minute.
+    Key TTL is set to 61 s so stale keys are cleaned up automatically.
+    Raises HTTP 429 if the caller exceeds *limit* requests per 60 s.
     """
-    limit = _get_rate_limit_rpm()
+    key = f"openbrain:rate_limit:internal:{client_ip}"
+    now = time.time()
+    window_start = now - 60.0
+
+    pipe = client.pipeline()
+    pipe.zremrangebyscore(key, 0, window_start)
+    pipe.zadd(key, {str(now): now})
+    pipe.zcard(key)
+    pipe.expire(key, 61)
+    results = pipe.execute()
+    count = results[2]
+
+    if count > limit:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": "60"},
+        )
+
+
+def _rate_limit_memory(client_ip: str, limit: int) -> None:
+    """Sliding-window rate limit using an in-memory deque (single-process only)."""
     now = time.time()
     window_start = now - 60.0
 
@@ -552,6 +606,27 @@ def check_internal_key_rate_limit(client_ip: str) -> None:
             ]
             for ip in stale:
                 del _rate_limit_store[ip]
+
+
+def check_internal_key_rate_limit(client_ip: str) -> None:
+    """Sliding-window rate limiter for internal key requests.
+
+    Uses Redis sorted set when REDIS_URL is configured (multi-instance safe),
+    falls back to in-memory deque otherwise.
+    Raises HTTP 429 if client exceeds AUTH_RATE_LIMIT_RPM per minute.
+    """
+    limit = _get_rate_limit_rpm()
+    redis = _get_redis_client()
+    if redis is not None:
+        try:
+            _rate_limit_redis(redis, client_ip, limit)
+            return
+        except HTTPException:
+            raise
+        except Exception:
+            # Redis error — fall back to in-memory limiter silently.
+            pass
+    _rate_limit_memory(client_ip, limit)
 
 
 async def require_auth(
