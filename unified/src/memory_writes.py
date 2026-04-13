@@ -237,10 +237,10 @@ async def _create_new_memory(
         "root_id": memory.id,
     }
 
-    if rec.domain == "corporate":
-        await _audit_compat(
-            session, "create", memory.id, actor=actor, tool_name="memory.write"
-        )
+    await _audit_compat(
+        session, "create", memory.id, actor=actor, tool_name="memory.write",
+        meta={"domain": rec.domain},
+    )
 
     if _commit:
         await session.commit()
@@ -355,6 +355,12 @@ async def _update_memory(
         "updated_by": actor,
         "source": rec.source.model_dump(),
     }
+
+    domain_val = existing.domain.value if hasattr(existing.domain, "value") else existing.domain
+    await _audit_compat(
+        session, "update", existing.id, actor=actor, tool_name="memory.write",
+        meta={"domain": domain_val},
+    )
 
     if _commit:
         await session.commit()
