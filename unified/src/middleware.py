@@ -18,7 +18,10 @@ REQUEST_ID_RE = re.compile(r"^[a-zA-Z0-9\-]{1,64}$")
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
+    """Record HTTP request count and duration Prometheus metrics."""
+
     async def dispatch(self, request, call_next):
+        """Track status code and duration for every request."""
         start_time = time.perf_counter()
         status_code = 500
         try:
@@ -32,7 +35,10 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Propagate or generate X-Request-ID header and bind it to structlog context."""
+
     async def dispatch(self, request, call_next):
+        """Bind request_id to log context and echo it in the response header."""
         raw = request.headers.get("X-Request-ID", "")
         req_id = raw if REQUEST_ID_RE.match(raw) else str(uuid.uuid4())
         structlog.contextvars.bind_contextvars(request_id=req_id)
@@ -164,6 +170,7 @@ class SecretScanMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request, call_next):
+        """Scan write request bodies for secrets and reject with 400 on match."""
         if os.environ.get("DISABLE_SECRET_SCANNING") == "1":
             _scan_logger.warning(
                 "Secret scanning is DISABLED via DISABLE_SECRET_SCANNING=1"

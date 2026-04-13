@@ -602,6 +602,7 @@ async def store_memory(
 async def store_memories_bulk(
     session: AsyncSession, items: list[MemoryCreate]
 ) -> list[MemoryOut]:
+    """Bulk-write multiple new memories using upsert mode and return their output records."""
     records = [
         MemoryWriteRecord(
             content=item.content,
@@ -635,17 +636,10 @@ async def store_memories_bulk(
     ]
 
 
-async def update_memory(
-    session: AsyncSession, memory_id: str, data: MemoryUpdate, actor: str = "agent"
-) -> MemoryOut | None:
-    stmt = select(Memory).where(Memory.id == memory_id)
-    res = await session.execute(stmt)
-    memory = res.scalar_one_or_none()
-    if not memory:
-        return None
-
+def _build_update_write_record(memory: Memory, data: MemoryUpdate) -> MemoryWriteRecord:
+    """Build a MemoryWriteRecord that merges current memory state with patch data."""
     metadata = memory.metadata_ or {}
-    write_record = MemoryWriteRecord(
+    return MemoryWriteRecord(
         match_key=memory.match_key,
         content=data.content if data.content is not None else memory.content,
         domain=memory.domain.value,
@@ -671,13 +665,25 @@ async def update_memory(
         if data.custom_fields is not None
         else (metadata.get("custom_fields") or {}),
     )
+
+
+async def update_memory(
+    session: AsyncSession, memory_id: str, data: MemoryUpdate, actor: str = "agent"
+) -> MemoryOut | None:
+    """Patch an existing memory record, appending a version for corporate domain."""
+    stmt = select(Memory).where(Memory.id == memory_id)
+    res = await session.execute(stmt)
+    memory = res.scalar_one_or_none()
+    if not memory:
+        return None
+
+    write_record = _build_update_write_record(memory, data)
     write_mode = (
         WriteMode.append_version
         if _requires_append_only(memory.domain, memory.entity_type)
         else WriteMode.upsert
     )
-    write_func = handle_memory_write
-    res_v1 = await write_func(
+    res_v1 = await handle_memory_write(
         session,
         MemoryWriteRequest(record=write_record, write_mode=write_mode),
         actor=actor,
@@ -694,6 +700,7 @@ async def update_memory(
 async def delete_memory(
     session: AsyncSession, memory_id: str, actor: str = "agent"
 ) -> bool:
+    """Hard-delete a memory; raises ValueError for append-only (corporate) records."""
     stmt = select(Memory).where(Memory.id == memory_id)
     result = await session.execute(stmt)
     memory = result.scalar_one_or_none()
@@ -722,9 +729,29 @@ async def delete_memory(
     return True
 
 
+def _classify_bulk_results(
+    results: list[BatchResultItem],
+    id_to_mem: dict,
+) -> tuple[list, list, list]:
+    """Classify bulk write results into inserted, updated, and skipped lists."""
+    inserted = []
+    updated = []
+    skipped = []
+    for result in results:
+        memory = id_to_mem.get(result.record_id) if result.record_id else None
+        if result.status == "created" and memory:
+            inserted.append(memory)
+        elif result.status in {"updated", "versioned"} and memory:
+            updated.append(memory)
+        elif result.status == "skipped":
+            skipped.append(result.record_id or "")
+    return inserted, updated, skipped
+
+
 async def upsert_memories_bulk(
     session: AsyncSession, items: list[MemoryUpsertItem]
 ) -> BulkUpsertResult:
+    """Upsert a batch of memories keyed by match_key; all items must have match_key set."""
     missing_match_keys = [
         str(index) for index, item in enumerate(items) if not item.match_key
     ]
@@ -764,15 +791,7 @@ async def upsert_memories_bulk(
     else:
         id_to_mem = {}
 
-    inserted, updated, skipped = [], [], []
-    for result in res.results:
-        memory = id_to_mem.get(result.record_id) if result.record_id else None
-        if result.status == "created" and memory:
-            inserted.append(memory)
-        elif result.status in {"updated", "versioned"} and memory:
-            updated.append(memory)
-        elif result.status == "skipped":
-            skipped.append(result.record_id or "")
+    inserted, updated, skipped = _classify_bulk_results(res.results, id_to_mem)
     return BulkUpsertResult(inserted=inserted, updated=updated, skipped=skipped)
 
 
@@ -785,135 +804,186 @@ async def run_maintenance(
         return await _run_maintenance_inner(session, req, actor)
 
 
-async def _run_maintenance_inner(
-    session: AsyncSession, req: MaintenanceRequest, actor: str = "agent"
-) -> MaintenanceReport:
+async def _process_duplicates(
+    session: AsyncSession,
+    dedup_threshold: int,
+    total: int,
+    dry_run: bool,
+) -> tuple[list[MaintenanceAction], int]:
+    """Find and remediate exact duplicate memories. Returns (actions, dedup_count)."""
     actions: list[MaintenanceAction] = []
-    dedup_count, owners_norm, links_fixed = 0, 0, 0
+    dedup_count = 0
 
-    total_result = await session.execute(
-        select(func.count(Memory.id)).where(Memory.status == "active")
+    if dedup_threshold <= 0 or total <= 1:
+        return actions, dedup_count
+
+    dup_groups_stmt = (
+        select(Memory.content_hash, Memory.entity_type, Memory.domain)
+        .where(Memory.status == "active", Memory.content_hash.isnot(None))
+        .group_by(Memory.content_hash, Memory.entity_type, Memory.domain)
+        .having(func.count(Memory.id) > 1)
     )
-    total = total_result.scalar_one()
+    dup_groups = (await session.execute(dup_groups_stmt)).all()
 
-    if req.dedup_threshold > 0 and total > 1:
-        dup_groups_stmt = (
-            select(Memory.content_hash, Memory.entity_type, Memory.domain)
-            .where(Memory.status == "active", Memory.content_hash.isnot(None))
-            .group_by(Memory.content_hash, Memory.entity_type, Memory.domain)
-            .having(func.count(Memory.id) > 1)
-        )
-        dup_groups = (await session.execute(dup_groups_stmt)).all()
-
-        for content_hash, entity_type, domain in dup_groups:
-            members_stmt = (
-                select(Memory)
-                .where(
-                    Memory.content_hash == content_hash,
-                    Memory.entity_type == entity_type,
-                    Memory.domain == domain,
-                    Memory.status == "active",
-                )
-                .order_by(Memory.created_at.asc())
+    for content_hash, entity_type, domain in dup_groups:
+        members_stmt = (
+            select(Memory)
+            .where(
+                Memory.content_hash == content_hash,
+                Memory.entity_type == entity_type,
+                Memory.domain == domain,
+                Memory.status == "active",
             )
-            members = (await session.execute(members_stmt)).scalars().all()
-            canonical = members[0]
-            for duplicate in members[1:]:
-                dedup_count += 1
-                actions.append(
-                    MaintenanceAction(
-                        action="dedup",
-                        memory_id=duplicate.id,
-                        detail=f"Exact duplicate of {canonical.id}",
-                    )
-                )
-                if not req.dry_run:
-                    if _requires_append_only(duplicate.domain, duplicate.entity_type):
-                        duplicate.status = STATUS_DUPLICATE
-                        duplicate.metadata_ = {
-                            **(duplicate.metadata_ or {}),
-                            "duplicate_of": canonical.id,
-                            "remediated_at": datetime.now().isoformat(),
-                        }
-                        actions.append(
-                            MaintenanceAction(
-                                action="dedup_remediate",
-                                memory_id=duplicate.id,
-                                detail=(
-                                    f"Exact duplicate of {canonical.id} "
-                                    f"marked as duplicate via "
-                                    f"governance-safe remediation (append-only)"
-                                ),
-                            )
-                        )
-                    else:
-                        duplicate.status = STATUS_SUPERSEDED
-                        duplicate.superseded_by = canonical.id
-
-    if req.normalize_owners:
-        old_owners = list(req.normalize_owners.keys())
-        norm_stmt = select(Memory).where(
-            Memory.status == "active", Memory.owner.in_(old_owners)
+            .order_by(Memory.created_at.asc())
         )
-        norm_memories = (await session.execute(norm_stmt)).scalars().all()
-        for memory in norm_memories:
-            new_owner = req.normalize_owners[memory.owner]
+        members = (await session.execute(members_stmt)).scalars().all()
+        canonical = members[0]
+        for duplicate in members[1:]:
+            dedup_count += 1
             actions.append(
                 MaintenanceAction(
-                    action="normalize_owner",
-                    memory_id=memory.id,
-                    detail=f"'{memory.owner}' -> '{new_owner}'",
+                    action="dedup",
+                    memory_id=duplicate.id,
+                    detail=f"Exact duplicate of {canonical.id}",
                 )
             )
-            if not req.dry_run:
+            if not dry_run:
+                if _requires_append_only(duplicate.domain, duplicate.entity_type):
+                    duplicate.status = STATUS_DUPLICATE
+                    duplicate.metadata_ = {
+                        **(duplicate.metadata_ or {}),
+                        "duplicate_of": canonical.id,
+                        "remediated_at": datetime.now().isoformat(),
+                    }
+                    actions.append(
+                        MaintenanceAction(
+                            action="dedup_remediate",
+                            memory_id=duplicate.id,
+                            detail=(
+                                f"Exact duplicate of {canonical.id} "
+                                f"marked as duplicate via "
+                                f"governance-safe remediation (append-only)"
+                            ),
+                        )
+                    )
+                else:
+                    duplicate.status = STATUS_SUPERSEDED
+                    duplicate.superseded_by = canonical.id
+
+    return actions, dedup_count
+
+
+async def _normalize_owners(
+    session: AsyncSession,
+    normalize_owners: dict[str, str] | None,
+    dry_run: bool,
+) -> tuple[list[MaintenanceAction], int]:
+    """Normalize owner names in memories. Returns (actions, owners_normalized_count)."""
+    actions: list[MaintenanceAction] = []
+    owners_norm = 0
+
+    if not normalize_owners:
+        return actions, owners_norm
+
+    old_owners = list(normalize_owners.keys())
+    norm_stmt = select(Memory).where(
+        Memory.status == "active", Memory.owner.in_(old_owners)
+    )
+    norm_memories = (await session.execute(norm_stmt)).scalars().all()
+    for memory in norm_memories:
+        new_owner = normalize_owners[memory.owner]
+        actions.append(
+            MaintenanceAction(
+                action="normalize_owner",
+                memory_id=memory.id,
+                detail=f"'{memory.owner}' -> '{new_owner}'",
+            )
+        )
+        if not dry_run:
+            if _requires_append_only(memory.domain, memory.entity_type):
+                actions.append(
+                    MaintenanceAction(
+                        action="policy_skip",
+                        memory_id=memory.id,
+                        detail="Skipped owner normalization for append-only memory",
+                    )
+                )
+                continue
+            memory.owner = new_owner
+            owners_norm += 1
+
+    return actions, owners_norm
+
+
+async def _fix_superseded_links(
+    session: AsyncSession,
+    dry_run: bool,
+) -> tuple[list[MaintenanceAction], int]:
+    """Repair broken superseded_by links. Returns (actions, links_fixed_count)."""
+    actions: list[MaintenanceAction] = []
+    links_fixed = 0
+
+    active_ids_result = await session.execute(
+        select(Memory.id).where(Memory.status == "active")
+    )
+    active_ids = {row[0] for row in active_ids_result.all()}
+    superseded_stmt = select(Memory).where(
+        Memory.superseded_by.isnot(None), Memory.status == "superseded"
+    )
+    superseded_memories = (await session.execute(superseded_stmt)).scalars().all()
+    for memory in superseded_memories:
+        if memory.superseded_by and memory.superseded_by not in active_ids:
+            links_fixed += 1
+            actions.append(
+                MaintenanceAction(
+                    action="fix_link",
+                    memory_id=memory.id,
+                    detail=f"superseded_by {memory.superseded_by} not found in active",
+                )
+            )
+            if not dry_run:
                 if _requires_append_only(memory.domain, memory.entity_type):
                     actions.append(
                         MaintenanceAction(
                             action="policy_skip",
                             memory_id=memory.id,
-                            detail="Skipped owner normalization for append-only memory",
+                            detail="Skipped supersession link repair for append-only memory",
                         )
                     )
                     continue
-                memory.owner = new_owner
-                owners_norm += 1
+                memory.superseded_by, memory.status = None, "active"
 
+    return actions, links_fixed
+
+
+async def _run_maintenance_inner(
+    session: AsyncSession, req: MaintenanceRequest, actor: str = "agent"
+) -> MaintenanceReport:
+    total_result = await session.execute(
+        select(func.count(Memory.id)).where(Memory.status == "active")
+    )
+    total = total_result.scalar_one()
+
+    dup_actions, dedup_count = await _process_duplicates(
+        session=session,
+        dedup_threshold=req.dedup_threshold,
+        total=total,
+        dry_run=req.dry_run,
+    )
+    owner_actions, owners_norm = await _normalize_owners(
+        session=session,
+        normalize_owners=req.normalize_owners,
+        dry_run=req.dry_run,
+    )
     if req.fix_superseded_links:
-        active_ids_result = await session.execute(
-            select(Memory.id).where(Memory.status == "active")
+        link_actions, links_fixed = await _fix_superseded_links(
+            session=session,
+            dry_run=req.dry_run,
         )
-        active_ids = {row[0] for row in active_ids_result.all()}
-        superseded_stmt = select(Memory).where(
-            Memory.superseded_by.isnot(None), Memory.status == "superseded"
-        )
-        superseded_memories = (await session.execute(superseded_stmt)).scalars().all()
-        for memory in superseded_memories:
-            if memory.superseded_by and memory.superseded_by not in active_ids:
-                links_fixed += 1
-                actions.append(
-                    MaintenanceAction(
-                        action="fix_link",
-                        memory_id=memory.id,
-                        detail=(
-                            f"superseded_by {memory.superseded_by} not found in active"
-                        ),
-                    )
-                )
-                if not req.dry_run:
-                    if _requires_append_only(memory.domain, memory.entity_type):
-                        actions.append(
-                            MaintenanceAction(
-                                action="policy_skip",
-                                memory_id=memory.id,
-                                detail=(
-                                    "Skipped supersession link repair "
-                                    "for append-only memory"
-                                ),
-                            )
-                        )
-                        continue
-                    memory.superseded_by, memory.status = None, "active"
+    else:
+        link_actions, links_fixed = [], 0
 
+    actions = dup_actions + owner_actions + link_actions
     report = MaintenanceReport(
         dry_run=req.dry_run,
         actions=actions,

@@ -10,6 +10,7 @@ def _normalize_actor(value: Any, fallback: str) -> str:
 
 
 def to_legacy_memory_shape(record: dict[str, Any]) -> dict[str, Any]:
+    """Extract and normalize the canonical set of memory fields from a raw record dict."""
     keys = (
         "id",
         "tenant_id",
@@ -45,6 +46,7 @@ def to_legacy_memory_shape(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_find_hits_to_records(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Flatten find-API hits to a list of legacy memory shape dicts."""
     out: list[dict[str, Any]] = []
     for hit in hits:
         if isinstance(hit, dict) and isinstance(hit.get("record"), dict):
@@ -57,6 +59,7 @@ def normalize_find_hits_to_records(hits: list[dict[str, Any]]) -> list[dict[str,
 def normalize_find_hits_to_scored_memories(
     hits: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    """Flatten find-API hits to a list of {memory, score} dicts."""
     out: list[dict[str, Any]] = []
     for hit in hits:
         if isinstance(hit, dict) and "record" in hit and "score" in hit:

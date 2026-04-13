@@ -31,76 +31,80 @@ _REST_EXACT = {
 }
 
 
+def _is_rest_path(path: str) -> bool:
+    return (
+        path in _REST_EXACT
+        or path.startswith("/api")
+        or path.startswith("/.well-known/")
+    )
+
+
+async def _send_root_redirect(send) -> None:
+    streamable_http_path = mcp_transport.STREAMABLE_HTTP_PATH
+    if streamable_http_path == "/":
+        _log.error(
+            "invalid_streamable_http_path",
+            extra={"streamable_http_path": streamable_http_path},
+        )
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 503,
+                "headers": [(b"content-type", b"application/json")],
+            }
+        )
+        await send(
+            {
+                "type": "http.response.body",
+                "body": b'{"detail":"Invalid MCP streamable transport path configuration"}',
+            }
+        )
+        return
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 307,
+            "headers": [(b"location", streamable_http_path.encode("ascii"))],
+        }
+    )
+    await send({"type": "http.response.body", "body": b""})
+
+
+async def _authorize_mcp(scope) -> bool:
+    """Return True if the request is authorized to reach FastMCP."""
+    headers = {k.lower(): v for k, v in scope.get("headers", [])}
+    internal_key = headers.get(b"x-internal-key", b"").decode("latin-1")
+    if (
+        internal_key
+        and INTERNAL_API_KEY
+        and hmac.compare_digest(internal_key, INTERNAL_API_KEY)
+    ):
+        return True
+    auth_header = headers.get(b"authorization", b"").decode("latin-1")
+    if auth_header.lower().startswith("bearer ") and _oidc:
+        token = auth_header[7:].strip()
+        try:
+            await _oidc.verify_token(token)
+            return True
+        except Exception as exc:
+            _log.warning("mcp_oidc_verification_failed", extra={"error": str(exc)})
+    return False
+
+
 async def app(scope, receive, send):
     if scope["type"] == "http":
         path = scope["path"]
 
-        # REST API, health, OpenAPI docs, and OAuth discovery (/.well-known/*)
-        # FastAPI in main.py is the single authoritative handler for all of these.
-        if (
-            path in _REST_EXACT
-            or path.startswith("/api")
-            or path.startswith("/.well-known/")
-        ):
+        if _is_rest_path(path):
             await rest_app(scope, receive, send)
             return
 
-        # Root redirect to MCP streamable HTTP path (for ChatGPT MCP discovery)
         if path == "/":
-            streamable_http_path = mcp_transport.STREAMABLE_HTTP_PATH
-            if streamable_http_path == "/":
-                _log.error(
-                    "invalid_streamable_http_path",
-                    extra={"streamable_http_path": streamable_http_path},
-                )
-                await send(
-                    {
-                        "type": "http.response.start",
-                        "status": 503,
-                        "headers": [(b"content-type", b"application/json")],
-                    }
-                )
-                await send(
-                    {
-                        "type": "http.response.body",
-                        "body": b'{"detail":"Invalid MCP streamable transport path configuration"}',
-                    }
-                )
-                return
-            # 307 preserves the POST method
-            await send(
-                {
-                    "type": "http.response.start",
-                    "status": 307,
-                    "headers": [(b"location", streamable_http_path.encode("ascii"))],
-                }
-            )
-            await send({"type": "http.response.body", "body": b""})
+            await _send_root_redirect(send)
             return
 
-    # Guard FastMCP transport with the same auth policy as the REST API.
     if PUBLIC_EXPOSURE and scope["type"] == "http":
-        headers = {k.lower(): v for k, v in scope.get("headers", [])}
-        authorized = False
-        internal_key = headers.get(b"x-internal-key", b"").decode("latin-1")
-        if (
-            internal_key
-            and INTERNAL_API_KEY
-            and hmac.compare_digest(internal_key, INTERNAL_API_KEY)
-        ):
-            authorized = True
-        if not authorized:
-            auth_header = headers.get(b"authorization", b"").decode("latin-1")
-            if auth_header.lower().startswith("bearer ") and _oidc:
-                token = auth_header[7:].strip()
-                try:
-                    await _oidc.verify_token(token)
-                    authorized = True
-                except Exception as exc:
-                    _log.warning(
-                        "mcp_oidc_verification_failed", extra={"error": str(exc)}
-                    )
-        if not authorized:
+        if not await _authorize_mcp(scope):
             await send(
                 {
                     "type": "http.response.start",

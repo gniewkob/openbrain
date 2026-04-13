@@ -35,6 +35,7 @@ _CONTRACT = _load_contract()
 
 
 def backend_error_message(status_code: int, detail: Any) -> str:
+    """Build a human-readable error message for a backend HTTP error response."""
     detail_text = (
         json.dumps(detail, ensure_ascii=False)
         if isinstance(detail, (dict, list))
@@ -70,6 +71,7 @@ def backend_error_message(status_code: int, detail: Any) -> str:
 
 
 def backend_request_failure_message(error: Exception) -> str:
+    """Build a human-readable message for a backend connectivity failure."""
     is_production = os.environ.get("ENV", "development").lower() == "production"
     if is_production:
         return "Backend request failed: upstream unavailable"

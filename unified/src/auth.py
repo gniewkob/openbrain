@@ -46,6 +46,8 @@ _local_auth_warning_emitted = False
 
 @dataclass
 class OIDCMetadata:
+    """OIDC discovery document fields used for token verification."""
+
     issuer: str
     authorization_endpoint: str
     token_endpoint: str
@@ -55,6 +57,8 @@ class OIDCMetadata:
 
 
 class OIDCVerifier:
+    """Verifies OIDC JWTs using issuer discovery and JWKS."""
+
     def __init__(
         self, issuer_url: str, audience: str = "", discovery_cache_s: int = 600
     ):
@@ -72,6 +76,7 @@ class OIDCVerifier:
         return self._refresh_lock
 
     async def metadata(self) -> OIDCMetadata:
+        """Fetch and cache OIDC discovery metadata, refreshing after TTL expires."""
         now = time.time()
         if (
             self._metadata
@@ -422,6 +427,7 @@ def get_domain_scope(claims: dict[str, Any], action: str) -> set[str]:
 
 
 def get_registry_domain_scope(subject: str, tenant_id: str, action: str) -> set[str]:
+    """Return allowed domain set for the given subject/tenant/action from the registry."""
     action = action.lower()
     allowed_domains = {"corporate", "build", "personal"}
 

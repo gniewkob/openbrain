@@ -149,6 +149,7 @@ class MCPConfig(BaseSettings):
     @field_validator("streamable_http_path")
     @classmethod
     def validate_streamable_http_path(cls, v: str) -> str:
+        """Validate MCP_STREAMABLE_HTTP_PATH is a safe, non-root path string."""
         value = (v or "").strip()
         if not value.startswith("/"):
             raise ValueError("MCP_STREAMABLE_HTTP_PATH must start with '/'")
@@ -178,6 +179,7 @@ class MCPConfig(BaseSettings):
     @field_validator("health_probe_timeout")
     @classmethod
     def validate_health_probe_timeout(cls, v: float) -> float:
+        """Validate health probe timeout is a finite positive number <= 30s."""
         if not math.isfinite(v):
             raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be finite")
         if v <= 0:
@@ -189,6 +191,7 @@ class MCPConfig(BaseSettings):
     @field_validator("backend_timeout")
     @classmethod
     def validate_backend_timeout(cls, v: float) -> float:
+        """Validate backend timeout is a finite positive number <= 120s."""
         if not math.isfinite(v):
             raise ValueError("BACKEND_TIMEOUT_S must be finite")
         if v <= 0:
@@ -200,6 +203,7 @@ class MCPConfig(BaseSettings):
     @field_validator("brain_url")
     @classmethod
     def validate_brain_url(cls, v: str) -> str:
+        """Validate BRAIN_URL is a credential-free http(s) base URL."""
         value = (v or "").strip()
         if any(ch.isspace() for ch in value):
             raise ValueError("BRAIN_URL must not include whitespace")
@@ -217,6 +221,7 @@ class MCPConfig(BaseSettings):
     @field_validator("source_system")
     @classmethod
     def validate_source_system(cls, v: str) -> str:
+        """Validate source_system matches the required slug pattern."""
         value = (v or "").strip().lower()
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", value):
             raise ValueError(
@@ -226,6 +231,7 @@ class MCPConfig(BaseSettings):
 
     @model_validator(mode="after")
     def validate_timeout_relationship(self) -> "MCPConfig":
+        """Ensure health_probe_timeout does not exceed backend_timeout."""
         if self.health_probe_timeout > self.backend_timeout:
             raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be <= BACKEND_TIMEOUT_S")
         return self

@@ -111,6 +111,26 @@ async def get_memory_with_repo(
     return _to_out(memory) if memory else None
 
 
+def _apply_status_filter(stmt, filters: dict[str, Any], default_status_filter: bool):
+    """Apply status filter or default exclusion of superseded/duplicate records."""
+    if "status" in filters:
+        return stmt.where(Memory.status == filters["status"])
+    if default_status_filter:
+        return stmt.where(Memory.status.notin_([STATUS_SUPERSEDED, STATUS_DUPLICATE]))
+    return stmt
+
+
+def _resolve_include_test_data(filters: dict[str, Any]) -> bool:
+    """Validate and return the include_test_data filter value."""
+    raw = filters.get("include_test_data", False)
+    if not isinstance(raw, bool):
+        raise ValueError(
+            "filters.include_test_data must be bool when provided "
+            f"(got {type(raw).__name__})"
+        )
+    return raw
+
+
 def _apply_filters_to_stmt(
     stmt,
     filters: dict[str, Any],
@@ -128,13 +148,7 @@ def _apply_filters_to_stmt(
     Returns:
         Modified statement with filters applied
     """
-    raw_include_test_data = filters.get("include_test_data", False)
-    if not isinstance(raw_include_test_data, bool):
-        raise ValueError(
-            "filters.include_test_data must be bool when provided "
-            f"(got {type(raw_include_test_data).__name__})"
-        )
-    include_test_data = raw_include_test_data
+    include_test_data = _resolve_include_test_data(filters)
     if not include_test_data:
         # Hide explicitly flagged test fixtures from default operational retrieval.
         stmt = stmt.where(
@@ -154,10 +168,7 @@ def _apply_filters_to_stmt(
             stmt = stmt.where(Memory.entity_type.in_(entity_types))
         else:
             stmt = stmt.where(Memory.entity_type == entity_types)
-    if "status" in filters:
-        stmt = stmt.where(Memory.status == filters["status"])
-    elif default_status_filter:
-        stmt = stmt.where(Memory.status.notin_([STATUS_SUPERSEDED, STATUS_DUPLICATE]))
+    stmt = _apply_status_filter(stmt, filters, default_status_filter)
     if "sensitivity" in filters:
         stmt = stmt.where(Memory.sensitivity == filters["sensitivity"])
     if "owner" in filters:
@@ -306,6 +317,7 @@ async def sync_check(
 
 
 async def get_memory_status_counts(session: AsyncSession) -> dict[str, int]:
+    """Return count of non-test memories grouped by status."""
     result = await session.execute(
         select(Memory.status, func.count(Memory.id))
         .where(func.coalesce(Memory.metadata_["test_data"].astext, "false") != "true")
@@ -323,6 +335,7 @@ async def get_memory_status_counts(session: AsyncSession) -> dict[str, int]:
 async def get_memory_domain_status_counts(
     session: AsyncSession,
 ) -> dict[str, dict[str, int]]:
+    """Return status counts per domain for non-test memories."""
     result = await session.execute(
         select(Memory.domain, Memory.status, func.count(Memory.id))
         .where(func.coalesce(Memory.metadata_["test_data"].astext, "false") != "true")
@@ -385,6 +398,135 @@ async def get_hidden_test_data_counts(session: AsyncSession) -> dict[str, int]:
         "hidden_test_data_corporate_total": int(corporate_active_result.scalar() or 0),
         "hidden_test_data_personal_total": int(personal_active_result.scalar() or 0),
     }
+
+
+def _compute_hidden_ratios(
+    hidden_counts: dict[str, int],
+    visible_status_counts: dict[str, int],
+    visible_domain_status_counts: dict[str, dict[str, int]],
+) -> tuple[float, dict[str, float]]:
+    """Compute hidden-to-active ratios overall and per domain.
+
+    Returns (hidden_active_ratio, hidden_active_ratio_by_domain).
+    """
+    hidden_active_total = int(hidden_counts.get("hidden_test_data_active_total", 0))
+    visible_active_total = int(visible_status_counts.get("active", 0))
+    hidden_build = int(hidden_counts.get("hidden_test_data_build_total", 0))
+    hidden_corporate = int(hidden_counts.get("hidden_test_data_corporate_total", 0))
+    hidden_personal = int(hidden_counts.get("hidden_test_data_personal_total", 0))
+    visible_build_active = int(
+        visible_domain_status_counts.get("build", {}).get("active", 0)
+    )
+    visible_corporate_active = int(
+        visible_domain_status_counts.get("corporate", {}).get("active", 0)
+    )
+    visible_personal_active = int(
+        visible_domain_status_counts.get("personal", {}).get("active", 0)
+    )
+    active_total_all = visible_active_total + hidden_active_total
+    hidden_active_ratio = (
+        round(hidden_active_total / active_total_all, 4)
+        if active_total_all > 0
+        else 0.0
+    )
+    hidden_active_ratio_by_domain = {
+        "build": (
+            round(hidden_build / (visible_build_active + hidden_build), 4)
+            if (visible_build_active + hidden_build) > 0
+            else 0.0
+        ),
+        "corporate": (
+            round(hidden_corporate / (visible_corporate_active + hidden_corporate), 4)
+            if (visible_corporate_active + hidden_corporate) > 0
+            else 0.0
+        ),
+        "personal": (
+            round(hidden_personal / (visible_personal_active + hidden_personal), 4)
+            if (visible_personal_active + hidden_personal) > 0
+            else 0.0
+        ),
+    }
+    return hidden_active_ratio, hidden_active_ratio_by_domain
+
+
+def _build_hygiene_recommendations(
+    hidden_counts: dict[str, int],
+    hidden_active_ratio: float,
+    null_match_key_count: int,
+    top_owners: dict[str, int],
+) -> list[TestDataActionSuggestion]:
+    """Build recommended actions for the hygiene report based on detected issues."""
+    recommended_actions: list[TestDataActionSuggestion] = []
+    hidden_total = int(hidden_counts.get("hidden_test_data_total", 0))
+    hidden_build = int(hidden_counts.get("hidden_test_data_build_total", 0))
+    hidden_corporate = int(hidden_counts.get("hidden_test_data_corporate_total", 0))
+
+    if hidden_total == 0:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="no_action_needed",
+                priority="low",
+                summary="No records flagged as test data were detected.",
+            )
+        )
+        return recommended_actions
+
+    if hidden_build > 0:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="cleanup_build_test_data",
+                priority="high",
+                summary=(
+                    "Build-domain test data detected; schedule controlled delete flow "
+                    "(dry-run list -> approve -> delete)."
+                ),
+            )
+        )
+    if hidden_active_ratio >= 0.25:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="hidden_ratio_elevated",
+                priority="high",
+                summary=(
+                    "Hidden test-data share is elevated (>=25% of active records); "
+                    "prioritize cleanup/quarantine to restore dashboard and retrieval trust."
+                ),
+            )
+        )
+    if hidden_corporate > 0:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="review_corporate_test_data",
+                priority="high",
+                summary=(
+                    "Corporate-domain test data detected; keep append-only constraints and "
+                    "review quarantine-only remediation."
+                ),
+            )
+        )
+    if null_match_key_count > 0:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="normalize_missing_match_keys",
+                priority="medium",
+                summary=(
+                    "Some test-data records have null match_key; add deterministic key policy "
+                    "to improve dedup and cleanup safety."
+                ),
+            )
+        )
+    if top_owners:
+        recommended_actions.append(
+            TestDataActionSuggestion(
+                code="owner_feedback_loop",
+                priority="medium",
+                summary=(
+                    "Top owners are identifiable; align ingestion hygiene with owners to reduce "
+                    "future test-data churn."
+                ),
+            )
+        )
+    return recommended_actions
 
 
 async def get_test_data_hygiene_report(
@@ -451,110 +593,15 @@ async def get_test_data_hygiene_report(
     )
     null_match_key_count = int(null_match_key_result.scalar() or 0)
 
-    recommended_actions: list[TestDataActionSuggestion] = []
-    hidden_total = int(hidden_counts.get("hidden_test_data_total", 0))
-    hidden_active_total = int(hidden_counts.get("hidden_test_data_active_total", 0))
-    hidden_build = int(hidden_counts.get("hidden_test_data_build_total", 0))
-    hidden_corporate = int(hidden_counts.get("hidden_test_data_corporate_total", 0))
-    hidden_personal = int(hidden_counts.get("hidden_test_data_personal_total", 0))
-    visible_active_total = int(visible_status_counts.get("active", 0))
-    visible_build_active = int(
-        visible_domain_status_counts.get("build", {}).get("active", 0)
+    hidden_active_ratio, hidden_active_ratio_by_domain = _compute_hidden_ratios(
+        hidden_counts, visible_status_counts, visible_domain_status_counts
     )
-    visible_corporate_active = int(
-        visible_domain_status_counts.get("corporate", {}).get("active", 0)
+    recommended_actions = _build_hygiene_recommendations(
+        hidden_counts=hidden_counts,
+        hidden_active_ratio=hidden_active_ratio,
+        null_match_key_count=null_match_key_count,
+        top_owners=top_owners,
     )
-    visible_personal_active = int(
-        visible_domain_status_counts.get("personal", {}).get("active", 0)
-    )
-    active_total_all = visible_active_total + hidden_active_total
-    hidden_active_ratio = (
-        round(hidden_active_total / active_total_all, 4)
-        if active_total_all > 0
-        else 0.0
-    )
-    hidden_active_ratio_by_domain = {
-        "build": (
-            round(hidden_build / (visible_build_active + hidden_build), 4)
-            if (visible_build_active + hidden_build) > 0
-            else 0.0
-        ),
-        "corporate": (
-            round(hidden_corporate / (visible_corporate_active + hidden_corporate), 4)
-            if (visible_corporate_active + hidden_corporate) > 0
-            else 0.0
-        ),
-        "personal": (
-            round(hidden_personal / (visible_personal_active + hidden_personal), 4)
-            if (visible_personal_active + hidden_personal) > 0
-            else 0.0
-        ),
-    }
-
-    if hidden_total == 0:
-        recommended_actions.append(
-            TestDataActionSuggestion(
-                code="no_action_needed",
-                priority="low",
-                summary="No records flagged as test data were detected.",
-            )
-        )
-    else:
-        if hidden_build > 0:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="cleanup_build_test_data",
-                    priority="high",
-                    summary=(
-                        "Build-domain test data detected; schedule controlled delete flow "
-                        "(dry-run list -> approve -> delete)."
-                    ),
-                )
-            )
-        if hidden_active_ratio >= 0.25:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="hidden_ratio_elevated",
-                    priority="high",
-                    summary=(
-                        "Hidden test-data share is elevated (>=25% of active records); "
-                        "prioritize cleanup/quarantine to restore dashboard and retrieval trust."
-                    ),
-                )
-            )
-        if hidden_corporate > 0:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="review_corporate_test_data",
-                    priority="high",
-                    summary=(
-                        "Corporate-domain test data detected; keep append-only constraints and "
-                        "review quarantine-only remediation."
-                    ),
-                )
-            )
-        if null_match_key_count > 0:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="normalize_missing_match_keys",
-                    priority="medium",
-                    summary=(
-                        "Some test-data records have null match_key; add deterministic key policy "
-                        "to improve dedup and cleanup safety."
-                    ),
-                )
-            )
-        if top_owners:
-            recommended_actions.append(
-                TestDataActionSuggestion(
-                    code="owner_feedback_loop",
-                    priority="medium",
-                    summary=(
-                        "Top owners are identifiable; align ingestion hygiene with owners to reduce "
-                        "future test-data churn."
-                    ),
-                )
-            )
 
     sample_result = await session.execute(
         select(
@@ -608,6 +655,7 @@ async def get_test_data_hygiene_report(
 async def list_maintenance_reports(
     session: AsyncSession, limit: int = 20
 ) -> list[MaintenanceReportEntry]:
+    """Return the most recent maintenance audit log entries as report summaries."""
     result = await session.execute(
         select(AuditLog)
         .where(
@@ -639,6 +687,7 @@ async def list_maintenance_reports(
 async def get_maintenance_report(
     session: AsyncSession, report_id: str
 ) -> MaintenanceReportDetail | None:
+    """Fetch a single maintenance report detail by audit log ID."""
     result = await session.execute(
         select(AuditLog).where(
             AuditLog.id == report_id,
@@ -699,6 +748,7 @@ async def get_grounding_pack(
     owner: str | None = None,
     tenant_id: str | None = None,
 ) -> MemoryGetContextResponse:
+    """Retrieve a grounding context pack for the given query and domain."""
     find_req = MemoryFindRequest(
         query=req.query,
         filters={"domain": req.domain} if req.domain else {},

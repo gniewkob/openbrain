@@ -57,9 +57,11 @@ class _CircuitBreaker:
 
     @property
     def state(self) -> str:
+        """Return the current circuit state: closed, open, or half_open."""
         return self._state
 
     def reset(self) -> None:
+        """Reset circuit to closed state and clear failure counter."""
         self._state = "closed"
         self._failures = 0
         self._opened_at = 0.0
@@ -79,10 +81,12 @@ class _CircuitBreaker:
         # half_open: allow one probe through
 
     def on_success(self) -> None:
+        """Record a successful call and close the circuit."""
         self._failures = 0
         self._state = "closed"
 
     def on_failure(self) -> None:
+        """Record a failure; open the circuit after failure_threshold is reached."""
         self._failures += 1
         if self._failures >= self.failure_threshold:
             self._state = "open"
