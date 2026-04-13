@@ -112,3 +112,20 @@ def test_pr_readiness_run_step_returns_124_on_timeout(monkeypatch) -> None:
 
     monkeypatch.setattr(module.subprocess, "run", _timeout)
     assert module.run_step("contract integrity smoke", ["pytest"]) == 124
+
+
+def test_pr_readiness_contract_loader_validates_shape(tmp_path: Path) -> None:
+    module = _load_pr_readiness_module()
+    broken = tmp_path / "pr_readiness_runner_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+
+    original_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for invalid PR readiness contract"
+        except ValueError as exc:
+            assert "guardrail_runner_test_files" in str(exc)
+    finally:
+        module.CONTRACT = original_contract

@@ -307,6 +307,21 @@ def test_hidden_test_data_alert_guardrail_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in share_high["allowed_exprs"])
 
 
+def test_dashboard_memory_semantics_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (
+            _contracts_dir() / "dashboard_memory_semantics_guardrail_contract.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert isinstance(raw["dashboard_path"], str) and raw["dashboard_path"]
+    required_panels = raw["required_panels"]
+    assert isinstance(required_panels, list) and required_panels
+    for panel in required_panels:
+        assert isinstance(panel, dict)
+        assert isinstance(panel["title"], str) and panel["title"]
+        assert isinstance(panel["expr"], str) and panel["expr"]
+
+
 def test_capabilities_health_guardrail_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "capabilities_health_guardrail_contract.json").read_text(
@@ -354,6 +369,21 @@ def test_tool_signature_guardrail_contract_shape() -> None:
     checked_tools = raw["checked_tools"]
     assert isinstance(checked_tools, list) and checked_tools
     assert all(isinstance(item, str) and item for item in checked_tools)
+
+
+def test_tool_inventory_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "tool_inventory_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert (
+        isinstance(raw["manifest_obsidian_tools_key"], str)
+        and raw["manifest_obsidian_tools_key"]
+    )
+    assert isinstance(raw["tool_name_prefix"], str) and raw["tool_name_prefix"]
+    assert isinstance(raw["obsidian_tool_prefix"], str) and raw["obsidian_tool_prefix"]
+    assert isinstance(raw["require_gateway_obsidian_tools"], bool)
 
 
 def test_admin_endpoint_guardrail_contract_shape() -> None:
@@ -404,6 +434,34 @@ def test_http_error_contract_guardrail_contract_shape() -> None:
     )
 
 
+def test_release_gate_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "release_gate_contract.json").read_text(encoding="utf-8")
+    )
+    required_checks = raw["required_checks"]
+    assert isinstance(required_checks, list) and required_checks
+    assert all(isinstance(item, str) and item for item in required_checks)
+
+
+def test_capabilities_truthfulness_guardrail_contract_shape() -> None:
+    raw = json.loads(
+        (
+            _contracts_dir() / "capabilities_truthfulness_guardrail_contract.json"
+        ).read_text(encoding="utf-8")
+    )
+    keys = (
+        "expected_health_required_keys",
+        "expected_health_component_required_keys",
+        "expected_health_overall_values",
+        "expected_tier_required_keys",
+        "expected_tier_status_values",
+    )
+    for key in keys:
+        value = raw[key]
+        assert isinstance(value, list) and value
+        assert all(isinstance(item, str) and item for item in value)
+
+
 def test_mcp_transport_mount_contract_shape() -> None:
     raw = json.loads(
         (_contracts_dir() / "mcp_transport_mount_contract.json").read_text(
@@ -438,6 +496,58 @@ def test_mcp_http_session_contract_shape() -> None:
     assert isinstance(raw["runbook_required_snippets"], list) and raw[
         "runbook_required_snippets"
     ]
+
+
+def test_local_guardrails_runner_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "local_guardrails_runner_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    steps = raw["steps"]
+    assert isinstance(steps, list) and steps
+    labels: set[str] = set()
+    for step in steps:
+        assert isinstance(step, dict)
+        assert isinstance(step["label"], str) and step["label"]
+        assert isinstance(step["script"], str) and step["script"]
+        assert isinstance(step["timeout_seconds"], int) and step["timeout_seconds"] > 0
+        labels.add(step["label"])
+    assert len(labels) == len(steps)
+
+
+def test_pr_readiness_runner_contract_shape() -> None:
+    raw = json.loads(
+        (_contracts_dir() / "pr_readiness_runner_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    guardrail_tests = raw["guardrail_runner_test_files"]
+    contract_smoke_tests = raw["contract_integrity_test_files"]
+    timeouts = raw["step_timeouts_seconds"]
+    step_contract_sources = raw["step_contract_sources"]
+    mappings = raw["makefile_parity_mappings"]
+    assert isinstance(guardrail_tests, list) and guardrail_tests
+    assert isinstance(contract_smoke_tests, list) and contract_smoke_tests
+    assert all(isinstance(item, str) and item for item in guardrail_tests)
+    assert all(isinstance(item, str) and item for item in contract_smoke_tests)
+    assert isinstance(timeouts, dict) and timeouts
+    for label in ("local guardrails", "guardrail runner tests", "contract integrity smoke"):
+        assert label in timeouts
+        assert isinstance(timeouts[label], int) and timeouts[label] > 0
+    assert isinstance(step_contract_sources, dict) and step_contract_sources
+    for step_label, contract_field in step_contract_sources.items():
+        assert isinstance(step_label, str) and step_label
+        assert isinstance(contract_field, str) and contract_field
+        assert contract_field in {
+            "guardrail_runner_test_files",
+            "contract_integrity_test_files",
+        }
+    assert isinstance(mappings, list) and mappings
+    for mapping in mappings:
+        assert isinstance(mapping, dict)
+        assert isinstance(mapping["step_label"], str) and mapping["step_label"]
+        assert isinstance(mapping["make_target"], str) and mapping["make_target"]
 
 
 def test_http_error_contract_prod_mode_masks_detail(monkeypatch) -> None:

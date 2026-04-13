@@ -9,16 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DASHBOARD = ROOT / "monitoring/grafana/dashboards/openbrain/openbrain-overview.json"
-
-ACTIVE_TITLE = "Active Memories (All incl Test Data)"
-ACTIVE_EXPR = 'active_memories_all_total{job="openbrain-unified"}'
-VISIBLE_TITLE = "Active Memories (Visible Excl Test Data)"
-VISIBLE_EXPR = 'active_memories_total{job="openbrain-unified"}'
-HIDDEN_TITLE = "Hidden Test Data (Active Only)"
-HIDDEN_EXPR = 'hidden_test_data_active_total{job="openbrain-unified"}'
-HIDDEN_SHARE_TITLE = "Hidden Test Data Share (Active)"
-HIDDEN_SHARE_EXPR = 'hidden_test_data_active_total{job="openbrain-unified"} / clamp_min(active_memories_all_total{job="openbrain-unified"}, 1)'
+CONTRACT = ROOT / "unified/contracts/dashboard_memory_semantics_guardrail_contract.json"
 
 
 def _fail(message: str) -> int:
@@ -47,49 +38,55 @@ def _find_panel_by_title(payload: dict[str, object], title: str) -> dict[str, ob
     return None
 
 
+def _load_contract() -> tuple[Path, list[dict[str, str]]]:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("dashboard memory semantics contract must be a JSON object")
+
+    dashboard_path_raw = payload.get("dashboard_path")
+    if not isinstance(dashboard_path_raw, str) or not dashboard_path_raw.strip():
+        raise ValueError("contract dashboard_path must be a non-empty string")
+    dashboard_path = ROOT / dashboard_path_raw
+
+    required_panels = payload.get("required_panels")
+    if not isinstance(required_panels, list) or not required_panels:
+        raise ValueError("contract required_panels must be a non-empty list")
+
+    normalized_panels: list[dict[str, str]] = []
+    for panel in required_panels:
+        if not isinstance(panel, dict):
+            raise ValueError("contract required_panels items must be objects")
+        title = panel.get("title")
+        expr = panel.get("expr")
+        if not isinstance(title, str) or not title:
+            raise ValueError("contract required_panels.title must be non-empty string")
+        if not isinstance(expr, str) or not expr:
+            raise ValueError("contract required_panels.expr must be non-empty string")
+        normalized_panels.append({"title": title, "expr": expr})
+
+    return dashboard_path, normalized_panels
+
+
 def main() -> int:
-    payload = json.loads(DASHBOARD.read_text(encoding="utf-8"))
+    try:
+        dashboard_path, required_panels = _load_contract()
+    except Exception as exc:
+        return _fail(f"failed to load dashboard memory semantics contract: {exc}")
+
+    payload = json.loads(dashboard_path.read_text(encoding="utf-8"))
     errors: list[str] = []
 
-    active_panel = _find_panel_by_title(payload, ACTIVE_TITLE)
-    if active_panel is None:
-        errors.append(f"missing dashboard panel title: {ACTIVE_TITLE}")
-    else:
-        active_expr = _extract_panel_expr(active_panel)
-        if active_expr != ACTIVE_EXPR:
+    for spec in required_panels:
+        title = spec["title"]
+        expected_expr = spec["expr"]
+        panel = _find_panel_by_title(payload, title)
+        if panel is None:
+            errors.append(f"missing dashboard panel title: {title}")
+            continue
+        actual_expr = _extract_panel_expr(panel)
+        if actual_expr != expected_expr:
             errors.append(
-                f"{ACTIVE_TITLE} must use expr {ACTIVE_EXPR!r} (got {active_expr!r})"
-            )
-
-    visible_panel = _find_panel_by_title(payload, VISIBLE_TITLE)
-    if visible_panel is None:
-        errors.append(f"missing dashboard panel title: {VISIBLE_TITLE}")
-    else:
-        visible_expr = _extract_panel_expr(visible_panel)
-        if visible_expr != VISIBLE_EXPR:
-            errors.append(
-                f"{VISIBLE_TITLE} must use expr {VISIBLE_EXPR!r} (got {visible_expr!r})"
-            )
-
-    hidden_panel = _find_panel_by_title(payload, HIDDEN_TITLE)
-    if hidden_panel is None:
-        errors.append(f"missing dashboard panel title: {HIDDEN_TITLE}")
-    else:
-        hidden_expr = _extract_panel_expr(hidden_panel)
-        if hidden_expr != HIDDEN_EXPR:
-            errors.append(
-                f"{HIDDEN_TITLE} must use expr {HIDDEN_EXPR!r} (got {hidden_expr!r})"
-            )
-
-    hidden_share_panel = _find_panel_by_title(payload, HIDDEN_SHARE_TITLE)
-    if hidden_share_panel is None:
-        errors.append(f"missing dashboard panel title: {HIDDEN_SHARE_TITLE}")
-    else:
-        hidden_share_expr = _extract_panel_expr(hidden_share_panel)
-        if hidden_share_expr != HIDDEN_SHARE_EXPR:
-            errors.append(
-                f"{HIDDEN_SHARE_TITLE} must use expr {HIDDEN_SHARE_EXPR!r} "
-                f"(got {hidden_share_expr!r})"
+                f"{title} must use expr {expected_expr!r} (got {actual_expr!r})"
             )
 
     if errors:

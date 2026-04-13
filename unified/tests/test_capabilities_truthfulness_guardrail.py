@@ -117,6 +117,7 @@ def test_capabilities_truthfulness_metadata_check_requires_health_entry(tmp_path
 
 def test_capabilities_truthfulness_contract_requires_tier_keys(tmp_path) -> None:
     module = _load_capabilities_truthfulness_module()
+    guardrail = module._load_guardrail_contract()
     contract_path = tmp_path / "capabilities_response_contract.json"
     contract_path.write_text(
         json.dumps(
@@ -139,7 +140,7 @@ def test_capabilities_truthfulness_contract_requires_tier_keys(tmp_path) -> None
     original = module.CONTRACT
     module.CONTRACT = contract_path
     try:
-        errors = module._check_contract()
+        errors = module._check_contract(guardrail)
     finally:
         module.CONTRACT = original
     assert any("tier_required_keys" in err for err in errors)
@@ -147,6 +148,7 @@ def test_capabilities_truthfulness_contract_requires_tier_keys(tmp_path) -> None
 
 def test_capabilities_truthfulness_contract_requires_tier_status_values(tmp_path) -> None:
     module = _load_capabilities_truthfulness_module()
+    guardrail = module._load_guardrail_contract()
     contract_path = tmp_path / "capabilities_response_contract.json"
     contract_path.write_text(
         json.dumps(
@@ -169,10 +171,28 @@ def test_capabilities_truthfulness_contract_requires_tier_status_values(tmp_path
     original = module.CONTRACT
     module.CONTRACT = contract_path
     try:
-        errors = module._check_contract()
+        errors = module._check_contract(guardrail)
     finally:
         module.CONTRACT = original
     assert any("tier_status_values" in err for err in errors)
+
+
+def test_capabilities_truthfulness_guardrail_contract_loader_validates_shape(
+    tmp_path,
+) -> None:
+    module = _load_capabilities_truthfulness_module()
+    broken = tmp_path / "capabilities_truthfulness_guardrail_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+    original = module.GUARDRAIL_CONTRACT
+    module.GUARDRAIL_CONTRACT = broken
+    try:
+        try:
+            module._load_guardrail_contract()
+            assert False, "expected ValueError for invalid truthfulness guardrail contract"
+        except ValueError as exc:
+            assert "expected_health_required_keys" in str(exc)
+    finally:
+        module.GUARDRAIL_CONTRACT = original
 
 
 def test_capabilities_truthfulness_checks_health_source_and_obsidian_mapping(

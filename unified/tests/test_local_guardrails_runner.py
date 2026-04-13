@@ -272,3 +272,20 @@ def test_local_guardrails_includes_update_audit_semantics_parity_step() -> None:
         "update audit semantics parity",
         "scripts/check_update_audit_semantics_parity.py",
     ) in module.GUARDRAIL_STEPS
+
+
+def test_local_guardrails_contract_loader_validates_shape(tmp_path: Path) -> None:
+    module = _load_local_guardrails_module()
+    broken = tmp_path / "local_guardrails_runner_contract.json"
+    broken.write_text("{}", encoding="utf-8")
+
+    original_contract = module.CONTRACT
+    module.CONTRACT = broken
+    try:
+        try:
+            module._load_contract()
+            assert False, "expected ValueError for invalid contract"
+        except ValueError as exc:
+            assert "steps" in str(exc)
+    finally:
+        module.CONTRACT = original_contract

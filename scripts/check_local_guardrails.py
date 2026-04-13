@@ -3,75 +3,49 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
+CONTRACT = ROOT / "unified/contracts/local_guardrails_runner_contract.json"
 
-GUARDRAIL_STEPS: tuple[tuple[str, str], ...] = (
-    ("repository hygiene", "scripts/check_repo_hygiene.py"),
-    ("compose guardrails", "scripts/check_compose_guardrails.py"),
-    ("capabilities manifest parity", "scripts/check_capabilities_manifest_parity.py"),
-    ("capabilities metadata parity", "scripts/check_capabilities_metadata_parity.py"),
-    ("capabilities health parity", "scripts/check_capabilities_health_parity.py"),
-    (
-        "capabilities tier status parity",
-        "scripts/check_capabilities_tier_status_parity.py",
-    ),
-    (
-        "backend probe contract parity",
-        "scripts/check_backend_probe_contract_parity.py",
-    ),
-    ("request/runtime parity", "scripts/check_request_runtime_parity.py"),
-    (
-        "makefile pr-readiness parity",
-        "scripts/check_makefile_pr_readiness_parity.py",
-    ),
-    ("shared http client reuse", "scripts/check_shared_http_client_reuse.py"),
-    ("tool signature parity", "scripts/check_tool_signature_parity.py"),
-    ("admin bounds parity", "scripts/check_admin_bounds_parity.py"),
-    (
-        "admin endpoint contract parity",
-        "scripts/check_admin_endpoint_contract_parity.py",
-    ),
-    ("tool inventory parity", "scripts/check_tool_inventory_parity.py"),
-    (
-        "mcp transport import scope",
-        "scripts/check_mcp_transport_import_scope.py",
-    ),
-    (
-        "mcp transport mount contract",
-        "scripts/check_mcp_transport_mount_contract.py",
-    ),
-    ("capabilities tools truthfulness", "scripts/check_capabilities_tools_truthfulness.py"),
-    ("search filter parity", "scripts/check_search_filter_parity.py"),
-    ("list filter parity", "scripts/check_list_filter_parity.py"),
-    ("response normalizers parity", "scripts/check_response_normalizers_parity.py"),
-    ("http error adapter parity", "scripts/check_http_error_adapter_parity.py"),
-    ("http error contract semantics", "scripts/check_http_error_contract_semantics.py"),
-    ("capabilities truthfulness", "scripts/check_capabilities_truthfulness.py"),
-    ("audit semantics", "scripts/check_audit_semantics.py"),
-    ("cleanup actor semantics", "scripts/check_cleanup_actor_semantics.py"),
-    ("update audit semantics parity", "scripts/check_update_audit_semantics_parity.py"),
-    ("delete semantics parity", "scripts/check_delete_semantics_parity.py"),
-    ("export contract", "scripts/check_export_contract.py"),
-    ("obsidian contract", "scripts/check_obsidian_contract.py"),
-    ("mcp http session contract", "scripts/check_mcp_http_session_contract.py"),
-    ("telemetry contract parity", "scripts/check_telemetry_contract_parity.py"),
-    ("dashboard memory semantics", "scripts/check_dashboard_memory_semantics.py"),
-    (
-        "hidden test-data alert parity",
-        "scripts/check_hidden_test_data_alert_parity.py",
-    ),
-    ("monitoring contract", "scripts/validate_monitoring_contract.py"),
-)
 
-STEP_TIMEOUT_SECONDS: dict[str, int] = {
-    label: 60 for label, _ in GUARDRAIL_STEPS
-}
-STEP_TIMEOUT_SECONDS["monitoring contract"] = 90
+def _load_contract() -> tuple[tuple[tuple[str, str], ...], dict[str, int]]:
+    payload = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("local guardrails runner contract must be a JSON object")
+    steps = payload.get("steps")
+    if not isinstance(steps, list) or not steps:
+        raise ValueError("contract steps must be a non-empty list")
+
+    normalized_steps: list[tuple[str, str]] = []
+    timeouts: dict[str, int] = {}
+    seen_labels: set[str] = set()
+    for item in steps:
+        if not isinstance(item, dict):
+            raise ValueError("contract steps items must be objects")
+        label = item.get("label")
+        script = item.get("script")
+        timeout = item.get("timeout_seconds")
+        if not isinstance(label, str) or not label:
+            raise ValueError("contract step.label must be non-empty string")
+        if not isinstance(script, str) or not script:
+            raise ValueError("contract step.script must be non-empty string")
+        if not isinstance(timeout, int) or timeout <= 0:
+            raise ValueError("contract step.timeout_seconds must be positive int")
+        if label in seen_labels:
+            raise ValueError(f"contract has duplicate step label: {label}")
+        seen_labels.add(label)
+        normalized_steps.append((label, script))
+        timeouts[label] = timeout
+
+    return tuple(normalized_steps), timeouts
+
+
+GUARDRAIL_STEPS, STEP_TIMEOUT_SECONDS = _load_contract()
 
 
 def run_step(label: str, rel_script: str) -> int:
