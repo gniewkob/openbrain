@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from src.runtime_limits import load_runtime_limits
 
 MAX_ENTITY_TYPE_LEN = 64
@@ -33,6 +33,10 @@ MAX_SYNC_LIMIT = _RUNTIME_LIMITS["max_sync_limit"]
 MAX_BULK_RECORDS = _RUNTIME_LIMITS["max_bulk_items"]
 MAX_EXPORT_IDS = _RUNTIME_LIMITS["max_bulk_items"]
 MAX_POLICY_REWRITES = 100
+MAX_CUSTOM_FIELDS = 20
+MAX_CUSTOM_KEY_LEN = 64
+MAX_CUSTOM_VALUE_STR_LEN = 256
+MAX_CUSTOM_FIELDS_BYTES = 5_120
 
 EntityTypeStr = Annotated[str, Field(max_length=MAX_ENTITY_TYPE_LEN)]
 TitleStr = Annotated[str, Field(max_length=MAX_TITLE_LEN)]
@@ -53,6 +57,51 @@ TagStr = Annotated[str, Field(max_length=MAX_TAG_LEN)]
 MatchKeyStr = Annotated[str, Field(max_length=MAX_MATCH_KEY_LEN)]
 QueryStr = Annotated[str, Field(max_length=MAX_QUERY_LEN)]
 PathStr = Annotated[str, Field(max_length=MAX_PATH_LEN)]
+
+
+# ---------------------------------------------------------------------------
+# Custom fields validation
+# ---------------------------------------------------------------------------
+
+_KEY_RE = __import__("re").compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def _validate_custom_fields(v: Any) -> dict[str, Any]:
+    """Validate custom_fields: key pattern, value types, and total size."""
+    import json
+
+    if not isinstance(v, dict):
+        raise ValueError("custom_fields must be a dict")
+    if len(v) > MAX_CUSTOM_FIELDS:
+        raise ValueError(
+            f"custom_fields exceeds max {MAX_CUSTOM_FIELDS} keys, got {len(v)}"
+        )
+    for key, val in v.items():
+        if not isinstance(key, str):
+            raise ValueError(f"custom_fields key must be str, got {type(key).__name__}")
+        if len(key) > MAX_CUSTOM_KEY_LEN:
+            raise ValueError(
+                f"custom_fields key '{key[:32]}…' exceeds {MAX_CUSTOM_KEY_LEN} chars"
+            )
+        if not _KEY_RE.match(key):
+            raise ValueError(
+                f"custom_fields key '{key}' must match ^[A-Za-z0-9_.-]+$"
+            )
+        if val is not None and not isinstance(val, (str, int, float, bool)):
+            raise ValueError(
+                f"custom_fields['{key}'] type {type(val).__name__} not allowed"
+                " (str | int | float | bool | None only)"
+            )
+        if isinstance(val, str) and len(val) > MAX_CUSTOM_VALUE_STR_LEN:
+            raise ValueError(
+                f"custom_fields['{key}'] value exceeds {MAX_CUSTOM_VALUE_STR_LEN} chars"
+            )
+    size = len(json.dumps(v, separators=(",", ":")).encode())
+    if size > MAX_CUSTOM_FIELDS_BYTES:
+        raise ValueError(
+            f"custom_fields JSON exceeds {MAX_CUSTOM_FIELDS_BYTES} bytes, got {size}"
+        )
+    return v
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +192,12 @@ class MemoryRecord(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("custom_fields", mode="before")
+    @classmethod
+    def _check_custom_fields(cls, v: Any) -> Any:
+        """Delegate to shared custom_fields validator."""
+        return _validate_custom_fields(v) if v is not None else {}
+
 
 # ---------------------------------------------------------------------------
 # Request Models (V1)
@@ -167,6 +222,12 @@ class MemoryWriteRecord(BaseModel):
     source: SourceMetadata = Field(default_factory=SourceMetadata)
     obsidian_ref: Optional[PathStr] = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("custom_fields", mode="before")
+    @classmethod
+    def _check_custom_fields(cls, v: Any) -> Any:
+        """Delegate to shared custom_fields validator."""
+        return _validate_custom_fields(v) if v is not None else {}
 
 
 class MemoryWriteRequest(BaseModel):
@@ -483,6 +544,12 @@ class MemoryCreate(BaseModel):
     valid_from: Optional[datetime] = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("custom_fields", mode="before")
+    @classmethod
+    def _check_custom_fields(cls, v: Any) -> Any:
+        """Delegate to shared custom_fields validator."""
+        return _validate_custom_fields(v) if v is not None else {}
+
 
 class MemoryUpdate(BaseModel):
     """Partial update payload; only provided fields are applied to the existing record."""
@@ -497,6 +564,12 @@ class MemoryUpdate(BaseModel):
     obsidian_ref: Optional[PathStr] = None
     tenant_id: Optional[TenantIdStr] = None
     custom_fields: Optional[dict[str, Any]] = None
+
+    @field_validator("custom_fields", mode="before")
+    @classmethod
+    def _check_custom_fields(cls, v: Any) -> Any:
+        """Delegate to shared custom_fields validator (None is allowed for partial updates)."""
+        return _validate_custom_fields(v) if v is not None else v
 
 
 class MemoryUpsertItem(BaseModel):
@@ -516,6 +589,12 @@ class MemoryUpsertItem(BaseModel):
     match_key: MatchKeyStr | None = None
     tenant_id: TenantIdStr | None = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("custom_fields", mode="before")
+    @classmethod
+    def _check_custom_fields(cls, v: Any) -> Any:
+        """Delegate to shared custom_fields validator."""
+        return _validate_custom_fields(v) if v is not None else {}
 
 
 class SearchRequest(BaseModel):
@@ -579,6 +658,12 @@ class MemoryOut(BaseModel):
     updated_by: str = ""
 
     model_config = {"from_attributes": True}
+
+    @field_validator("custom_fields", mode="before")
+    @classmethod
+    def _check_custom_fields(cls, v: Any) -> Any:
+        """Delegate to shared custom_fields validator."""
+        return _validate_custom_fields(v) if v is not None else {}
 
 
 class SearchResult(BaseModel):
