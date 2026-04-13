@@ -1002,5 +1002,88 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/healthz probe failed", result["reason"])
 
 
+    # -------------------------------------------------------------------------
+    # brain_delete — httpx.RequestError path (lines 584-585)
+    # -------------------------------------------------------------------------
+
+    async def test_brain_delete_raises_on_request_error(self) -> None:
+        """httpx.RequestError → ValueError with backend_request_failure_message."""
+        with patch.object(
+            mcp_transport,
+            "_client",
+            side_effect=httpx.ConnectError("connection refused"),
+        ):
+            with self.assertRaises(ValueError):
+                await mcp_transport.brain_delete("mem-1")
+
+    async def test_brain_delete_is_error_with_json_parse_failure(self) -> None:
+        """response.is_error=True and response.json() raises → detail = response.text (lines 594-595)."""
+        response = _FakeResponse(
+            500,
+            payload=ValueError("cannot parse"),  # json() will raise
+            text="Internal Server Error",
+        )
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            with self.assertRaises(ValueError):
+                await mcp_transport.brain_delete("mem-1")
+
+    # -------------------------------------------------------------------------
+    # brain_get_context — happy path (lines 572-573)
+    # -------------------------------------------------------------------------
+
+    async def test_brain_get_context_sends_correct_payload(self) -> None:
+        response = _FakeResponse(200, payload={"query": "q", "records": []})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            result = await mcp_transport.brain_get_context("test query")
+        self.assertIn("query", fake_client.last_request[2]["json"])
+        self.assertEqual(fake_client.last_request[2]["json"]["query"], "test query")
+
+    # -------------------------------------------------------------------------
+    # brain_store_bulk — validation branches (lines 687-695)
+    # -------------------------------------------------------------------------
+
+    async def test_brain_store_bulk_raises_on_empty_items(self) -> None:
+        with self.assertRaisesRegex(ValueError, "empty"):
+            await mcp_transport.brain_store_bulk([])
+
+    async def test_brain_store_bulk_raises_on_over_limit(self) -> None:
+        oversized = [{"content": f"item {i}", "domain": "build"} for i in range(200)]
+        with self.assertRaisesRegex(ValueError, "maximum"):
+            await mcp_transport.brain_store_bulk(oversized)
+
+    async def test_brain_store_bulk_happy_path(self) -> None:
+        response = _FakeResponse(200, payload={"created": 1, "updated": 0})
+        fake_client = _FakeClient(response)
+        with patch.object(mcp_transport, "_client", return_value=fake_client):
+            result = await mcp_transport.brain_store_bulk(
+                [{"content": "test", "domain": "build", "entity_type": "Note"}]
+            )
+        self.assertIn("created", result)
+
+    # -------------------------------------------------------------------------
+    # brain_upsert_bulk — empty and over-limit validation (lines 708, 713)
+    # -------------------------------------------------------------------------
+
+    async def test_brain_upsert_bulk_raises_on_empty_items(self) -> None:
+        with self.assertRaisesRegex(ValueError, "empty"):
+            await mcp_transport.brain_upsert_bulk([])
+
+    async def test_brain_upsert_bulk_raises_on_over_limit(self) -> None:
+        oversized = [{"content": f"item {i}", "match_key": f"k{i}"} for i in range(200)]
+        with self.assertRaisesRegex(ValueError, "maximum"):
+            await mcp_transport.brain_upsert_bulk(oversized)
+
+    # -------------------------------------------------------------------------
+    # _http_obsidian_tools_registered — checks callable globals (lines 94-99)
+    # -------------------------------------------------------------------------
+
+    def test_http_obsidian_tools_registered_returns_bool(self) -> None:
+        """The function should return True or False based on what's in globals."""
+        result = mcp_transport._http_obsidian_tools_registered()
+        self.assertIsInstance(result, bool)
+
+
 if __name__ == "__main__":
     unittest.main()
