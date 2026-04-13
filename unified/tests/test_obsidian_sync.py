@@ -423,3 +423,288 @@ class TestResolveConflict:
         result = engine.resolve_conflict(change)
         
         assert result == "openbrain"
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage: SyncResult.to_dict, _load_state error, _check_memory_changed
+# resolve_conflict strategies, apply_sync, sync
+# ---------------------------------------------------------------------------
+
+
+class TestSyncResultToDict:
+    """Tests for SyncResult.to_dict."""
+
+    def test_to_dict_with_completed_at(self):
+        from src.obsidian_sync import SyncResult
+
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        result = SyncResult(started_at=now, completed_at=now)
+        d = result.to_dict()
+        assert d["started_at"] == now.isoformat()
+        assert d["completed_at"] == now.isoformat()
+        assert d["changes_detected"] == 0
+
+
+class TestLoadStateError:
+    """Tests for _load_state error recovery."""
+
+    def test_corrupted_json_resets_state(self, tmp_path):
+        import json
+
+        storage_path = tmp_path / "sync_state.json"
+        storage_path.write_text("{{invalid json{{")
+
+        tracker = ObsidianChangeTracker(storage_path=str(storage_path))
+        # should not raise, state should be empty
+        assert tracker.get_all_states() == []
+
+
+class TestCheckMemoryChanged:
+    """Tests for _check_memory_changed module-level function."""
+
+    def test_returns_true_when_updated_at_is_newer(self):
+        from src.obsidian_sync import _check_memory_changed
+
+        past = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        future = datetime(2026, 6, 1, tzinfo=timezone.utc)
+
+        state = SyncState(
+            memory_id="m1",
+            obsidian_path="n.md",
+            vault="v",
+            content_hash="same_hash",  # hashes match
+            memory_updated_at=past,
+            obsidian_modified_at=past,
+        )
+        memory = MagicMock()
+        memory.content = "content"
+        memory.updated_at = future
+
+        result = _check_memory_changed(state, memory, lambda c: "same_hash")
+        assert result is True
+
+
+class TestResolveConflictStrategies:
+    """Tests for all resolve_conflict strategy branches."""
+
+    def _change(self, conflict=True, source="both"):
+        return SyncChange(
+            memory_id="m1",
+            obsidian_path="test.md",
+            vault="v",
+            change_type=ChangeType.UPDATED,
+            source=source,
+            conflict=conflict,
+        )
+
+    def test_last_write_wins_openbrain_newer(self):
+        engine = BidirectionalSyncEngine(strategy=SyncStrategy.LAST_WRITE_WINS)
+        change = self._change()
+        now = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        old = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        change.openbrain_state = SyncState(
+            memory_id="m1", obsidian_path="test.md", vault="v",
+            content_hash="h", memory_updated_at=now, obsidian_modified_at=old,
+        )
+        change.obsidian_state = SyncState(
+            memory_id="m1", obsidian_path="test.md", vault="v",
+            content_hash="h", memory_updated_at=old, obsidian_modified_at=old,
+        )
+        assert engine.resolve_conflict(change) == "openbrain"
+
+    def test_last_write_wins_obsidian_newer(self):
+        engine = BidirectionalSyncEngine(strategy=SyncStrategy.LAST_WRITE_WINS)
+        change = self._change()
+        now = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        old = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        change.openbrain_state = SyncState(
+            memory_id="m1", obsidian_path="test.md", vault="v",
+            content_hash="h", memory_updated_at=old, obsidian_modified_at=old,
+        )
+        change.obsidian_state = SyncState(
+            memory_id="m1", obsidian_path="test.md", vault="v",
+            content_hash="h", memory_updated_at=old, obsidian_modified_at=now,
+        )
+        assert engine.resolve_conflict(change) == "obsidian"
+
+    def test_domain_based_corporate_wins_openbrain(self):
+        engine = BidirectionalSyncEngine(strategy=SyncStrategy.DOMAIN_BASED)
+        change = self._change()
+        memory = MagicMock()
+        memory.domain = "corporate"
+        assert engine.resolve_conflict(change, memory=memory) == "openbrain"
+
+    def test_domain_based_personal_wins_obsidian(self):
+        engine = BidirectionalSyncEngine(strategy=SyncStrategy.DOMAIN_BASED)
+        change = self._change()
+        memory = MagicMock()
+        memory.domain = "personal"
+        assert engine.resolve_conflict(change, memory=memory) == "obsidian"
+
+    def test_manual_review_returns_manual(self):
+        engine = BidirectionalSyncEngine(strategy=SyncStrategy.MANUAL_REVIEW)
+        change = self._change()
+        assert engine.resolve_conflict(change) == "manual"
+        assert change.resolution == "manual_review_required"
+
+    def test_no_conflict_source_both_returns_openbrain(self):
+        engine = BidirectionalSyncEngine()
+        change = self._change(conflict=False, source="both")
+        assert engine.resolve_conflict(change) == "openbrain"
+
+
+class TestApplySync:
+    """Tests for BidirectionalSyncEngine.apply_sync."""
+
+    def _engine(self, tmp_path):
+        storage_path = tmp_path / "sync_state.json"
+        tracker = ObsidianChangeTracker(storage_path=str(storage_path))
+        return BidirectionalSyncEngine(tracker=tracker)
+
+    def _change(self, change_type=ChangeType.CREATED, source="obsidian"):
+        return SyncChange(
+            memory_id="m1",
+            obsidian_path="Notes/test.md",
+            vault="my-vault",
+            change_type=change_type,
+            source=source,
+            conflict=False,
+        )
+
+    @pytest.mark.asyncio
+    async def test_created_openbrain_returns_true(self, tmp_path):
+        engine = self._engine(tmp_path)
+        session = AsyncMock()
+        adapter = MagicMock()
+        change = self._change(source="openbrain")
+        # openbrain source created = pass (stub)
+        result = await engine.apply_sync(session, adapter, change)
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_created_obsidian_imports_note(self, tmp_path):
+        from src.common.obsidian_adapter import ObsidianNote
+
+        engine = self._engine(tmp_path)
+        session = AsyncMock()
+        note = ObsidianNote(
+            vault="my-vault", path="Notes/test.md", title="Test",
+            content="# Test", frontmatter={"domain": "build", "owner": "alice"},
+            tags=["test"], file_hash="abc",
+        )
+        adapter = MagicMock()
+        adapter.read_note = AsyncMock(return_value=note)
+
+        change = self._change(source="obsidian")
+
+        mock_result = MagicMock()
+        mock_result.record = MagicMock()
+        mock_result.record.id = "new-id"
+
+        # handle_memory_write is a local import inside apply_sync, patch at source module
+        with patch("src.memory_writes.handle_memory_write", AsyncMock(return_value=mock_result)):
+            result = await engine.apply_sync(session, adapter, change)
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_updated_manual_returns_false(self, tmp_path):
+        engine = BidirectionalSyncEngine(strategy=SyncStrategy.MANUAL_REVIEW)
+        session = AsyncMock()
+        adapter = MagicMock()
+        change = self._change(change_type=ChangeType.UPDATED, source="both")
+        change.conflict = True
+        result = await engine.apply_sync(session, adapter, change)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_updated_openbrain_wins_returns_true(self, tmp_path):
+        engine = self._engine(tmp_path)
+        session = AsyncMock()
+        adapter = MagicMock()
+        change = self._change(change_type=ChangeType.UPDATED, source="openbrain")
+        result = await engine.apply_sync(session, adapter, change)
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_deleted_returns_true(self, tmp_path):
+        engine = self._engine(tmp_path)
+        session = AsyncMock()
+        adapter = MagicMock()
+        change = self._change(change_type=ChangeType.DELETED)
+        result = await engine.apply_sync(session, adapter, change)
+        assert result is True
+
+
+class TestSyncMethod:
+    """Tests for BidirectionalSyncEngine.sync."""
+
+    def _engine(self):
+        return BidirectionalSyncEngine()
+
+    @pytest.mark.asyncio
+    async def test_dry_run_returns_without_applying(self, tmp_path):
+        engine = self._engine()
+        session = AsyncMock()
+        adapter = MagicMock()
+        change = SyncChange(
+            memory_id="m1", obsidian_path="test.md", vault="v",
+            change_type=ChangeType.UPDATED, source="openbrain", conflict=False,
+        )
+        with patch.object(engine, "detect_changes", AsyncMock(return_value=[change])):
+            result = await engine.sync(session, adapter, "my-vault", dry_run=True)
+        assert result.changes_detected == 1
+        assert result.changes_applied == 0
+        assert result.completed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_sync_applies_changes(self, tmp_path):
+        engine = self._engine()
+        session = AsyncMock()
+        adapter = MagicMock()
+        change = SyncChange(
+            memory_id="m1", obsidian_path="test.md", vault="v",
+            change_type=ChangeType.UPDATED, source="openbrain", conflict=False,
+        )
+        with (
+            patch.object(engine, "detect_changes", AsyncMock(return_value=[change])),
+            patch.object(engine, "apply_sync", AsyncMock(return_value=True)),
+        ):
+            result = await engine.sync(session, adapter, "my-vault")
+        assert result.changes_applied == 1
+        assert result.errors == []
+
+    @pytest.mark.asyncio
+    async def test_sync_records_failed_change(self, tmp_path):
+        engine = self._engine()
+        session = AsyncMock()
+        adapter = MagicMock()
+        change = SyncChange(
+            memory_id="m1", obsidian_path="fail.md", vault="v",
+            change_type=ChangeType.UPDATED, source="openbrain", conflict=False,
+        )
+        with (
+            patch.object(engine, "detect_changes", AsyncMock(return_value=[change])),
+            patch.object(engine, "apply_sync", AsyncMock(return_value=False)),
+        ):
+            result = await engine.sync(session, adapter, "my-vault")
+        assert result.changes_applied == 0
+        assert len(result.errors) == 1
+
+    @pytest.mark.asyncio
+    async def test_sync_skips_manual_review_conflicts(self, tmp_path):
+        engine = BidirectionalSyncEngine(strategy=SyncStrategy.MANUAL_REVIEW)
+        session = AsyncMock()
+        adapter = MagicMock()
+        change = SyncChange(
+            memory_id="m1", obsidian_path="conflict.md", vault="v",
+            change_type=ChangeType.UPDATED, source="both", conflict=True,
+        )
+        apply_mock = AsyncMock(return_value=True)
+        with (
+            patch.object(engine, "detect_changes", AsyncMock(return_value=[change])),
+            patch.object(engine, "apply_sync", apply_mock),
+        ):
+            result = await engine.sync(session, adapter, "my-vault")
+        # manual review conflict should be skipped, apply_sync not called
+        apply_mock.assert_not_called()
+        assert result.changes_applied == 0
