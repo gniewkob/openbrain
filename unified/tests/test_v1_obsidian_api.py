@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.common.obsidian_adapter import ObsidianCliError, ObsidianNote
+from src.schemas import ObsidianExportItem, ObsidianExportResponse
 
 
 # ---------------------------------------------------------------------------
@@ -432,15 +433,18 @@ def test_v1_obsidian_update_note_with_tags():
         mock_adapter.update_note = AsyncMock(return_value=note)
 
         with patch(_ADAPTER_PATH, return_value=mock_adapter):
+            # list params need separate key=value pairs to encode as repeated query params
             r = client.post(
                 "/api/v1/obsidian/update-note",
-                params={
-                    "vault": "my-vault",
-                    "path": "Notes/test.md",
-                    "tags": ["tag1", "tag2"],
-                },
+                params=[
+                    ("vault", "my-vault"),
+                    ("path", "Notes/test.md"),
+                    ("tags", "tag1"),
+                    ("tags", "tag2"),
+                ],
             )
         assert r.status_code == 200
+        mock_adapter.update_note.assert_called_once()
     finally:
         _restore(app)
 
@@ -516,6 +520,109 @@ def test_v1_obsidian_bidirectional_sync_timeout():
             r = client.post(
                 "/api/v1/obsidian/bidirectional-sync",
                 json={"vault": "my-vault"},
+            )
+        assert r.status_code == 503
+    finally:
+        _restore(app)
+
+
+# ---------------------------------------------------------------------------
+# /collection — success + domain filter + ObsidianCliError on index write
+# ---------------------------------------------------------------------------
+
+
+def test_v1_obsidian_collection_success():
+
+    client, app = _client()
+    try:
+        mem = _mock_memory_out()
+        note = _note()
+        mock_adapter = MagicMock()
+        mock_adapter.write_note = AsyncMock(return_value=note)
+
+        export_response = ObsidianExportResponse(
+            vault="my-vault",
+            folder="Collections/test-col",
+            exported_count=1,
+            exported=[ObsidianExportItem(memory_id="m1", path="p.md", title="T", created=True)],
+            errors=[],
+        )
+
+        with (
+            patch(_ADAPTER_PATH, return_value=mock_adapter),
+            patch("src.api.v1.obsidian.search_memories", AsyncMock(return_value=[(mem, 0.9)])),
+            patch("src.api.v1.obsidian.v1_obsidian_export", AsyncMock(return_value=export_response)),
+            patch("src.api.v1.obsidian.build_collection_index", return_value="# Index"),
+        ):
+            r = client.post(
+                "/api/v1/obsidian/collection",
+                json={"query": "test query", "collection_name": "test-col", "vault": "my-vault"},
+            )
+        assert r.status_code == 200
+        assert r.json()["collection_name"] == "test-col"
+    finally:
+        _restore(app)
+
+
+def test_v1_obsidian_collection_with_domain_filter():
+
+    client, app = _client()
+    try:
+        mem_build = _mock_memory_out("m1")
+        mem_build.domain = "build"
+        mem_corp = _mock_memory_out("m2")
+        mem_corp.domain = "corporate"
+        note = _note()
+        mock_adapter = MagicMock()
+        mock_adapter.write_note = AsyncMock(return_value=note)
+
+        export_response = ObsidianExportResponse(
+            vault="my-vault",
+            folder="Collections/test-col",
+            exported_count=1,
+            exported=[ObsidianExportItem(memory_id="m1", path="p.md", title="T", created=True)],
+            errors=[],
+        )
+
+        with (
+            patch(_ADAPTER_PATH, return_value=mock_adapter),
+            patch("src.api.v1.obsidian.search_memories",
+                  AsyncMock(return_value=[(mem_build, 0.9), (mem_corp, 0.8)])),
+            patch("src.api.v1.obsidian.v1_obsidian_export", AsyncMock(return_value=export_response)),
+            patch("src.api.v1.obsidian.build_collection_index", return_value="# Index"),
+        ):
+            r = client.post(
+                "/api/v1/obsidian/collection",
+                json={"query": "test", "collection_name": "test-col", "vault": "my-vault",
+                      "domain": "build"},
+            )
+        assert r.status_code == 200
+    finally:
+        _restore(app)
+
+
+def test_v1_obsidian_collection_index_write_error():
+
+    client, app = _client()
+    try:
+        mem = _mock_memory_out()
+        mock_adapter = MagicMock()
+        mock_adapter.write_note = AsyncMock(side_effect=ObsidianCliError("write failed"))
+
+        export_response = ObsidianExportResponse(
+            vault="my-vault", folder="Collections/test-col",
+            exported_count=0, exported=[], errors=[],
+        )
+
+        with (
+            patch(_ADAPTER_PATH, return_value=mock_adapter),
+            patch("src.api.v1.obsidian.search_memories", AsyncMock(return_value=[(mem, 0.9)])),
+            patch("src.api.v1.obsidian.v1_obsidian_export", AsyncMock(return_value=export_response)),
+            patch("src.api.v1.obsidian.build_collection_index", return_value="# Index"),
+        ):
+            r = client.post(
+                "/api/v1/obsidian/collection",
+                json={"query": "test", "collection_name": "test-col", "vault": "my-vault"},
             )
         assert r.status_code == 503
     finally:
