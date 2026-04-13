@@ -16,7 +16,6 @@ from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
-    ARRAY,
     DateTime,
     Index,
     Integer,
@@ -26,7 +25,7 @@ from sqlalchemy import (
     Enum,
     text as sa_text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base

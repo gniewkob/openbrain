@@ -349,3 +349,192 @@ def test_seed_ignores_non_numeric_id():
     repo = InMemoryMemoryRepository()
     repo.seed([_seeded_memory("custom-id")])
     assert repo._id_counter == 0
+
+
+def test_seed_with_non_numeric_mem_prefix_id():
+    """mem_abc → ValueError in int() → except branch (lines 394-395)."""
+    repo = InMemoryMemoryRepository()
+    repo.seed([_seeded_memory("mem_abc")])
+    assert repo._id_counter == 0  # exception swallowed, counter unchanged
+
+
+# ---------------------------------------------------------------------------
+# InMemoryMemoryRepository — search_by_embedding zero-norm (line 363-364)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_search_skips_zero_norm_memory_embedding():
+    """A stored memory with a zero-vector → query_norm==0 or mem_norm==0 continue branch."""
+    repo = InMemoryMemoryRepository()
+    repo.seed([_seeded_memory("m1", status="active", embedding=[0.0, 0.0])])
+    # Non-zero query, but stored embedding has zero norm → skipped
+    result = await repo.search_by_embedding([1.0, 0.0])
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_search_skips_zero_norm_query_embedding():
+    """A zero query vector → query_norm==0 → continue for every stored memory."""
+    repo = InMemoryMemoryRepository()
+    repo.seed([_seeded_memory("m1", status="active", embedding=[1.0, 0.0])])
+    result = await repo.search_by_embedding([0.0, 0.0])
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# SQLAlchemyMemoryRepository — all methods via mocked AsyncSession
+# ---------------------------------------------------------------------------
+
+
+from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
+
+from src.repositories.memory_repository import SQLAlchemyMemoryRepository  # noqa: E402
+
+
+def _make_session():
+    session = AsyncMock()
+    session.execute = AsyncMock()
+    session.add = MagicMock()
+    session.delete = AsyncMock()
+    session.flush = AsyncMock()
+    session.refresh = AsyncMock()
+    return session
+
+
+def _scalar_result(value):
+    """Return a mock mimicking result.scalar_one_or_none()."""
+    r = MagicMock()
+    r.scalar_one_or_none.return_value = value
+    r.scalar_one.return_value = value
+    return r
+
+
+def _scalars_result(values):
+    """Return a mock mimicking result.scalars().all()."""
+    r = MagicMock()
+    r.scalars.return_value.all.return_value = values
+    return r
+
+
+@pytest.mark.asyncio
+async def test_sa_get_by_id_returns_none_when_missing():
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalar_result(None))
+    repo = SQLAlchemyMemoryRepository(session)
+    assert await repo.get_by_id("missing") is None
+
+
+@pytest.mark.asyncio
+async def test_sa_get_by_id_returns_record():
+    mock_mem = MagicMock()
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalar_result(mock_mem))
+    repo = SQLAlchemyMemoryRepository(session)
+    result = await repo.get_by_id("m1")
+    assert result is mock_mem
+
+
+@pytest.mark.asyncio
+async def test_sa_get_by_match_key_returns_record():
+    mock_mem = MagicMock()
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalar_result(mock_mem))
+    repo = SQLAlchemyMemoryRepository(session)
+    result = await repo.get_by_match_key("key-1")
+    assert result is mock_mem
+
+
+@pytest.mark.asyncio
+async def test_sa_list_all_with_all_filters():
+    mock_mems = [MagicMock(), MagicMock()]
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalars_result(mock_mems))
+    repo = SQLAlchemyMemoryRepository(session)
+    result = await repo.list_all(domain="build", entity_type="Note", status="active")
+    assert result == mock_mems
+
+
+@pytest.mark.asyncio
+async def test_sa_list_all_no_filters():
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalars_result([]))
+    repo = SQLAlchemyMemoryRepository(session)
+    result = await repo.list_all()
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_sa_count_with_all_filters():
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalar_result(3))
+    repo = SQLAlchemyMemoryRepository(session)
+    result = await repo.count(domain="build", entity_type="Note", status="active")
+    assert result == 3
+
+
+@pytest.mark.asyncio
+async def test_sa_create_adds_and_returns():
+    mock_mem = MagicMock()
+    session = _make_session()
+
+    async def refresh_side_effect(obj):
+        pass
+
+    session.refresh = AsyncMock(side_effect=refresh_side_effect)
+    session.add = MagicMock()
+    session.flush = AsyncMock()
+
+    repo = SQLAlchemyMemoryRepository(session)
+
+    with patch("src.repositories.memory_repository.Memory", return_value=mock_mem):
+        result = await repo.create(_create_data())
+
+    session.add.assert_called_once_with(mock_mem)
+    session.flush.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sa_update_returns_none_when_not_found():
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalar_result(None))
+    repo = SQLAlchemyMemoryRepository(session)
+    result = await repo.update("missing", MemoryUpdate(content="x"))
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_sa_update_modifies_and_returns():
+    mock_mem = MagicMock()
+    mock_mem.content = "old"
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalar_result(mock_mem))
+    session.flush = AsyncMock()
+    session.refresh = AsyncMock()
+    repo = SQLAlchemyMemoryRepository(session)
+    result = await repo.update("m1", MemoryUpdate(content="new"))
+    assert result is mock_mem
+    session.flush.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sa_delete_returns_false_when_not_found():
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalar_result(None))
+    repo = SQLAlchemyMemoryRepository(session)
+    result = await repo.delete("missing")
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_sa_delete_returns_true_when_found():
+    mock_mem = MagicMock()
+    session = _make_session()
+    session.execute = AsyncMock(return_value=_scalar_result(mock_mem))
+    session.delete = AsyncMock()
+    session.flush = AsyncMock()
+    repo = SQLAlchemyMemoryRepository(session)
+    result = await repo.delete("m1")
+    assert result is True
+    session.delete.assert_called_once_with(mock_mem)
+    session.flush.assert_called_once()
