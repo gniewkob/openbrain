@@ -283,3 +283,66 @@ async def test_list_memories_with_tenant_id_scalar_filter():
 
     result = await list_memories(session, {"tenant_id": "tenant-1"})
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_list_memories_with_entity_type_scalar_filter():
+    """entity_type as plain string — exercises the == branch (line 170)."""
+    from src.memory_reads import list_memories
+
+    session = _make_session()
+    mock_result = MagicMock()
+    mock_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[]))
+    session.execute = AsyncMock(return_value=mock_result)
+
+    result = await list_memories(session, {"entity_type": "Note"})
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# get_memory_raw and get_memory — lines 52-54, 68-71
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_memory_raw_returns_record():
+    from src.memory_reads import get_memory_raw
+
+    session = _make_session()
+    mock_mem = MagicMock()
+    res_mock = MagicMock()
+    res_mock.scalar_one.return_value = mock_mem
+    session.execute = AsyncMock(return_value=res_mock)
+
+    result = await get_memory_raw(session, "m1")
+    assert result is mock_mem
+
+
+@pytest.mark.asyncio
+async def test_get_memory_returns_none_when_not_found():
+    from src.memory_reads import get_memory
+
+    session = _make_session()
+    res_mock = MagicMock()
+    res_mock.scalar_one_or_none.return_value = None
+    session.execute = AsyncMock(return_value=res_mock)
+
+    result = await get_memory(session, "missing")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_memory_returns_out_when_found():
+    from src.memory_reads import get_memory
+
+    session = _make_session()
+    mock_mem = MagicMock()
+    res_mock = MagicMock()
+    res_mock.scalar_one_or_none.return_value = mock_mem
+    session.execute = AsyncMock(return_value=res_mock)
+
+    with patch("src.memory_reads._to_out", return_value=MagicMock()) as mock_to_out:
+        result = await get_memory(session, "m1")
+
+    mock_to_out.assert_called_once_with(mock_mem)
+    assert result is not None
