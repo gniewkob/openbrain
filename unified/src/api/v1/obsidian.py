@@ -25,6 +25,8 @@ from ...schemas import (
     ObsidianBidirectionalSyncResponse,
     ObsidianCollectionRequest,
     ObsidianCollectionResponse,
+    MemoryOut,
+    ObsidianExportItem,
     ObsidianExportRequest,
     ObsidianExportResponse,
     ObsidianReadRequest,
@@ -205,8 +207,6 @@ async def v1_obsidian_export(
     require_admin(_user)
 
     # Get memories to export
-    from ...schemas import MemoryOut
-
     memories: list[MemoryOut] = []
     if req.memory_ids:
         for mid in req.memory_ids:
@@ -256,8 +256,6 @@ async def v1_obsidian_export(
                 frontmatter=frontmatter,
                 overwrite=True,
             )
-            from ...schemas import ObsidianExportItem
-
             exported.append(
                 ObsidianExportItem(
                     memory_id=memory.id,
@@ -298,8 +296,6 @@ async def v1_obsidian_collection(
         memories = [m for m in memories if m.domain == req.domain]
 
     # Export memories first
-    from ...schemas import ObsidianExportRequest
-
     export_req = ObsidianExportRequest(
         vault=req.vault,
         folder=f"{req.folder}/{req.collection_name}",
