@@ -144,8 +144,8 @@ async def _post_with_retry(path: str, payload: dict[str, str]) -> httpx.Response
         response.raise_for_status()
         return response
 
-    assert last_error is not None
-    raise last_error
+    assert last_error is not None  # pragma: no cover
+    raise last_error  # pragma: no cover
 
 
 async def get_embedding(text: str) -> list[float]:

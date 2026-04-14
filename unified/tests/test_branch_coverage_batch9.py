@@ -390,3 +390,66 @@ def test_public_mode_config_raises_when_no_oidc_and_no_key():
         with pytest.raises((ValidationError, ValueError)):
             from src.config import AppConfig
             AppConfig()
+
+
+# ---------------------------------------------------------------------------
+# auth.py:95 — OIDCVerifier.metadata() inner double-check cache hit
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_oidc_metadata_inner_cache_hit():
+    """Inner double-check inside lock returns cached metadata (auth.py:95)."""
+    from src.auth import OIDCVerifier
+
+    verifier = OIDCVerifier(issuer_url="https://example.com", audience="test")
+    cached = {"issuer": "https://example.com", "jwks_uri": "https://example.com/.well-known/jwks.json"}
+
+    class _MockRefreshLock:
+        async def __aenter__(self):
+            # Simulate another coroutine having refreshed metadata while we waited for the lock
+            verifier._metadata = cached
+            verifier._metadata_fetched_at = time.time()
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+    verifier._metadata = None  # ensure outer check fails (line 81-85)
+    with patch.object(verifier, "_get_refresh_lock", return_value=_MockRefreshLock()):
+        result = await verifier.metadata()
+
+    assert result == cached
+
+
+# ---------------------------------------------------------------------------
+# memory_writes._run_maintenance_inner:1022 — await maybe_add
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_run_maintenance_inner_awaits_when_session_add_is_awaitable():
+    """_run_maintenance_inner awaits session.add if it returns awaitable (line 1022)."""
+    from src.memory_writes import _run_maintenance_inner
+    from src.schemas import MaintenanceRequest
+
+    session = _make_session()
+    awaited = []
+
+    async def _async_add():
+        awaited.append(True)
+
+    session.add = MagicMock(return_value=_async_add())
+
+    # scalar_one() returns 0 (no memories)
+    total_result = MagicMock()
+    total_result.scalar_one.return_value = 0
+    session.execute = AsyncMock(return_value=total_result)
+
+    req = MaintenanceRequest(dry_run=False, fix_superseded_links=False)
+
+    with patch("src.memory_writes._process_duplicates", new=AsyncMock(return_value=([], 0))):
+        with patch("src.memory_writes._normalize_owners", new=AsyncMock(return_value=([], 0))):
+            with patch("src.memory_writes.AuditLog", return_value=MagicMock()):
+                await _run_maintenance_inner(session, req, "agent")
+
+    assert awaited, "session.add coroutine should have been awaited in _run_maintenance_inner"
+

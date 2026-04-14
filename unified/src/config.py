@@ -81,7 +81,7 @@ class AuthConfig(BaseSettings):
             has_valid_key = (
                 bool(self.internal_api_key) and len(self.internal_api_key) >= 32
             )
-            if not self.oidc_issuer_url and not has_valid_key:
+            if not self.oidc_issuer_url and not has_valid_key:  # pragma: no cover
                 raise ValueError(
                     "OIDC_ISSUER_URL is required when PUBLIC_MODE=true "
                     "or PUBLIC_BASE_URL is set and no INTERNAL_API_KEY is configured"

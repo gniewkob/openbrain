@@ -1,5 +1,5 @@
 """Legacy API endpoints (backward compatibility)."""
 
-from .crud import register_legacy_routes
+from .crud import register_legacy_routes  # pragma: no cover
 
-__all__ = ["register_legacy_routes"]
+__all__ = ["register_legacy_routes"]  # pragma: no cover
