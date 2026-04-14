@@ -108,9 +108,7 @@ def test_load_contract_falls_back_to_defaults_on_read_error(tmp_path):
         "read_text",
         side_effect=FileNotFoundError("no file"),
     ):
-        with patch("src.memory_paths._load_contract") as mock_load:
-            mock_load.return_value = (memory_paths._DEFAULT_BASE, dict(memory_paths._DEFAULT_PATHS))
-            base, paths = memory_paths._load_contract()
+        base, paths = memory_paths._load_contract()
 
     assert base == "/api/v1/memory"
     assert "find" in paths
