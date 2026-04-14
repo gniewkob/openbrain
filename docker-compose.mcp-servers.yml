@@ -1,0 +1,139 @@
+# MCP Servers — third-party integrations
+#
+# RESTART POLICY NOTES:
+#   stdio servers (memory, playwright, filesystem, sequentialthinking,
+#   desktop-commander, youtube-transcript, markitdown, obsidian):
+#     restart: "no" — they exit when there is no MCP client connected.
+#     Starting them persistently causes an infinite restart loop.
+#     They are spawned on-demand by Claude Desktop / Docker Desktop MCP toolkit.
+#
+#   HTTP servers (context7, node-code-sandbox, atlassian):
+#     restart: unless-stopped — they bind a port and stay running.
+#
+# REQUIRED ENV VARS (add to .env):
+#   OBSIDIAN_API_KEY   — Obsidian Local REST API plugin key
+#   ATLASSIAN_URL      — e.g. https://your-org.atlassian.net
+#   ATLASSIAN_USER     — Atlassian account email
+#   ATLASSIAN_API_TOKEN — Atlassian API token
+#   FIRECRAWL_API_KEY  — Firecrawl API key
+
+networks:
+  net_unified:
+    external: true
+
+volumes:
+  openbrain_mcp_memory:
+    external: true
+    name: openbrain_openbrain_mcp_memory
+
+services:
+
+  # ── HTTP servers (persistent) ──────────────────────────────────────────────
+
+  mcp-context7:
+    image: mcp/context7:latest
+    container_name: openbrain-mcp-context7
+    restart: unless-stopped
+    environment:
+      MCP_TRANSPORT: http
+      PORT: "8080"
+    volumes:
+      - /Users/gniewkob/Repos/openbrain/unified:/workspace:rw
+    networks:
+      - net_unified
+
+  mcp-node-code-sandbox:
+    image: mcp/node-code-sandbox:latest
+    container_name: openbrain-mcp-node-code-sandbox
+    restart: unless-stopped
+    networks:
+      - net_unified
+
+  mcp-atlassian:
+    image: mcp/atlassian:latest
+    container_name: openbrain-mcp-atlassian
+    restart: "no"
+    environment:
+      ATLASSIAN_URL: ${ATLASSIAN_URL:-}
+      ATLASSIAN_USER: ${ATLASSIAN_USER:-}
+      ATLASSIAN_API_TOKEN: ${ATLASSIAN_API_TOKEN:-}
+    networks:
+      - net_unified
+
+  # ── stdio servers (on-demand only) ────────────────────────────────────────
+  # These exit immediately when no MCP client is connected — do NOT restart.
+
+  mcp-memory:
+    image: mcp/memory:latest
+    container_name: openbrain-mcp-memory
+    restart: "no"
+    volumes:
+      - openbrain_mcp_memory:/memory:rw
+    networks:
+      - net_unified
+
+  mcp-filesystem:
+    image: mcp/filesystem:latest
+    container_name: openbrain-mcp-filesystem
+    restart: "no"
+    command: ["/app/data"]
+    volumes:
+      - /Users/gniewkob/Repos/openbrain:/app/data:rw
+    networks:
+      - net_unified
+
+  mcp-playwright:
+    image: mcp/playwright:latest
+    container_name: openbrain-mcp-playwright
+    restart: "no"
+    networks:
+      - net_unified
+
+  mcp-markitdown:
+    image: mcp/markitdown:latest
+    container_name: openbrain-mcp-markitdown
+    restart: "no"
+    networks:
+      - net_unified
+
+  mcp-sequentialthinking:
+    image: mcp/sequentialthinking:latest
+    container_name: openbrain-mcp-sequentialthinking
+    restart: "no"
+    networks:
+      - net_unified
+
+  mcp-desktop-commander:
+    image: mcp/desktop-commander:latest
+    container_name: openbrain-mcp-desktop-commander
+    restart: "no"
+    environment:
+      MCP_CLIENT_DOCKER: "true"
+    networks:
+      - net_unified
+
+  mcp-youtube-transcript:
+    image: mcp/youtube-transcript:latest
+    container_name: openbrain-mcp-youtube-transcript
+    restart: "no"
+    networks:
+      - net_unified
+
+  mcp-obsidian:
+    image: mcp/obsidian:latest
+    container_name: openbrain-mcp-obsidian
+    restart: "no"
+    environment:
+      OBSIDIAN_API_KEY: ${OBSIDIAN_API_KEY:-}
+      OBSIDIAN_VAULT_PATH: ${OBSIDIAN_VAULT_PATH:-}
+    networks:
+      - net_unified
+
+  mcp-firecrawl:
+    image: mcp/firecrawl:latest
+    container_name: openbrain-mcp-firecrawl
+    restart: "no"
+    environment:
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+    networks:
+      - net_unified
