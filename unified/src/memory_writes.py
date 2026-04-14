@@ -238,7 +238,11 @@ async def _create_new_memory(
     }
 
     await _audit_compat(
-        session, "create", memory.id, actor=actor, tool_name="memory.write",
+        session,
+        "create",
+        memory.id,
+        actor=actor,
+        tool_name="memory.write",
         meta={"domain": rec.domain},
     )
 
@@ -356,9 +360,15 @@ async def _update_memory(
         "source": rec.source.model_dump(),
     }
 
-    domain_val = existing.domain.value if hasattr(existing.domain, "value") else existing.domain
+    domain_val = (
+        existing.domain.value if hasattr(existing.domain, "value") else existing.domain
+    )
     await _audit_compat(
-        session, "update", existing.id, actor=actor, tool_name="memory.write",
+        session,
+        "update",
+        existing.id,
+        actor=actor,
+        tool_name="memory.write",
         meta={"domain": domain_val},
     )
 
@@ -454,6 +464,37 @@ async def handle_memory_write(
 
 # Keep the rest of the file (handle_memory_write_many, etc.)
 # Copy from original file...
+async def _prefetch_embeddings(records: list) -> None:
+    """Warm the LRU embedding cache in parallel before batch processing."""
+    if records:
+        await asyncio.gather(
+            *(get_embedding(r.content) for r in records), return_exceptions=True
+        )
+
+
+async def _batch_lookup_match_keys(
+    session: AsyncSession, records: list
+) -> dict[str, str | None]:
+    """Single query to map match_key → existing memory ID (avoids N+1)."""
+    match_keys = [r.match_key for r in records if r.match_key]
+    if not match_keys:
+        return {}
+    stmt = select(Memory.match_key, Memory.id).where(
+        Memory.match_key.in_(match_keys), Memory.status == "active"
+    )
+    result = await session.execute(stmt)
+    return {row[0]: row[1] for row in result.all()}
+
+
+def _compute_overall_status(summary: dict, total: int) -> str:
+    """Derive batch overall status from per-record summary counts."""
+    if summary["failed"] == 0:
+        return "success"
+    if summary["failed"] < total:
+        return "partial_success"
+    return "failed"
+
+
 async def handle_memory_write_many(
     session: AsyncSession,
     request: MemoryWriteManyRequest,
@@ -474,35 +515,16 @@ async def handle_memory_write_many(
     }
     atomic = request.atomic
 
-    # Pre-fetch embeddings in parallel to populate the LRU cache (speed up batch processing)
-    # Exceptions are ignored here; they will be handled individually during write.
-    if request.records:
-        await asyncio.gather(
-            *(get_embedding(r.content) for r in request.records), return_exceptions=True
-        )
-
-    # Batch lookup: collect all match_keys first to avoid N+1 queries
-    match_keys = [r.match_key for r in request.records if r.match_key]
-    existing_id_map: dict[str, str | None] = {}
-
-    if match_keys:
-        # Single query to fetch all existing records by match_key
-        batch_lookup_stmt = select(Memory.match_key, Memory.id).where(
-            Memory.match_key.in_(match_keys), Memory.status == "active"
-        )
-        batch_result = await session.execute(batch_lookup_stmt)
-        existing_id_map = {row[0]: row[1] for row in batch_result.all()}
+    await _prefetch_embeddings(request.records)
+    existing_id_map = await _batch_lookup_match_keys(session, request.records)
 
     async def _process_records(commit_each: bool) -> None:
         for index, record in enumerate(request.records):
             try:
-                # Use pre-fetched existing_id from batch lookup
                 existing_id = (
                     existing_id_map.get(record.match_key) if record.match_key else None
                 )
-
-                write_func = handle_memory_write
-                res = await write_func(
+                res = await handle_memory_write(
                     session,
                     MemoryWriteRequest(record=record, write_mode=request.write_mode),
                     actor=actor,
@@ -555,13 +577,7 @@ async def handle_memory_write_many(
     else:
         await _process_records(commit_each=True)
 
-    overall = (
-        "success"
-        if summary["failed"] == 0
-        else (
-            "partial_success" if summary["failed"] < len(request.records) else "failed"
-        )
-    )
+    overall = _compute_overall_status(summary, len(request.records))
     return MemoryWriteManyResponse(status=overall, summary=summary, results=results)
 
 

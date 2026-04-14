@@ -587,120 +587,98 @@ class BidirectionalSyncEngine:
 
         return "openbrain"  # Default fallback
 
+    async def _import_note_as_memory(
+        self,
+        session: "AsyncSession",
+        adapter: "ObsidianCliAdapter",
+        change: SyncChange,
+    ) -> None:
+        """Import an Obsidian note into OpenBrain as a new memory (CREATED from obsidian)."""
+        from .memory_writes import handle_memory_write
+        from .schemas import MemoryWriteRequest, MemoryWriteRecord, WriteMode
+
+        try:
+            note = await adapter.read_note(change.vault, change.obsidian_path)
+            record = MemoryWriteRecord(
+                content=note.content,
+                domain=note.frontmatter.get("domain", "personal"),
+                entity_type=note.frontmatter.get("entity_type", "Note"),
+                title=note.title,
+                owner=note.frontmatter.get("owner", ""),
+                tags=note.tags,
+                obsidian_ref=note.path,
+            )
+            result = await handle_memory_write(
+                session,
+                MemoryWriteRequest(record=record, write_mode=WriteMode.upsert),
+                actor="obsidian-sync",
+            )
+            if result.record:
+                self.tracker.update_state(
+                    SyncState(
+                        memory_id=result.record.id,
+                        obsidian_path=note.path,
+                        vault=change.vault,
+                        content_hash=self.compute_content_hash(note.content),
+                        memory_updated_at=datetime.now(timezone.utc),
+                        obsidian_modified_at=datetime.now(timezone.utc),
+                    )
+                )
+        except Exception as e:
+            log.error(
+                "import_from_obsidian_failed",
+                error=str(e),
+                vault=change.vault,
+                path=change.obsidian_path,
+            )
+            raise ObsidianCliError(
+                f"Failed to import from Obsidian: {e}",
+                details={"vault": change.vault, "path": change.obsidian_path},
+            ) from e
+
+    async def _update_memory_from_obsidian(
+        self,
+        adapter: "ObsidianCliAdapter",
+        change: SyncChange,
+    ) -> None:
+        """Read updated note from Obsidian (UPDATE obsidian-wins path — memory update TODO)."""
+        try:
+            await adapter.read_note(change.vault, change.obsidian_path)
+            # TODO: update existing memory by memory_id lookup
+        except Exception as e:
+            log.error(
+                "update_from_obsidian_failed",
+                error=str(e),
+                vault=change.vault,
+                path=change.obsidian_path,
+            )
+            raise ObsidianCliError(
+                f"Failed to update from Obsidian: {e}",
+                details={"vault": change.vault, "path": change.obsidian_path},
+            ) from e
+
     async def apply_sync(
         self,
         session: "AsyncSession",
         adapter: "ObsidianCliAdapter",
         change: SyncChange,
     ) -> bool:
-        """
-        Apply a sync change.
-
-        Returns True if successful, False otherwise.
-        """
-        from .memory_writes import handle_memory_write
-        from .schemas import MemoryWriteRequest, MemoryWriteRecord, WriteMode
-
+        """Apply a single sync change. Returns True if successful, False if deferred."""
         try:
             if change.change_type == ChangeType.CREATED:
-                if change.source == "openbrain":
-                    # Export from OpenBrain to Obsidian
-                    # This would need the actual memory content
-                    pass
-
-                elif change.source == "obsidian":
-                    # Import from Obsidian to OpenBrain
-                    try:
-                        note = await adapter.read_note(
-                            change.vault, change.obsidian_path
-                        )
-
-                        # Create memory from note
-                        record = MemoryWriteRecord(
-                            content=note.content,
-                            domain=note.frontmatter.get("domain", "personal"),
-                            entity_type=note.frontmatter.get("entity_type", "Note"),
-                            title=note.title,
-                            owner=note.frontmatter.get("owner", ""),
-                            tags=note.tags,
-                            obsidian_ref=note.path,
-                        )
-
-                        result = await handle_memory_write(
-                            session,
-                            MemoryWriteRequest(
-                                record=record, write_mode=WriteMode.upsert
-                            ),
-                            actor="obsidian-sync",
-                        )
-
-                        if result.record:
-                            # Update tracker
-                            state = SyncState(
-                                memory_id=result.record.id,
-                                obsidian_path=note.path,
-                                vault=change.vault,
-                                content_hash=self.compute_content_hash(note.content),
-                                memory_updated_at=datetime.now(timezone.utc),
-                                obsidian_modified_at=datetime.now(timezone.utc),
-                            )
-                            self.tracker.update_state(state)
-
-                        return True
-                    except Exception as e:
-                        log.error(
-                            "import_from_obsidian_failed",
-                            error=str(e),
-                            vault=change.vault,
-                            path=change.obsidian_path,
-                        )
-                        raise ObsidianCliError(
-                            f"Failed to import from Obsidian: {e}",
-                            details={
-                                "vault": change.vault,
-                                "path": change.obsidian_path,
-                            },
-                        ) from e
+                if change.source == "obsidian":
+                    await self._import_note_as_memory(session, adapter, change)
+                # change.source == "openbrain": export to Obsidian (not yet implemented)
 
             elif change.change_type == ChangeType.UPDATED:
                 resolution = self.resolve_conflict(change)
-
                 if resolution == "manual":
-                    # Skip for now, will be handled manually
                     return False
+                if resolution != "openbrain":  # obsidian wins
+                    await self._update_memory_from_obsidian(adapter, change)
+                # resolution == "openbrain": push to Obsidian (not yet implemented)
 
-                if resolution == "openbrain":
-                    # Update Obsidian from OpenBrain
-                    pass  # Would need actual memory
-
-                else:  # obsidian wins
-                    # Update OpenBrain from Obsidian
-                    try:
-                        note = await adapter.read_note(
-                            change.vault, change.obsidian_path
-                        )
-
-                        # Update existing memory
-                        # This would need the memory_id lookup
-                        pass
-                    except Exception as e:
-                        log.error(
-                            "update_from_obsidian_failed",
-                            error=str(e),
-                            vault=change.vault,
-                            path=change.obsidian_path,
-                        )
-                        raise ObsidianCliError(
-                            f"Failed to update from Obsidian: {e}",
-                            details={
-                                "vault": change.vault,
-                                "path": change.obsidian_path,
-                            },
-                        ) from e
-
-            elif change.change_type == ChangeType.DELETED:
-                # Handle deletions
-                pass
+            # ChangeType.DELETED: not yet implemented
 
             return True
 
