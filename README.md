@@ -1,5 +1,7 @@
 # OpenBrain Unified
 
+![Tests](https://img.shields.io/badge/tests-1403%20passed-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen) ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+
 OpenBrain is an intelligent, unified memory platform that serves as a semantic bridge between your personal knowledge (e.g., Obsidian) and Large Language Models (ChatGPT, Claude, Gemini).
 
 It provides a governed, domain-aware vector store that allows AI agents to store, retrieve, and synthesize information with high precision and metadata integrity.
@@ -82,12 +84,13 @@ make pr-readiness
 
 ## Documentation
 
+- [Current Status (2026-04-14)](docs/STATUS_2026-04-14.md)
 - [Installation & Configuration](INSTALLATION.md)
 - [Operating Manual](docs/operating-manual.md)
 - [Governance Layer](docs/governance-layer.md)
-- [Prometheus Alert Rules](docs/prometheus-alerts.yml)
 - [API Architecture](docs/README.md)
-- [Operational Report: 2026-03-27](docs/operational-report-2026-03-27.md)
+- [Architecture Decisions](docs/adr/)
+- [Improvement Roadmap Q2 2026](docs/IMPROVEMENT_ROADMAP_2026-Q2.md)
 
 ## License
 

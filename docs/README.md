@@ -38,6 +38,11 @@ OpenBrain supports several explicit write modes to prevent accidental data loss:
 - [ADR-0001: Architecture Baseline and Module Ownership](./adr/ADR-0001-architecture-baseline.md)
 - [ADR-0002: Canonical MCP Transport and Compatibility Posture](./adr/ADR-0002-canonical-mcp-transport.md)
 
+## Current Status
+
+- [Status 2026-04-14](./STATUS_2026-04-14.md) — **100% test coverage, 1403 tests, ngrok active**
+- [Improvement Roadmap Q2 2026](./IMPROVEMENT_ROADMAP_2026-Q2.md)
+
 ## Iteration Tracking (2026-04-08)
 
 - [Iteration Synthesis](./ITERATION_SYNTHESIS_2026-04-08.md)

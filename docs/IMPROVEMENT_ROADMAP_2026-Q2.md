@@ -1,8 +1,22 @@
 # PLAN POPRAWY TECHNICAL DEBT - Q2 2026
 
 **Data**: 2026-04-04  
+**Aktualizacja**: 2026-04-14  
 **Czas realizacji**: 6-8 tygodni  
-**Status**: Plan przygotowawczy  
+**Status**: W toku
+
+## Postęp (stan 2026-04-14)
+
+| # | Zadanie | Status |
+|---|---|---|
+| — | 100% pokrycie testów (1403 testów) | ✅ DONE |
+| — | `aiofiles` jako oficjalna zależność projektu | ✅ DONE |
+| — | Refaktoryzacja `detect_changes()` | ⏳ TODO |
+| — | Refaktoryzacja `run_maintenance()` | ⏳ TODO |
+| 1.1 | Naprawa E501 long lines | ⏳ TODO |
+| 1.2 | Black/Ruff format enforcement | ⏳ TODO |
+
+---
 
 ---
 
