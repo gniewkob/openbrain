@@ -453,3 +453,29 @@ async def test_run_maintenance_inner_awaits_when_session_add_is_awaitable():
 
     assert awaited, "session.add coroutine should have been awaited in _run_maintenance_inner"
 
+
+# ---------------------------------------------------------------------------
+# obsidian_adapter.py:459-461 — except Exception fallback when aiofiles.open raises
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_read_note_falls_back_to_cli_when_aiofiles_raises(tmp_path):
+    """aiofiles.open() raises non-ImportError → except Exception catches, falls to CLI (lines 459-461)."""
+    import aiofiles
+    from src.common.obsidian_adapter import ObsidianCliAdapter
+
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+    (vault_dir / "note.md").write_text("---\ntitle: Direct\n---\nBody")
+
+    adapter = ObsidianCliAdapter()
+    cli_content = "---\ntitle: CLI Fallback\n---\nCLI body"
+    cli_tags = "[]"
+
+    with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
+        with patch.object(adapter, "_run", side_effect=[cli_content, cli_tags]):
+            with patch.object(aiofiles, "open", side_effect=OSError("disk error")):
+                result = await adapter.read_note("testvault", "note.md")
+
+    assert result.title == "CLI Fallback"
+

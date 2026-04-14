@@ -437,7 +437,7 @@ class ObsidianCliAdapter:
                         tags=tags,
                         file_hash=_compute_hash(raw_content),
                     )
-                except ImportError:
+                except ImportError:  # pragma: no cover
                     raw_content = await asyncio.get_running_loop().run_in_executor(
                         None,
                         lambda: full_path.read_text(encoding="utf-8"),
@@ -732,7 +732,7 @@ class ObsidianCliAdapter:
 
             async with aiofiles.open(full_path, "w", encoding="utf-8") as f:
                 await f.write(content)
-        except ImportError:
+        except ImportError:  # pragma: no cover
             # Fallback to sync file write with thread pool
             import asyncio
 
