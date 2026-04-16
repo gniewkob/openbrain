@@ -94,33 +94,38 @@ class BrainUrlEnvTest(unittest.TestCase):
     """H5 — BRAIN_URL must be read from env, defaulting to the internal port 80."""
 
     def test_brain_url_reads_from_env(self) -> None:
-        with patch.dict(os.environ, {"BRAIN_URL": "http://testhost:9999"}):
-            import importlib
-            import src.mcp_transport as transport_mod
+        import importlib
 
-            # Re-evaluate the default at import time by reading the module attribute
-            # after env is set, then restore. For a module-level constant we check
-            # the default in the source by reading a fresh import.
-            importlib.reload(transport_mod)
-            self.assertEqual(transport_mod.BRAIN_URL, "http://testhost:9999")
-            # Restore
-            importlib.reload(transport_mod)
-
-    def test_brain_url_default_is_internal_80(self) -> None:
+        import src.config as config_mod
         import src.mcp_transport as transport_mod
 
-        # Remove env var to test default
+        with patch.dict(os.environ, {"BRAIN_URL": "http://testhost:9999"}):
+            # get_config() is lru_cache — must clear so reload picks up new env.
+            config_mod.get_config.cache_clear()
+            importlib.reload(transport_mod)
+            self.assertEqual(transport_mod.BRAIN_URL, "http://testhost:9999")
+
+        # Restore: clear cache again so subsequent tests get clean config.
+        config_mod.get_config.cache_clear()
+        importlib.reload(transport_mod)
+
+    def test_brain_url_default_is_internal_80(self) -> None:
+        import importlib
+
+        import src.config as config_mod
+        import src.mcp_transport as transport_mod
+
         saved = os.environ.pop("BRAIN_URL", None)
         try:
-            import importlib
-
+            config_mod.get_config.cache_clear()
             importlib.reload(transport_mod)
             self.assertIn(":80", transport_mod.BRAIN_URL)
             self.assertNotIn("7010", transport_mod.BRAIN_URL)
         finally:
             if saved:
                 os.environ["BRAIN_URL"] = saved
-            import importlib
+            config_mod.get_config.cache_clear()
+            importlib.reload(transport_mod)
 
             importlib.reload(transport_mod)
 
@@ -754,9 +759,14 @@ class PerfIndexesMigrationTests(unittest.TestCase):
         from pathlib import Path
 
         migration_path = (
-            Path(__file__).parent.parent / "migrations" / "versions" / "011_add_perf_indexes.py"
+            Path(__file__).parent.parent
+            / "migrations"
+            / "versions"
+            / "011_add_perf_indexes.py"
         )
-        self.assertTrue(migration_path.exists(), "Migration 011_add_perf_indexes.py not found")
+        self.assertTrue(
+            migration_path.exists(), "Migration 011_add_perf_indexes.py not found"
+        )
 
         spec = importlib.util.spec_from_file_location("m011", migration_path)
         m = importlib.util.module_from_spec(spec)
@@ -768,6 +778,7 @@ class PerfIndexesMigrationTests(unittest.TestCase):
         self.assertTrue(callable(m.downgrade))
 
         import inspect
+
         source = inspect.getsource(m.upgrade)
         self.assertIn("created_at", source)
         self.assertIn("updated_at", source)
