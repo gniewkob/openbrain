@@ -97,6 +97,7 @@ class AuthSecurityTests(unittest.TestCase):
     def test_local_mode_logs_warning_once_when_auth_is_disabled(self) -> None:
         with patch.dict(os.environ, {"PUBLIC_MODE": "false", "PUBLIC_BASE_URL": ""}):
             from src import config
+
             config.get_config.cache_clear()
             auth = self._reload_auth()
             request = Request({"type": "http", "headers": []})
@@ -190,22 +191,28 @@ class RateLimitTests(unittest.TestCase):
 
     def test_stale_ips_evicted_when_store_exceeds_cap(self) -> None:
         """When _rate_limit_store exceeds _MAX_RATE_LIMIT_IPS, stale entries are removed."""
+        import collections
         import time
         from unittest.mock import patch as mpatch
-        from src.auth import check_internal_key_rate_limit, _rate_limit_store, _MAX_RATE_LIMIT_IPS
+
+        from src.auth import (
+            _MAX_RATE_LIMIT_IPS,
+            _rate_limit_store,
+            check_internal_key_rate_limit,
+        )
 
         _rate_limit_store.clear()
 
         # Fill store with _MAX_RATE_LIMIT_IPS stale entries (old timestamps → empty windows)
         stale_time = time.time() - 120  # 2 minutes ago — outside 60s window
         for i in range(_MAX_RATE_LIMIT_IPS):
-            import collections
             dq = collections.deque()
             dq.append(stale_time)
             _rate_limit_store[f"10.{i // 65536}.{(i // 256) % 256}.{i % 256}"] = dq
 
-        # One more request triggers eviction
-        check_internal_key_rate_limit("192.0.2.100")
+        # Force in-memory path regardless of REDIS_URL env in CI.
+        with mpatch("src.auth._get_redis_client", return_value=None):
+            check_internal_key_rate_limit("192.0.2.100")
 
         # Store should be much smaller now — all stale IPs evicted
         self.assertLess(len(_rate_limit_store), _MAX_RATE_LIMIT_IPS)
