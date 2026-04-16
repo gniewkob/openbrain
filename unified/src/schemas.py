@@ -84,9 +84,7 @@ def _validate_custom_fields(v: Any) -> dict[str, Any]:
                 f"custom_fields key '{key[:32]}…' exceeds {MAX_CUSTOM_KEY_LEN} chars"
             )
         if not _KEY_RE.match(key):
-            raise ValueError(
-                f"custom_fields key '{key}' must match ^[A-Za-z0-9_.-]+$"
-            )
+            raise ValueError(f"custom_fields key '{key}' must match ^[A-Za-z0-9_.-]+$")
         if val is not None and not isinstance(val, (str, int, float, bool)):
             raise ValueError(
                 f"custom_fields['{key}'] type {type(val).__name__} not allowed"
