@@ -1,0 +1,75 @@
+# MCP Dev Tools — third-party integrations for development sessions only
+#
+# NOT required for OpenBrain to function. Start manually during dev:
+#   docker compose -f docker-compose.mcp-dev.yml up -d
+#
+name: openbrain-dev
+# RESTART POLICY NOTES:
+#   stdio servers (playwright, markitdown, desktop-commander):
+#     restart: "no" — exit when no MCP client is connected.
+#     Spawned on-demand by Claude Desktop / Docker Desktop MCP toolkit.
+#
+#   HTTP servers (context7, node-code-sandbox, firecrawl):
+#     restart: unless-stopped — bind a port, stay running.
+#
+# REQUIRED ENV VARS (add to .env):
+#   FIRECRAWL_API_KEY  — Firecrawl API key
+
+networks:
+  net_unified:
+    external: true
+
+services:
+
+  # ── HTTP servers (persistent) ──────────────────────────────────────────────
+
+  mcp-context7:
+    image: mcp/context7:latest
+    container_name: openbrain-mcp-context7
+    restart: unless-stopped
+    environment:
+      MCP_TRANSPORT: http
+      PORT: "8080"
+    networks:
+      - net_unified
+
+  mcp-node-code-sandbox:
+    image: mcp/node-code-sandbox:latest
+    container_name: openbrain-mcp-node-code-sandbox
+    restart: unless-stopped
+    networks:
+      - net_unified
+
+  # ── stdio servers (on-demand only) ────────────────────────────────────────
+
+  mcp-playwright:
+    image: mcp/playwright:latest
+    container_name: openbrain-mcp-playwright
+    restart: "no"
+    networks:
+      - net_unified
+
+  mcp-markitdown:
+    image: mcp/markitdown:latest
+    container_name: openbrain-mcp-markitdown
+    restart: "no"
+    networks:
+      - net_unified
+
+  mcp-desktop-commander:
+    image: mcp/desktop-commander:latest
+    container_name: openbrain-mcp-desktop-commander
+    restart: "no"
+    environment:
+      MCP_CLIENT_DOCKER: "true"
+    networks:
+      - net_unified
+
+  mcp-firecrawl:
+    image: mcp/firecrawl:latest
+    container_name: openbrain-mcp-firecrawl
+    restart: "no"
+    environment:
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+    networks:
+      - net_unified
