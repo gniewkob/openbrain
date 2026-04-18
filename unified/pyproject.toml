@@ -34,6 +34,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "fastmcp>=2.0",
     "mypy>=1.10",
+    "authlib>=1.6.11",
 ]
 
 [tool.pytest.ini_options]
