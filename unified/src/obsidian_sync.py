@@ -7,6 +7,7 @@ between OpenBrain memories and Obsidian notes.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -462,19 +463,30 @@ class BidirectionalSyncEngine:
         # Get tracked states for this vault
         tracked_states = [s for s in self.tracker.get_all_states() if s.vault == vault]
 
+        # Batch-read Obsidian content for all tracked paths that still exist.
+        # This is the only correct way to detect Obsidian-side changes without
+        # file mtime support in the adapter.
+        existing_tracked = [s for s in tracked_states if s.obsidian_path in obsidian_files]
+        note_results = await asyncio.gather(
+            *(adapter.read_note(s.vault, s.obsidian_path) for s in existing_tracked),
+            return_exceptions=True,
+        )
+        tracked_obsidian_hashes: dict[str, str] = {}
+        for state, result in zip(existing_tracked, note_results):
+            if not isinstance(result, Exception):
+                tracked_obsidian_hashes[state.obsidian_path] = self.compute_content_hash(
+                    result.content
+                )
+
         # Process tracked items
         for state in tracked_states:
             memory = memory_map.get(state.obsidian_path)
             obsidian_exists = state.obsidian_path in obsidian_files
+            memory_changed = _check_memory_changed(state, memory, self.compute_content_hash)
 
-            # Check for changes
-            memory_changed = _check_memory_changed(
-                state, memory, self.compute_content_hash
-            )
-            # Obsidian change detection: file exists but we haven't tracked
-            # a modification time comparison. In production, this should
-            # compare mtime with obsidian_modified_at from state.
-            obsidian_changed = False  # Simplified for now
+            # Obsidian change detection via content hash comparison
+            current_hash = tracked_obsidian_hashes.get(state.obsidian_path)
+            obsidian_changed = current_hash is not None and current_hash != state.content_hash
 
             # Determine change type and create change record
             change = self._determine_change(
