@@ -95,8 +95,8 @@ class Memory(Base):
 
     # --- Tagging & relations ---
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
-    relations: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    metadata_: Mapped[dict] = mapped_column(
+    relations: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, default=dict
     )
 
@@ -161,7 +161,7 @@ class AuditLog(Base):
     actor_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
     request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     authorization_context: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    meta: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    meta: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_now
     )

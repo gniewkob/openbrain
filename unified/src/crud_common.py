@@ -4,6 +4,7 @@ from inspect import isawaitable
 from typing import Any
 
 from sqlalchemy import or_
+from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import AuditLog, DomainEnum, Memory
@@ -152,8 +153,8 @@ def _to_record(m: Memory) -> MemoryRecord:
         owner=m.owner,
         tags=m.tags or [],
         relations=MemoryRelations(**(m.relations or {})),
-        status=m.status,
-        sensitivity=m.sensitivity,
+        status=m.status,  # type: ignore[arg-type]
+        sensitivity=m.sensitivity,  # type: ignore[arg-type]
         source=SourceMetadata(**source) if source else SourceMetadata(),
         governance=GovernanceMetadata(**gov) if gov else GovernanceMetadata(),
         obsidian_ref=m.obsidian_ref,
@@ -217,7 +218,7 @@ async def _audit(
     memory_id: str | None,
     actor: str = "agent",
     tool_name: str = "",
-    meta: dict | None = None,
+    meta: dict[str, Any] | None = None,
     actor_ip: str | None = None,
     request_id: str | None = None,
     authorization_context: str | None = None,
@@ -232,7 +233,7 @@ async def _audit(
         authorization_context=authorization_context,
         meta=meta or {},
     )
-    maybe_result = session.add(entry)
+    maybe_result = session.add(entry)  # type: ignore[func-returns-value]
     if isawaitable(maybe_result):
         await maybe_result
 
@@ -261,23 +262,23 @@ def _export_record(
     return exported
 
 
-def _tenant_filter_expr(tenant_ids: list[str]):
+def _tenant_filter_expr(tenant_ids: list[str]) -> ColumnElement[bool]:
     return or_(
         Memory.tenant_id.in_(tenant_ids),
         Memory.metadata_["tenant_id"].astext.in_(tenant_ids),
     )
 
 
-def _match_metadata_fields(existing: Memory, rec, metadata: dict) -> bool:
+def _match_metadata_fields(existing: Memory, rec: Any, metadata: dict[str, Any]) -> bool:
     """Check that metadata-sourced fields match the record."""
-    return (
+    return bool(
         metadata.get("title") == rec.title
         and (metadata.get("custom_fields") or {}) == rec.custom_fields
         and (metadata.get("source") or {}) == rec.source.model_dump()
     )
 
 
-def _record_matches_existing(existing: Memory, rec, content_hash: str) -> bool:
+def _record_matches_existing(existing: Memory, rec: Any, content_hash: str) -> bool:
     metadata = existing.metadata_ or {}
     return (
         existing.content_hash == content_hash

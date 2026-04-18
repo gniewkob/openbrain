@@ -58,7 +58,6 @@ module = [
     "src.api.v1.obsidian",
     "src.api.v1.health",
     "src.common.obsidian_adapter",
-    "src.crud_common",
     "src.exceptions",
     "src.memory_writes",
     "src.repositories.memory_repository",
