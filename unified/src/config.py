@@ -25,6 +25,8 @@ class DatabaseConfig(BaseSettings):
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/openbrain_unified",
         alias="DATABASE_URL",
     )
+    pool_size: int = Field(default=5, alias="DB_POOL_SIZE")
+    max_overflow: int = Field(default=10, alias="DB_MAX_OVERFLOW")
 
     @field_validator("url")
     @classmethod

@@ -49,11 +49,14 @@ def validate_database_configuration() -> None:
 
 validate_database_configuration()
 
+_DB_POOL_SIZE: int = int(os.environ.get("DB_POOL_SIZE", "5"))
+_DB_MAX_OVERFLOW: int = int(os.environ.get("DB_MAX_OVERFLOW", "10"))
+
 engine = create_async_engine(
     DB_URL,
     echo=False,
-    pool_size=5,
-    max_overflow=10,
+    pool_size=_DB_POOL_SIZE,
+    max_overflow=_DB_MAX_OVERFLOW,
     pool_timeout=30,
     pool_recycle=1800,  # recycle idle connections every 30 min
     pool_pre_ping=True,  # detect stale connections before use
