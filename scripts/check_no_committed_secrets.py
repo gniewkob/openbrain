@@ -14,10 +14,13 @@ IGNORED_PATHS = {
     ".github/workflows/ci.yml",
     # Secret scan tests contain deliberate secret-like fixtures
     "unified/tests/test_secret_scan.py",
-    # Audit docs contain example/redacted credential URLs
+    # Audit docs contain example/redacted credential URLs (old paths)
     "docs/AUDIT_REPORT_2026-04-04.md",
     "docs/CRITICAL_CODE_AUDIT_2026-04-04.md",
-    # Implementation plans contain fake/example credentials as test fixtures
+    # Audit docs (new paths after docs reorganization 2026-04-18)
+    "docs/reports/audits/AUDIT_REPORT_2026-04-04.md",
+    "docs/reports/audits/CRITICAL_CODE_AUDIT_2026-04-04.md",
+    # Implementation plans — fake/example credentials as test fixtures (old paths)
     "docs/superpowers/plans/2026-04-05-track-a-p0-hardening.md",
     "docs/superpowers/plans/2026-04-05-track-b-p1-fixes.md",
     "docs/superpowers/plans/2026-04-06-audit-remediation-p1-p2.md",
@@ -25,6 +28,14 @@ IGNORED_PATHS = {
     "docs/superpowers/specs/2026-04-05-track-a-p0-hardening-design.md",
     "docs/superpowers/specs/2026-04-05-track-b-p1-fixes-design.md",
     "docs/mcp-api-keys-and-configuration.md",
+    # Implementation plans (new paths after docs reorganization 2026-04-18)
+    "docs/architecture/superpowers/plans/2026-04-05-track-a-p0-hardening.md",
+    "docs/architecture/superpowers/plans/2026-04-05-track-b-p1-fixes.md",
+    "docs/architecture/superpowers/plans/2026-04-06-audit-remediation-p1-p2.md",
+    "docs/architecture/superpowers/plans/2026-04-06-m2-write-truncation-warning.md",
+    "docs/architecture/superpowers/specs/2026-04-05-track-a-p0-hardening-design.md",
+    "docs/architecture/superpowers/specs/2026-04-05-track-b-p1-fixes-design.md",
+    "docs/getting-started/configuration.md",
 }
 
 IGNORED_SUFFIXES = {
