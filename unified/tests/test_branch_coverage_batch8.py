@@ -54,7 +54,12 @@ def test_custom_fields_non_str_key_raises():
 @pytest.mark.asyncio
 async def test_apply_sync_updated_obsidian_wins_read_succeeds():
     """obsidian wins + adapter.read_note succeeds → hits pass at line 685, returns True."""
-    from src.obsidian_sync import BidirectionalSyncEngine, SyncStrategy, SyncChange, ChangeType
+    from src.obsidian_sync import (
+        BidirectionalSyncEngine,
+        SyncStrategy,
+        SyncChange,
+        ChangeType,
+    )
 
     engine = BidirectionalSyncEngine(strategy=SyncStrategy.DOMAIN_BASED)
 
@@ -70,14 +75,20 @@ async def test_apply_sync_updated_obsidian_wins_read_succeeds():
     mock_note = MagicMock()
     mock_note.content = "updated content"
     mock_note.path = "note.md"
+    mock_note.frontmatter = {"title": "Test Note"}
+    mock_note.tags = []
 
     mock_adapter = AsyncMock()
     mock_adapter.read_note = AsyncMock(return_value=mock_note)
     mock_session = AsyncMock()
 
     # resolve_conflict returns "obsidian" → takes the obsidian-wins path
-    # read_note succeeds → hits line 685 `pass`, returns True (line 705)
-    with patch.object(engine, "resolve_conflict", return_value="obsidian"):
+    # read_note succeeds → calls update_memory, returns True
+    with (
+        patch.object(engine, "resolve_conflict", return_value="obsidian"),
+        patch("src.memory_writes.update_memory", new_callable=AsyncMock) as mock_update,
+    ):
+        mock_update.return_value = MagicMock()
         result = await engine.apply_sync(mock_session, mock_adapter, change)
 
     assert result is True

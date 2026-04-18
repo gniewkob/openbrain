@@ -638,19 +638,54 @@ class BidirectionalSyncEngine:
 
     async def _update_memory_from_obsidian(
         self,
+        session: "AsyncSession",
         adapter: "ObsidianCliAdapter",
         change: SyncChange,
     ) -> None:
-        """Read updated note from Obsidian (UPDATE obsidian-wins path — memory update TODO)."""
+        """Update an existing memory from an Obsidian note (obsidian-wins conflict resolution)."""
+        from .memory_writes import update_memory
+        from .schemas import MemoryUpdate
+
+        if not change.memory_id:
+            raise ObsidianCliError(
+                "Cannot update memory: memory_id is missing from SyncChange",
+                details={"vault": change.vault, "path": change.obsidian_path},
+            )
         try:
-            await adapter.read_note(change.vault, change.obsidian_path)
-            # TODO: update existing memory by memory_id lookup
+            note = await adapter.read_note(change.vault, change.obsidian_path)
+            data = MemoryUpdate(
+                content=note.content,
+                title=note.frontmatter.get("title"),
+                tags=note.tags or [],
+                obsidian_ref=note.path,
+                updated_by="obsidian-sync",
+            )
+            updated = await update_memory(
+                session, change.memory_id, data, actor="obsidian-sync"
+            )
+            if updated is None:
+                log.warning(
+                    "update_from_obsidian_memory_not_found: memory_id=%s vault=%s path=%s",
+                    change.memory_id,
+                    change.vault,
+                    change.obsidian_path,
+                )
+            else:
+                log.info(
+                    "update_from_obsidian_success: memory_id=%s vault=%s path=%s",
+                    change.memory_id,
+                    change.vault,
+                    change.obsidian_path,
+                )
+        except ObsidianCliError:
+            raise
         except Exception as e:
             log.error(
-                "update_from_obsidian_failed",
-                error=str(e),
-                vault=change.vault,
-                path=change.obsidian_path,
+                "update_from_obsidian_failed: memory_id=%s error=%s vault=%s path=%s",
+                change.memory_id,
+                str(e),
+                change.vault,
+                change.obsidian_path,
             )
             raise ObsidianCliError(
                 f"Failed to update from Obsidian: {e}",
@@ -675,7 +710,7 @@ class BidirectionalSyncEngine:
                 if resolution == "manual":
                     return False
                 if resolution != "openbrain":  # obsidian wins
-                    await self._update_memory_from_obsidian(adapter, change)
+                    await self._update_memory_from_obsidian(session, adapter, change)
                 # resolution == "openbrain": push to Obsidian (not yet implemented)
 
             # ChangeType.DELETED: not yet implemented
@@ -684,9 +719,9 @@ class BidirectionalSyncEngine:
 
         except Exception as e:
             log.error(
-                "apply_sync_failed",
-                error=str(e),
-                change_type=change.change_type.value if change else None,
+                "apply_sync_failed: change_type=%s error=%s",
+                change.change_type.value if change else None,
+                str(e),
             )
             raise
 
