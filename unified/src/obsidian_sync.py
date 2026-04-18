@@ -834,6 +834,50 @@ class BidirectionalSyncEngine:
                 details={"vault": change.vault, "path": change.obsidian_path},
             ) from e
 
+    async def _handle_deleted(
+        self,
+        session: "AsyncSession",
+        adapter: "ObsidianCliAdapter",
+        change: SyncChange,
+    ) -> None:
+        """Handle deletion in either direction, then remove tracker state."""
+        from .memory_writes import delete_memory
+
+        if change.source == "obsidian":
+            # Note removed from Obsidian → delete corresponding memory (non-corporate only)
+            if change.memory_id:
+                try:
+                    await delete_memory(session, change.memory_id, actor="obsidian-sync")
+                    log.info(
+                        "deleted_memory_from_obsidian_signal: memory_id=%s vault=%s path=%s",
+                        change.memory_id,
+                        change.vault,
+                        change.obsidian_path,
+                    )
+                except ValueError:
+                    log.warning(
+                        "cannot_delete_corporate_memory: memory_id=%s (append-only)",
+                        change.memory_id,
+                    )
+        else:
+            # Memory removed from OpenBrain → delete Obsidian note
+            try:
+                await adapter.delete_note(change.vault, change.obsidian_path)
+                log.info(
+                    "deleted_obsidian_note_from_openbrain_signal: vault=%s path=%s",
+                    change.vault,
+                    change.obsidian_path,
+                )
+            except Exception as e:
+                log.warning(
+                    "delete_obsidian_note_failed: vault=%s path=%s error=%s",
+                    change.vault,
+                    change.obsidian_path,
+                    str(e),
+                )
+
+        self.tracker.remove_state(change.vault, change.obsidian_path)
+
     async def apply_sync(
         self,
         session: "AsyncSession",
@@ -857,7 +901,8 @@ class BidirectionalSyncEngine:
                 else:  # openbrain wins
                     await self._push_memory_to_obsidian(session, adapter, change)
 
-            # ChangeType.DELETED: handled in Task A4
+            elif change.change_type == ChangeType.DELETED:
+                await self._handle_deleted(session, adapter, change)
 
             return True
 
