@@ -93,5 +93,7 @@ async def test_detect_changes_read_note_exception_treated_as_unchanged():
         changes = await engine.detect_changes(mock_session, mock_adapter, "TestVault")
 
     # Should not raise; the state should be treated as unchanged
-    obsidian_updated = [c for c in changes if c.source == "obsidian" and c.memory_id == "mem-1"]
+    obsidian_updated = [
+        c for c in changes if c.source == "obsidian" and c.memory_id == "mem-1"
+    ]
     assert obsidian_updated == []

@@ -167,7 +167,9 @@ async def test_get_sync_engine_creates_singleton():
         mock_engine_instance = MagicMock()
 
         with (
-            patch.object(obsidian_mod, "_get_sync_tracker", AsyncMock(return_value=mock_tracker)),
+            patch.object(
+                obsidian_mod, "_get_sync_tracker", AsyncMock(return_value=mock_tracker)
+            ),
         ):
             with patch("src.api.v1.obsidian.BidirectionalSyncEngine") as mock_cls:
                 mock_cls.return_value = mock_engine_instance

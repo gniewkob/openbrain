@@ -91,7 +91,9 @@ def test_capabilities_truthfulness_metadata_check_uses_dynamic_api_version(
         module.METADATA = original
 
 
-def test_capabilities_truthfulness_metadata_check_requires_health_entry(tmp_path) -> None:
+def test_capabilities_truthfulness_metadata_check_requires_health_entry(
+    tmp_path,
+) -> None:
     module = _load_capabilities_truthfulness_module()
     metadata_path = tmp_path / "capabilities_metadata.json"
     metadata_path.write_text(
@@ -146,7 +148,9 @@ def test_capabilities_truthfulness_contract_requires_tier_keys(tmp_path) -> None
     assert any("tier_required_keys" in err for err in errors)
 
 
-def test_capabilities_truthfulness_contract_requires_tier_status_values(tmp_path) -> None:
+def test_capabilities_truthfulness_contract_requires_tier_status_values(
+    tmp_path,
+) -> None:
     module = _load_capabilities_truthfulness_module()
     guardrail = module._load_guardrail_contract()
     contract_path = tmp_path / "capabilities_response_contract.json"
@@ -188,7 +192,9 @@ def test_capabilities_truthfulness_guardrail_contract_loader_validates_shape(
     try:
         try:
             module._load_guardrail_contract()
-            assert False, "expected ValueError for invalid truthfulness guardrail contract"
+            assert False, (
+                "expected ValueError for invalid truthfulness guardrail contract"
+            )
         except ValueError as exc:
             assert "expected_health_required_keys" in str(exc)
     finally:

@@ -109,7 +109,9 @@ class TestDataHygieneReportEndpointTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(
             mem_module,
             "require_admin",
-            side_effect=HTTPException(status_code=403, detail="Admin privileges required"),
+            side_effect=HTTPException(
+                status_code=403, detail="Admin privileges required"
+            ),
         ):
             with self.assertRaises(HTTPException) as ctx:
                 await mem_module.test_data_hygiene_report(

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import os
 
-from src.http_error_adapter import backend_error_message, backend_request_failure_message
+from src.http_error_adapter import (
+    backend_error_message,
+    backend_request_failure_message,
+)
 
 
 def test_backend_error_message_dev_includes_detail() -> None:

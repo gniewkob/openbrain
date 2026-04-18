@@ -65,7 +65,9 @@ async def test_get_memory_as_record_returns_both_when_found():
     session.execute = AsyncMock(return_value=res_mock)
 
     with (
-        patch("src.memory_reads._to_record", return_value=MagicMock()) as mock_to_record,
+        patch(
+            "src.memory_reads._to_record", return_value=MagicMock()
+        ) as mock_to_record,
         patch("src.memory_reads._to_out", return_value=MagicMock()) as mock_to_out,
     ):
         record, out = await get_memory_as_record(session, "m1")
@@ -174,7 +176,9 @@ async def test_get_grounding_pack_collects_risks():
     from src.schemas import MemoryGetContextRequest
 
     session = _make_session()
-    risk_record = _mock_record(entity_type="Risk", content="security vulnerability", tags=[])
+    risk_record = _mock_record(
+        entity_type="Risk", content="security vulnerability", tags=[]
+    )
     hits = [(risk_record, 0.95)]
 
     req = MemoryGetContextRequest(query="risks")

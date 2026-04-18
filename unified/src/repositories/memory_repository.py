@@ -234,7 +234,7 @@ class InMemoryMemoryRepository(MemoryRepository):
     deterministic behavior for unit tests without database dependencies.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._storage: dict[str, Memory] = {}
         self._match_key_index: dict[str, str] = {}  # match_key -> memory_id
         self._id_counter = 0

@@ -41,7 +41,11 @@ def test_pr_readiness_runner_stops_on_first_failure(monkeypatch) -> None:
 def test_pr_readiness_contract_smoke_includes_transport_parity() -> None:
     module = _load_pr_readiness_module()
     step = next(
-        (cmd for label, cmd in module.PR_READINESS_STEPS if label == "contract integrity smoke"),
+        (
+            cmd
+            for label, cmd in module.PR_READINESS_STEPS
+            if label == "contract integrity smoke"
+        ),
         [],
     )
     assert "unified/tests/test_transport_parity.py" in step
@@ -50,7 +54,11 @@ def test_pr_readiness_contract_smoke_includes_transport_parity() -> None:
 def test_pr_readiness_contract_smoke_includes_core_contract_tests() -> None:
     module = _load_pr_readiness_module()
     step = next(
-        (cmd for label, cmd in module.PR_READINESS_STEPS if label == "contract integrity smoke"),
+        (
+            cmd
+            for label, cmd in module.PR_READINESS_STEPS
+            if label == "contract integrity smoke"
+        ),
         [],
     )
     required = {
@@ -65,7 +73,11 @@ def test_pr_readiness_contract_smoke_includes_core_contract_tests() -> None:
 def test_pr_readiness_contract_smoke_includes_admin_openapi_contract() -> None:
     module = _load_pr_readiness_module()
     step = next(
-        (cmd for label, cmd in module.PR_READINESS_STEPS if label == "contract integrity smoke"),
+        (
+            cmd
+            for label, cmd in module.PR_READINESS_STEPS
+            if label == "contract integrity smoke"
+        ),
         [],
     )
     assert "unified/tests/test_admin_openapi_contract.py" in step
@@ -74,25 +86,41 @@ def test_pr_readiness_contract_smoke_includes_admin_openapi_contract() -> None:
 def test_pr_readiness_guardrail_runner_includes_self_runner_test() -> None:
     module = _load_pr_readiness_module()
     step = next(
-        (cmd for label, cmd in module.PR_READINESS_STEPS if label == "guardrail runner tests"),
+        (
+            cmd
+            for label, cmd in module.PR_READINESS_STEPS
+            if label == "guardrail runner tests"
+        ),
         [],
     )
     assert "unified/tests/test_pr_readiness_runner.py" in step
 
 
-def test_pr_readiness_guardrail_runner_includes_mcp_transport_import_scope_test() -> None:
+def test_pr_readiness_guardrail_runner_includes_mcp_transport_import_scope_test() -> (
+    None
+):
     module = _load_pr_readiness_module()
     step = next(
-        (cmd for label, cmd in module.PR_READINESS_STEPS if label == "guardrail runner tests"),
+        (
+            cmd
+            for label, cmd in module.PR_READINESS_STEPS
+            if label == "guardrail runner tests"
+        ),
         [],
     )
     assert "unified/tests/test_mcp_transport_import_scope_guardrail.py" in step
 
 
-def test_pr_readiness_guardrail_runner_includes_mcp_transport_mount_contract_test() -> None:
+def test_pr_readiness_guardrail_runner_includes_mcp_transport_mount_contract_test() -> (
+    None
+):
     module = _load_pr_readiness_module()
     step = next(
-        (cmd for label, cmd in module.PR_READINESS_STEPS if label == "guardrail runner tests"),
+        (
+            cmd
+            for label, cmd in module.PR_READINESS_STEPS
+            if label == "guardrail runner tests"
+        ),
         [],
     )
     assert "unified/tests/test_mcp_transport_mount_contract_guardrail.py" in step

@@ -104,8 +104,7 @@ class PatchEndpointRouteTests(unittest.TestCase):
         from src.api.v1.memory import router
 
         patch_routes = [
-            r for r in router.routes
-            if hasattr(r, "methods") and "PATCH" in r.methods
+            r for r in router.routes if hasattr(r, "methods") and "PATCH" in r.methods
         ]
         self.assertTrue(
             patch_routes,
@@ -123,19 +122,27 @@ class PatchEndpointBuildDomainTests(unittest.IsolatedAsyncioTestCase):
     async def test_build_patch_returns_updated_record_with_same_id(self) -> None:
         from src.api.v1 import memory as mem_module
 
-        original = _make_memory_out(mem_id="build-1", domain="build", content="original")
+        original = _make_memory_out(
+            mem_id="build-1", domain="build", content="original"
+        )
         updated = _make_memory_out(mem_id="build-1", domain="build", content="updated")
         original_record = _make_memory_record(original)
         updated_record = _make_memory_record(updated)
 
         with (
-            patch.object(mem_module, "get_memory_as_record", new=AsyncMock(
-                side_effect=[
-                    (original_record, original),   # pre-check
-                    (updated_record, updated),     # post-update fetch
-                ]
-            )),
-            patch.object(mem_module, "update_memory", new=AsyncMock(return_value=updated)),
+            patch.object(
+                mem_module,
+                "get_memory_as_record",
+                new=AsyncMock(
+                    side_effect=[
+                        (original_record, original),  # pre-check
+                        (updated_record, updated),  # post-update fetch
+                    ]
+                ),
+            ),
+            patch.object(
+                mem_module, "update_memory", new=AsyncMock(return_value=updated)
+            ),
         ):
             from src.api.v1.memory import v1_update
             from src.schemas import MemoryUpdate
@@ -154,7 +161,9 @@ class PatchEndpointBuildDomainTests(unittest.IsolatedAsyncioTestCase):
     async def test_patch_uses_authenticated_subject_for_audit_actor(self) -> None:
         from src.api.v1 import memory as mem_module
 
-        original = _make_memory_out(mem_id="build-1", domain="build", content="original")
+        original = _make_memory_out(
+            mem_id="build-1", domain="build", content="original"
+        )
         updated = _make_memory_out(mem_id="build-1", domain="build", content="updated")
         original_record = _make_memory_record(original)
         updated_record = _make_memory_record(updated)
@@ -184,10 +193,14 @@ class PatchEndpointBuildDomainTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(update_mock.await_args.kwargs["actor"], "auth-sub")
 
-    async def test_patch_overrides_payload_updated_by_with_authenticated_subject(self) -> None:
+    async def test_patch_overrides_payload_updated_by_with_authenticated_subject(
+        self,
+    ) -> None:
         from src.api.v1 import memory as mem_module
 
-        original = _make_memory_out(mem_id="build-1", domain="build", content="original")
+        original = _make_memory_out(
+            mem_id="build-1", domain="build", content="original"
+        )
         updated = _make_memory_out(mem_id="build-1", domain="build", content="updated")
         original_record = _make_memory_record(original)
         updated_record = _make_memory_record(updated)
@@ -223,7 +236,9 @@ class PatchEndpointBuildDomainTests(unittest.IsolatedAsyncioTestCase):
         from src.api.v1 import memory as mem_module
         from fastapi import HTTPException
 
-        with patch.object(mem_module, "get_memory_as_record", new=AsyncMock(return_value=(None, None))):
+        with patch.object(
+            mem_module, "get_memory_as_record", new=AsyncMock(return_value=(None, None))
+        ):
             from src.api.v1.memory import v1_update
             from src.schemas import MemoryUpdate
 
@@ -245,25 +260,41 @@ class PatchEndpointCorporateTests(unittest.IsolatedAsyncioTestCase):
         from src.api.v1 import memory as mem_module
 
         original = _make_memory_out(
-            mem_id="corp-1", domain="corporate", entity_type="Decision",
-            content="v1 content", version=1, root_id="corp-1", match_key="corp:mk:1"
+            mem_id="corp-1",
+            domain="corporate",
+            entity_type="Decision",
+            content="v1 content",
+            version=1,
+            root_id="corp-1",
+            match_key="corp:mk:1",
         )
         versioned = _make_memory_out(
-            mem_id="corp-2", domain="corporate", entity_type="Decision",
-            content="v2 content", version=2,
-            previous_id="corp-1", root_id="corp-1", match_key="corp:mk:1"
+            mem_id="corp-2",
+            domain="corporate",
+            entity_type="Decision",
+            content="v2 content",
+            version=2,
+            previous_id="corp-1",
+            root_id="corp-1",
+            match_key="corp:mk:1",
         )
         orig_record = _make_memory_record(original)
         vers_record = _make_memory_record(versioned)
 
         with (
-            patch.object(mem_module, "get_memory_as_record", new=AsyncMock(
-                side_effect=[
-                    (orig_record, original),
-                    (vers_record, versioned),
-                ]
-            )),
-            patch.object(mem_module, "update_memory", new=AsyncMock(return_value=versioned)),
+            patch.object(
+                mem_module,
+                "get_memory_as_record",
+                new=AsyncMock(
+                    side_effect=[
+                        (orig_record, original),
+                        (vers_record, versioned),
+                    ]
+                ),
+            ),
+            patch.object(
+                mem_module, "update_memory", new=AsyncMock(return_value=versioned)
+            ),
         ):
             from src.api.v1.memory import v1_update
             from src.schemas import MemoryUpdate

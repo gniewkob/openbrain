@@ -287,7 +287,7 @@ class MatchKeySelectForUpdateTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_writes,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=[0.1, 0.2]),
         ):
             # The SELECT FOR UPDATE statement should be the first executed
@@ -350,7 +350,7 @@ class StoreBulkFieldMappingTest(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(
                 memory_writes,
-                "_get_embedding_compat",
+                "get_embedding",
                 new=AsyncMock(return_value=[0.1]),
             ),
         ):
@@ -468,7 +468,7 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_writes,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=[0.1, 0.2]),
         ):
             result = await memory_writes.handle_memory_write(session, req)
@@ -516,7 +516,7 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_writes,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=[0.1, 0.2]),
         ):
             result = await memory_writes.handle_memory_write(session, req)
@@ -638,7 +638,7 @@ class SearchScoreSemanticsTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_reads,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=[0.1, 0.2]),
         ):
             results = await memory_reads.search_memories(

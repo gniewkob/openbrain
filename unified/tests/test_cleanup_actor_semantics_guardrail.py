@@ -37,4 +37,6 @@ async def cleanup_build_test_data(req, session, _user):
     )
 """
     errors = module._check_cleanup_actor_semantics(src)
-    assert any("must set actor via get_subject(_user) or 'agent'" in err for err in errors)
+    assert any(
+        "must set actor via get_subject(_user) or 'agent'" in err for err in errors
+    )

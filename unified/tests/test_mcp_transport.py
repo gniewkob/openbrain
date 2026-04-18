@@ -244,9 +244,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result["obsidian_http"]["status"], "disabled")
         self.assertEqual(result["obsidian_http"]["tools"], [])
-        self.assertIn(
-            "ENABLE_HTTP_OBSIDIAN_TOOLS=1", result["obsidian_http"]["reason"]
-        )
+        self.assertIn("ENABLE_HTTP_OBSIDIAN_TOOLS=1", result["obsidian_http"]["reason"])
         self.assertIn("before starting transport", result["obsidian_http"]["reason"])
         self.assertIn("disabled", result["obsidian_http"]["reason"])
         self.assertNotIn("obsidian_vaults", result["tier_2_advanced"]["tools"])
@@ -256,7 +254,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         with (
             patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", True),
-            patch.object(mcp_transport, "_http_obsidian_tools_registered", return_value=True),
+            patch.object(
+                mcp_transport, "_http_obsidian_tools_registered", return_value=True
+            ),
             patch.object(
                 mcp_transport,
                 "_get_backend_status",
@@ -295,7 +295,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         with (
             patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", True),
-            patch.object(mcp_transport, "_http_obsidian_tools_registered", return_value=False),
+            patch.object(
+                mcp_transport, "_http_obsidian_tools_registered", return_value=False
+            ),
             patch.object(
                 mcp_transport,
                 "_get_backend_status",
@@ -650,7 +652,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fake_client.last_request[0], "DELETE")
         self.assertEqual(fake_client.last_request[1], "/api/v1/memory/mem-1")
 
-    async def test_brain_delete_maps_missing_session_id_to_actionable_hint(self) -> None:
+    async def test_brain_delete_maps_missing_session_id_to_actionable_hint(
+        self,
+    ) -> None:
         response = _FakeResponse(400, payload={"detail": "Missing session ID"})
         fake_client = _FakeClient(response)
         with patch.object(mcp_transport, "_client", return_value=fake_client):
@@ -858,7 +862,11 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     async def test_brain_cleanup_build_test_data_uses_v1_admin_endpoint(self) -> None:
         response = _FakeResponse(
             200,
-            payload={"dry_run": True, "candidates_count": 2, "candidate_ids": ["a", "b"]},
+            payload={
+                "dry_run": True,
+                "candidates_count": 2,
+                "candidate_ids": ["a", "b"],
+            },
         )
         fake_client = _FakeClient(response)
         with patch.object(mcp_transport, "_client", return_value=fake_client):
@@ -911,7 +919,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["db"], "ok")
         self.assertEqual(result["vector_store"], "ok")
 
-    async def test_get_backend_status_uses_api_v1_readyz_when_root_readyz_fails(self) -> None:
+    async def test_get_backend_status_uses_api_v1_readyz_when_root_readyz_fails(
+        self,
+    ) -> None:
         with patch.object(
             mcp_transport,
             "_client",
@@ -1000,7 +1010,6 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["probe"], "api_health_fallback")
         self.assertIn("/readyz probe failed", result["reason"])
         self.assertIn("/healthz probe failed", result["reason"])
-
 
     # -------------------------------------------------------------------------
     # brain_delete — httpx.RequestError path (lines 584-585)

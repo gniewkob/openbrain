@@ -27,6 +27,7 @@ def mcp_with_obsidian_tools():
     os.environ["ENABLE_HTTP_OBSIDIAN_TOOLS"] = "1"
     try:
         import src.mcp_transport as reloaded_mod
+
         yield reloaded_mod
     finally:
         # Restore original module and env
@@ -60,7 +61,9 @@ async def test_brain_obsidian_read_note_calls_safe_req(mcp_with_obsidian_tools):
     """brain_obsidian_read_note → calls _safe_req POST (lines 638-641)."""
     mod = mcp_with_obsidian_tools
 
-    with patch.object(mod, "_safe_req", AsyncMock(return_value={"content": "note"})) as mock_req:
+    with patch.object(
+        mod, "_safe_req", AsyncMock(return_value={"content": "note"})
+    ) as mock_req:
         result = await mod.brain_obsidian_read_note(path="note.md", vault="MyVault")
 
     mock_req.assert_awaited_once_with(
@@ -76,7 +79,9 @@ async def test_brain_obsidian_sync_calls_safe_req(mcp_with_obsidian_tools):
     """brain_obsidian_sync → validates limit, calls _safe_req POST (lines 659-671)."""
     mod = mcp_with_obsidian_tools
 
-    with patch.object(mod, "_safe_req", AsyncMock(return_value={"synced": 5})) as mock_req:
+    with patch.object(
+        mod, "_safe_req", AsyncMock(return_value={"synced": 5})
+    ) as mock_req:
         result = await mod.brain_obsidian_sync(vault="V", limit=10)
 
     assert result == {"synced": 5}

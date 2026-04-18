@@ -16,7 +16,9 @@ def test_build_counter_backend_defaults_to_memory(monkeypatch) -> None:
     assert isinstance(backend, InMemoryCounterBackend)
 
 
-def test_build_counter_backend_redis_without_url_falls_back_to_memory(monkeypatch) -> None:
+def test_build_counter_backend_redis_without_url_falls_back_to_memory(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("TELEMETRY_BACKEND", "redis")
     monkeypatch.delenv("TELEMETRY_REDIS_URL", raising=False)
     monkeypatch.delenv("REDIS_URL", raising=False)
@@ -27,7 +29,9 @@ def test_build_counter_backend_redis_without_url_falls_back_to_memory(monkeypatc
 def test_build_counter_backend_redis_failure_falls_back_to_memory(monkeypatch) -> None:
     monkeypatch.setenv("TELEMETRY_BACKEND", "redis")
     monkeypatch.setenv("TELEMETRY_REDIS_URL", "redis://localhost:6379/0")
-    with patch("src.telemetry_counters.RedisCounterBackend", side_effect=RuntimeError("boom")):
+    with patch(
+        "src.telemetry_counters.RedisCounterBackend", side_effect=RuntimeError("boom")
+    ):
         backend = build_counter_backend(("memories_created_total",))
     assert isinstance(backend, InMemoryCounterBackend)
 
@@ -61,7 +65,9 @@ def test_build_counter_backend_with_meta_reports_redis_constructor_failure(
 ) -> None:
     monkeypatch.setenv("TELEMETRY_BACKEND", "redis")
     monkeypatch.setenv("TELEMETRY_REDIS_URL", "redis://localhost:6379/0")
-    with patch("src.telemetry_counters.RedisCounterBackend", side_effect=RuntimeError("boom")):
+    with patch(
+        "src.telemetry_counters.RedisCounterBackend", side_effect=RuntimeError("boom")
+    ):
         backend, meta = build_counter_backend_with_meta(("memories_created_total",))
     assert isinstance(backend, InMemoryCounterBackend)
     assert meta.requested_backend == "redis"

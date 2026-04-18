@@ -26,7 +26,9 @@ def test_build_memory_gauges_uses_active_status_as_source_of_truth() -> None:
 
 
 @pytest.mark.asyncio
-async def test_refresh_memory_gauges_sets_all_active_memory_metrics(monkeypatch) -> None:
+async def test_refresh_memory_gauges_sets_all_active_memory_metrics(
+    monkeypatch,
+) -> None:
     session = AsyncMock()
 
     async def fake_get_memory_status_counts(_session):

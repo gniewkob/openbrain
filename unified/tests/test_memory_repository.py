@@ -90,10 +90,12 @@ async def test_list_all_returns_all():
 @pytest.mark.asyncio
 async def test_list_all_filter_by_domain():
     repo = InMemoryMemoryRepository()
-    repo.seed([
-        _seeded_memory("m1", domain="build"),
-        _seeded_memory("m2", domain="corporate"),
-    ])
+    repo.seed(
+        [
+            _seeded_memory("m1", domain="build"),
+            _seeded_memory("m2", domain="corporate"),
+        ]
+    )
     result = await repo.list_all(domain="build")
     assert len(result) == 1
     assert result[0].id == "m1"
@@ -102,10 +104,12 @@ async def test_list_all_filter_by_domain():
 @pytest.mark.asyncio
 async def test_list_all_filter_by_entity_type():
     repo = InMemoryMemoryRepository()
-    repo.seed([
-        _seeded_memory("m1", entity_type="Note"),
-        _seeded_memory("m2", entity_type="Fact"),
-    ])
+    repo.seed(
+        [
+            _seeded_memory("m1", entity_type="Note"),
+            _seeded_memory("m2", entity_type="Fact"),
+        ]
+    )
     result = await repo.list_all(entity_type="Note")
     assert len(result) == 1
 
@@ -113,10 +117,12 @@ async def test_list_all_filter_by_entity_type():
 @pytest.mark.asyncio
 async def test_list_all_filter_by_status():
     repo = InMemoryMemoryRepository()
-    repo.seed([
-        _seeded_memory("m1", status="active"),
-        _seeded_memory("m2", status="deprecated"),
-    ])
+    repo.seed(
+        [
+            _seeded_memory("m1", status="active"),
+            _seeded_memory("m2", status="deprecated"),
+        ]
+    )
     result = await repo.list_all(status="active")
     assert len(result) == 1
     assert result[0].id == "m1"
@@ -151,21 +157,30 @@ async def test_count_all():
 @pytest.mark.asyncio
 async def test_count_filtered_by_domain():
     repo = InMemoryMemoryRepository()
-    repo.seed([_seeded_memory("m1", domain="build"), _seeded_memory("m2", domain="personal")])
+    repo.seed(
+        [_seeded_memory("m1", domain="build"), _seeded_memory("m2", domain="personal")]
+    )
     assert await repo.count(domain="build") == 1
 
 
 @pytest.mark.asyncio
 async def test_count_filtered_by_entity_type():
     repo = InMemoryMemoryRepository()
-    repo.seed([_seeded_memory("m1", entity_type="Note"), _seeded_memory("m2", entity_type="Fact")])
+    repo.seed(
+        [
+            _seeded_memory("m1", entity_type="Note"),
+            _seeded_memory("m2", entity_type="Fact"),
+        ]
+    )
     assert await repo.count(entity_type="Fact") == 1
 
 
 @pytest.mark.asyncio
 async def test_count_filtered_by_status():
     repo = InMemoryMemoryRepository()
-    repo.seed([_seeded_memory("m1", status="active"), _seeded_memory("m2", status="draft")])
+    repo.seed(
+        [_seeded_memory("m1", status="active"), _seeded_memory("m2", status="draft")]
+    )
     assert await repo.count(status="draft") == 1
 
 
@@ -320,7 +335,9 @@ async def test_search_by_embedding_threshold_filters():
 async def test_search_by_embedding_top_k_limits():
     repo = InMemoryMemoryRepository()
     for i in range(5):
-        repo.seed([_seeded_memory(f"m{i}", status="active", embedding=[float(i + 1), 0.0])])
+        repo.seed(
+            [_seeded_memory(f"m{i}", status="active", embedding=[float(i + 1), 0.0])]
+        )
     result = await repo.search_by_embedding([1.0, 0.0], top_k=2)
     assert len(result) <= 2
 

@@ -53,16 +53,6 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = [
-    "src.obsidian_sync",
-    "src.app_factory",
-    "src.api.v1.obsidian",
-    "src.api.v1.health",
-    "src.common.obsidian_adapter",
-    "src.exceptions",
-    "src.memory_writes",
-    "src.repositories.memory_repository",
-    "src.telemetry_counters",
-    "src.telemetry",
-]
-ignore_errors = true
+module = ["src.common.obsidian_adapter"]
+warn_unused_ignores = false
+

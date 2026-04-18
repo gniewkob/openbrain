@@ -25,7 +25,11 @@ def _memory(**overrides) -> Memory:
         "superseded_by": None,
         "tags": ["alpha"],
         "relations": {"related": ["x"]},
-        "metadata_": {"title": "Note", "custom_fields": {"priority": "high"}, "root_id": "mem-1"},
+        "metadata_": {
+            "title": "Note",
+            "custom_fields": {"priority": "high"},
+            "root_id": "mem-1",
+        },
         "obsidian_ref": "notes/openbrain.md",
         "content_hash": "hash-123",
         "match_key": "mk-1",
@@ -54,7 +58,9 @@ class ExportPolicyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_export_redacts_internal_records(self) -> None:
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [_memory()]))
+        session.execute.return_value = SimpleNamespace(
+            scalars=lambda: SimpleNamespace(all=lambda: [_memory()])
+        )
 
         result = await export_memories(session, ["mem-1"])
 
@@ -71,7 +77,9 @@ class ExportPolicyTests(unittest.IsolatedAsyncioTestCase):
     async def test_export_redacts_confidential_records_more_aggressively(self) -> None:
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(
-            scalars=lambda: SimpleNamespace(all=lambda: [_memory(sensitivity="confidential")])
+            scalars=lambda: SimpleNamespace(
+                all=lambda: [_memory(sensitivity="confidential")]
+            )
         )
 
         result = await export_memories(session, ["mem-1"])
@@ -84,7 +92,9 @@ class ExportPolicyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_export_redacts_internal_records_for_internal_role(self) -> None:
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [_memory()]))
+        session.execute.return_value = SimpleNamespace(
+            scalars=lambda: SimpleNamespace(all=lambda: [_memory()])
+        )
 
         result = await export_memories(session, ["mem-1"], role="internal")
 
@@ -93,10 +103,14 @@ class ExportPolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exported["owner"], "[REDACTED]")
         self.assertEqual(exported["tags"], [])
 
-    async def test_export_redacts_restricted_records_with_strictest_policy(self) -> None:
+    async def test_export_redacts_restricted_records_with_strictest_policy(
+        self,
+    ) -> None:
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(
-            scalars=lambda: SimpleNamespace(all=lambda: [_memory(sensitivity="restricted")])
+            scalars=lambda: SimpleNamespace(
+                all=lambda: [_memory(sensitivity="restricted")]
+            )
         )
 
         result = await export_memories(session, ["mem-1"])
@@ -109,16 +123,22 @@ class ExportPolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exported["custom_fields"], {})
         self.assertEqual(exported["relations"], {})
 
-    async def test_export_falls_back_to_restricted_policy_for_unknown_sensitivity(self) -> None:
+    async def test_export_falls_back_to_restricted_policy_for_unknown_sensitivity(
+        self,
+    ) -> None:
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(
-            scalars=lambda: SimpleNamespace(all=lambda: [_memory(sensitivity="super_restricted")])
+            scalars=lambda: SimpleNamespace(
+                all=lambda: [_memory(sensitivity="super_restricted")]
+            )
         )
 
         result = await export_memories(session, ["mem-1"])
 
         exported = result[0]
-        self.assertEqual(exported["content"], "[REDACTED — super_restricted sensitivity]")
+        self.assertEqual(
+            exported["content"], "[REDACTED — super_restricted sensitivity]"
+        )
         self.assertEqual(exported["owner"], "[REDACTED]")
         self.assertEqual(exported["tags"], [])
         self.assertIsNone(exported["match_key"])
@@ -126,7 +146,9 @@ class ExportPolicyTests(unittest.IsolatedAsyncioTestCase):
     async def test_export_keeps_restricted_records_unredacted_for_admin(self) -> None:
         session = AsyncMock()
         session.execute.return_value = SimpleNamespace(
-            scalars=lambda: SimpleNamespace(all=lambda: [_memory(sensitivity="restricted")])
+            scalars=lambda: SimpleNamespace(
+                all=lambda: [_memory(sensitivity="restricted")]
+            )
         )
 
         result = await export_memories(session, ["mem-1"], role="admin")

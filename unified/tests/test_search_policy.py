@@ -29,7 +29,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_reads,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=[0.1, 0.2, 0.3]),
         ):
             await memory_reads.search_memories(
@@ -53,7 +53,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_reads,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=[0.1, 0.2, 0.3]),
         ):
             result = await memory_reads.search_memories(
@@ -80,7 +80,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_reads,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=[0.1, 0.2, 0.3]),
         ):
             result = await memory_reads.search_memories(
@@ -110,7 +110,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_reads,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=[0.1, 0.2, 0.3]),
         ):
             result = await memory_reads.find_memories_v1(
@@ -135,7 +135,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_reads,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=None),
         ):
             await memory_reads.find_memories_v1(
@@ -159,7 +159,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_reads,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=None),
         ):
             await memory_reads.find_memories_v1(
@@ -179,7 +179,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
         session = SimpleNamespace(execute=AsyncMock())
         with patch.object(
             memory_reads,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=None),
         ):
             with self.assertRaisesRegex(ValueError, "include_test_data must be bool"):
@@ -240,7 +240,7 @@ class SearchPolicyTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             memory_writes,
-            "_get_embedding_compat",
+            "get_embedding",
             new=AsyncMock(return_value=[0.3, 0.4]),
         ):
             result = await memory_writes.handle_memory_write(

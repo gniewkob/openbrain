@@ -48,10 +48,14 @@ async def brain_cleanup_build_test_data(dry_run: bool = True, limit: int = 100):
     errors = module._check_admin_endpoint_contract_parity(
         transport_src, gateway_src, checked_tools
     )
-    assert any("brain_cleanup_build_test_data endpoint contract drift" in err for err in errors)
+    assert any(
+        "brain_cleanup_build_test_data endpoint contract drift" in err for err in errors
+    )
 
 
-def test_admin_endpoint_guardrail_contract_loader_validates_shape(tmp_path: Path) -> None:
+def test_admin_endpoint_guardrail_contract_loader_validates_shape(
+    tmp_path: Path,
+) -> None:
     module = _load_admin_endpoint_contract_parity_module()
     broken = tmp_path / "admin_endpoint_guardrail_contract.json"
     broken.write_text("{}", encoding="utf-8")

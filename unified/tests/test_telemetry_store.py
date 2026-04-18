@@ -86,7 +86,9 @@ async def test_get_histograms_empty():
 async def test_get_histograms_returns_structured_map():
     from src.telemetry_store import get_telemetry_histograms
 
-    h = _histogram("latency_ms", sum_=100.0, count=5, buckets=[10, 50, 100], counts=[1, 3, 1])
+    h = _histogram(
+        "latency_ms", sum_=100.0, count=5, buckets=[10, 50, 100], counts=[1, 3, 1]
+    )
     session = _make_session()
     session.execute = AsyncMock(return_value=_exec_result([h]))
     result = await get_telemetry_histograms(session)
@@ -152,7 +154,9 @@ async def test_upsert_creates_new_histogram():
     session = _make_session()
     session.execute = AsyncMock(return_value=_exec_result([]))
 
-    payload = {"latency_ms": {"sum": 50.0, "count": 2, "buckets": [10, 100], "counts": [1, 1]}}
+    payload = {
+        "latency_ms": {"sum": 50.0, "count": 2, "buckets": [10, 100], "counts": [1, 1]}
+    }
     await upsert_telemetry_metrics(session, {}, payload)
     session.add.assert_called_once()
 
@@ -165,7 +169,9 @@ async def test_upsert_updates_existing_histogram():
     session = _make_session()
     session.execute = AsyncMock(return_value=_exec_result([existing]))
 
-    payload = {"latency_ms": {"sum": 99.0, "count": 9, "buckets": [10, 100], "counts": [5, 4]}}
+    payload = {
+        "latency_ms": {"sum": 99.0, "count": 9, "buckets": [10, 100], "counts": [5, 4]}
+    }
     await upsert_telemetry_metrics(session, {}, payload)
     assert existing.sum == 99.0
     assert existing.count == 9

@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import datetime
-from inspect import isawaitable
+from typing import Any
 
 import structlog
 from sqlalchemy import func, select
@@ -51,22 +51,8 @@ from .schemas import (
 log = structlog.get_logger()
 
 
-# Direct function references - no circular imports
-async def _get_embedding_compat(text: str):
-    """Get embedding using local import."""
-    return await get_embedding(text)
-
-
-async def _audit_compat(*args, **kwargs):
-    """Audit using direct reference."""
-    return await _audit(*args, **kwargs)
-
-
-def _session_add(session: AsyncSession, obj) -> None:
-    maybe_result = session.add(obj)
-    if isawaitable(maybe_result):
-        return maybe_result
-    return None
+def _session_add(session: AsyncSession, obj: Any) -> None:
+    session.add(obj)
 
 
 def _validate_corporate_domain(
@@ -179,7 +165,7 @@ def _build_memory_metadata(
     append_only_policy: bool,
     previous_id: str | None = None,
     root_id: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Build metadata dictionary for memory record."""
     return {
         "title": rec.title,
@@ -205,9 +191,9 @@ async def _create_new_memory(
     _commit: bool,
 ) -> MemoryWriteResponse:
     """Create a new memory record."""
-    embedding = await _get_embedding_compat(rec.content)
+    embedding = await get_embedding(rec.content)
 
-    memory = Memory(
+    memory = Memory(  # type: ignore[call-arg]
         domain=rec.domain,
         entity_type=rec.entity_type,
         content=rec.content,
@@ -226,9 +212,7 @@ async def _create_new_memory(
         metadata_=_build_memory_metadata(rec, actor, append_only_policy),
     )
 
-    maybe_add = _session_add(session, memory)
-    if maybe_add is not None:
-        await maybe_add
+    _session_add(session, memory)
     await session.flush()
 
     memory.metadata_ = {
@@ -237,7 +221,7 @@ async def _create_new_memory(
         "root_id": memory.id,
     }
 
-    await _audit_compat(
+    await _audit(
         session,
         "create",
         memory.id,
@@ -264,7 +248,7 @@ async def _version_memory(
     _commit: bool,
 ) -> MemoryWriteResponse:
     """Create a new version of an existing memory."""
-    new_embedding = await _get_embedding_compat(rec.content)
+    new_embedding = await get_embedding(rec.content)
 
     # Supersede old record first to release the unique-active constraint
     # before inserting the new version with the same match_key.
@@ -272,7 +256,7 @@ async def _version_memory(
     existing.status = "superseded"
     await session.flush()
 
-    new_memory = Memory(
+    new_memory = Memory(  # type: ignore[call-arg]
         domain=existing.domain,
         entity_type=rec.entity_type,
         content=rec.content,
@@ -305,14 +289,12 @@ async def _version_memory(
         },
     )
 
-    maybe_add = _session_add(session, new_memory)
-    if maybe_add is not None:
-        await maybe_add
+    _session_add(session, new_memory)
     await session.flush()
 
     existing.superseded_by = new_memory.id
 
-    await _audit_compat(
+    await _audit(
         session,
         "version",
         new_memory.id,
@@ -339,7 +321,7 @@ async def _update_memory(
     _commit: bool,
 ) -> MemoryWriteResponse:
     """Update an existing memory in place."""
-    new_embedding = await _get_embedding_compat(rec.content)
+    new_embedding = await get_embedding(rec.content)
 
     existing.content = rec.content
     existing.content_hash = content_hash
@@ -363,7 +345,7 @@ async def _update_memory(
     domain_val = (
         existing.domain.value if hasattr(existing.domain, "value") else existing.domain
     )
-    await _audit_compat(
+    await _audit(
         session,
         "update",
         existing.id,
@@ -464,7 +446,7 @@ async def handle_memory_write(
 
 # Keep the rest of the file (handle_memory_write_many, etc.)
 # Copy from original file...
-async def _prefetch_embeddings(records: list) -> None:
+async def _prefetch_embeddings(records: list[Any]) -> None:
     """Warm the LRU embedding cache in parallel before batch processing."""
     if records:
         await asyncio.gather(
@@ -473,7 +455,7 @@ async def _prefetch_embeddings(records: list) -> None:
 
 
 async def _batch_lookup_match_keys(
-    session: AsyncSession, records: list
+    session: AsyncSession, records: list[Any]
 ) -> dict[str, str | None]:
     """Single query to map match_key → existing memory ID (avoids N+1)."""
     match_keys = [r.match_key for r in records if r.match_key]
@@ -486,7 +468,7 @@ async def _batch_lookup_match_keys(
     return {row[0]: row[1] for row in result.all()}
 
 
-def _compute_overall_status(summary: dict, total: int) -> str:
+def _compute_overall_status(summary: dict[str, Any], total: int) -> str:
     """Derive batch overall status from per-record summary counts."""
     if summary["failed"] == 0:
         return "success"
@@ -578,7 +560,7 @@ async def handle_memory_write_many(
         await _process_records(commit_each=True)
 
     overall = _compute_overall_status(summary, len(request.records))
-    return MemoryWriteManyResponse(status=overall, summary=summary, results=results)
+    return MemoryWriteManyResponse(status=overall, summary=summary, results=results)  # type: ignore[arg-type]
 
 
 async def store_memory(
@@ -607,7 +589,7 @@ async def store_memory(
         tags=data.tags,
         match_key=data.match_key,
         obsidian_ref=data.obsidian_ref,
-        sensitivity=data.sensitivity,
+        sensitivity=data.sensitivity,  # type: ignore[arg-type]
         custom_fields=data.custom_fields,
     )
     write_func = handle_memory_write
@@ -618,6 +600,7 @@ async def store_memory(
     )
     if res.status == "failed":
         raise ValueError(f"Write failed: {res.errors}")
+    assert res.record is not None
     return _to_out(await get_memory_raw(session, res.record.id))
 
 
@@ -635,7 +618,7 @@ async def store_memories_bulk(
             tags=item.tags,
             match_key=item.match_key,
             obsidian_ref=item.obsidian_ref,
-            sensitivity=item.sensitivity,
+            sensitivity=item.sensitivity,  # type: ignore[arg-type]
             custom_fields=item.custom_fields,
             relations=MemoryRelations(**(item.relations or {})),
         )
@@ -671,7 +654,7 @@ def _build_update_write_record(memory: Memory, data: MemoryUpdate) -> MemoryWrit
         tenant_id=data.tenant_id
         if data.tenant_id is not None
         else (memory.tenant_id or metadata.get("tenant_id")),
-        tags=data.tags if data.tags is not None else memory.tags,
+        tags=data.tags if data.tags is not None else (memory.tags or []),
         relations=MemoryRelations(
             **(
                 data.relations
@@ -682,7 +665,7 @@ def _build_update_write_record(memory: Memory, data: MemoryUpdate) -> MemoryWrit
         obsidian_ref=data.obsidian_ref
         if data.obsidian_ref is not None
         else memory.obsidian_ref,
-        sensitivity=data.sensitivity if data.sensitivity else memory.sensitivity,
+        sensitivity=data.sensitivity if data.sensitivity else memory.sensitivity,  # type: ignore[arg-type]
         custom_fields=data.custom_fields
         if data.custom_fields is not None
         else (metadata.get("custom_fields") or {}),
@@ -730,7 +713,7 @@ async def delete_memory(
         return False
     if not _can_hard_delete(memory.domain, memory.entity_type):
         raise ValueError("Cannot hard-delete append-only memories.")
-    await _audit_compat(
+    await _audit(
         session,
         "delete",
         memory.id,
@@ -753,8 +736,8 @@ async def delete_memory(
 
 def _classify_bulk_results(
     results: list[BatchResultItem],
-    id_to_mem: dict,
-) -> tuple[list, list, list]:
+    id_to_mem: dict[str, Any],
+) -> tuple[list[Any], list[Any], list[Any]]:
     """Classify bulk write results into inserted, updated, and skipped lists."""
     inserted = []
     updated = []
@@ -792,7 +775,7 @@ async def upsert_memories_bulk(
             tags=item.tags,
             match_key=item.match_key,
             obsidian_ref=item.obsidian_ref,
-            sensitivity=item.sensitivity,
+            sensitivity=item.sensitivity,  # type: ignore[arg-type]
             custom_fields=item.custom_fields,
         )
         for item in items
@@ -828,7 +811,7 @@ async def run_maintenance(
 
 async def _process_duplicates(
     session: AsyncSession,
-    dedup_threshold: int,
+    dedup_threshold: float,
     total: int,
     dry_run: bool,
 ) -> tuple[list[MaintenanceAction], int]:
@@ -1019,7 +1002,7 @@ async def _run_maintenance_inner(
         await session.commit()
         return report
 
-    audit_entry = AuditLog(
+    audit_entry = AuditLog(  # type: ignore[call-arg]
         operation="maintain",
         tool_name="memory.maintain",
         memory_id=None,
@@ -1033,9 +1016,7 @@ async def _run_maintenance_inner(
             "actions": [action.model_dump() for action in actions],
         },
     )
-    maybe_add = _session_add(session, audit_entry)
-    if maybe_add is not None:
-        await maybe_add
+    _session_add(session, audit_entry)
     await session.flush()
     report.report_id = audit_entry.id
     await session.commit()

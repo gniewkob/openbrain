@@ -33,11 +33,13 @@ def test_validate_request_contracts_non_null_query_raises():
     from src.request_builders import _validate_request_contracts
 
     with pytest.raises(ValueError, match="must be null"):
-        _validate_request_contracts({
-            "find_list_query": "SELECT *",
-            "find_list_sort": "created_at desc",
-            "updated_by_default": "system",
-        })
+        _validate_request_contracts(
+            {
+                "find_list_query": "SELECT *",
+                "find_list_sort": "created_at desc",
+                "updated_by_default": "system",
+            }
+        )
 
 
 def test_validate_request_contracts_bad_sort_raises():
@@ -45,11 +47,13 @@ def test_validate_request_contracts_bad_sort_raises():
     from src.request_builders import _validate_request_contracts
 
     with pytest.raises(ValueError, match="must be a non-empty string"):
-        _validate_request_contracts({
-            "find_list_query": None,
-            "find_list_sort": "",
-            "updated_by_default": "system",
-        })
+        _validate_request_contracts(
+            {
+                "find_list_query": None,
+                "find_list_sort": "",
+                "updated_by_default": "system",
+            }
+        )
 
 
 # ---------------------------------------------------------------------------

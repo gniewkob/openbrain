@@ -183,7 +183,9 @@ def test_check_rate_limit_uses_redis_when_available():
 
     with patch("src.auth._rate_limit_redis") as mock_redis_rl:
         auth_mod.check_internal_key_rate_limit("1.1.1.1")
-        mock_redis_rl.assert_called_once_with(mock_client, "1.1.1.1", auth_mod._get_rate_limit_rpm())
+        mock_redis_rl.assert_called_once_with(
+            mock_client, "1.1.1.1", auth_mod._get_rate_limit_rpm()
+        )
 
     auth_mod._redis_client = None
 

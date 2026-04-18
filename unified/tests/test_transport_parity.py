@@ -221,7 +221,10 @@ class _TransportClient:
             return _FakeResponse(200, V1_RECORD)
         if method == "GET" and path == "/api/memories":
             return _FakeResponse(200, [LEGACY_MEMORY])
-        if method == "DELETE" and path in ("/api/memories/mem-1", "/api/v1/memory/mem-1"):
+        if method == "DELETE" and path in (
+            "/api/memories/mem-1",
+            "/api/v1/memory/mem-1",
+        ):
             return _FakeResponse(204, None)
         raise AssertionError(f"Unexpected transport request: {method} {path}")
 
@@ -242,7 +245,9 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch("_gateway_src.main._get_backend_status", return_value=backend),
             patch.object(mcp_transport, "_get_backend_status", return_value=backend),
-            patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=False),
+            patch(
+                "_gateway_src.main._obsidian_local_tools_enabled", return_value=False
+            ),
             patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
         ):
             gateway_caps = await gateway.brain_capabilities()
@@ -260,8 +265,13 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             gateway_caps["health"]["components"]["vector_store"], "healthy"
         )
-        self.assertEqual(gateway_caps["tier_1_core"]["tools"], transport_caps["tier_1_core"]["tools"])
-        self.assertEqual(gateway_caps["tier_3_admin"]["tools"], transport_caps["tier_3_admin"]["tools"])
+        self.assertEqual(
+            gateway_caps["tier_1_core"]["tools"], transport_caps["tier_1_core"]["tools"]
+        )
+        self.assertEqual(
+            gateway_caps["tier_3_admin"]["tools"],
+            transport_caps["tier_3_admin"]["tools"],
+        )
         self.assertEqual(
             set(gateway_caps["tier_2_advanced"]["tools"]),
             set(transport_caps["tier_2_advanced"]["tools"]),
@@ -281,8 +291,12 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gateway_caps["tier_1_core"]["status"], "stable")
         self.assertEqual(gateway_caps["tier_2_advanced"]["status"], "active")
         self.assertEqual(gateway_caps["tier_3_admin"]["status"], "guarded")
-        self.assertEqual(gateway_caps["obsidian"]["status"], transport_caps["obsidian"]["status"])
-        self.assertEqual(gateway_caps["obsidian"]["tools"], transport_caps["obsidian"]["tools"])
+        self.assertEqual(
+            gateway_caps["obsidian"]["status"], transport_caps["obsidian"]["status"]
+        )
+        self.assertEqual(
+            gateway_caps["obsidian"]["tools"], transport_caps["obsidian"]["tools"]
+        )
 
     async def test_capabilities_parity_for_degraded_backend_state(self) -> None:
         backend = {
@@ -297,7 +311,9 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch("_gateway_src.main._get_backend_status", return_value=backend),
             patch.object(mcp_transport, "_get_backend_status", return_value=backend),
-            patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=False),
+            patch(
+                "_gateway_src.main._obsidian_local_tools_enabled", return_value=False
+            ),
             patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
         ):
             gateway_caps = await gateway.brain_capabilities()
@@ -322,7 +338,9 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch("_gateway_src.main._get_backend_status", return_value=backend),
             patch.object(mcp_transport, "_get_backend_status", return_value=backend),
-            patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=False),
+            patch(
+                "_gateway_src.main._obsidian_local_tools_enabled", return_value=False
+            ),
             patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
         ):
             gateway_caps = await gateway.brain_capabilities()
@@ -436,7 +454,9 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(transport_result, gateway_result)
 
-    async def test_search_and_list_validation_parity_between_stdio_and_http(self) -> None:
+    async def test_search_and_list_validation_parity_between_stdio_and_http(
+        self,
+    ) -> None:
         with self.assertRaisesRegex(ValueError, "top_k must be 1"):
             await gateway.brain_search(query="payload", top_k=0)
         with self.assertRaisesRegex(ValueError, "top_k must be 1"):
@@ -476,7 +496,9 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(_drop_none(transport_result), _drop_none(gateway_result))
 
-    async def test_update_updated_by_placeholder_parity_between_stdio_and_http(self) -> None:
+    async def test_update_updated_by_placeholder_parity_between_stdio_and_http(
+        self,
+    ) -> None:
         gateway_client = _GatewayClient()
         transport_client = _TransportClient()
         with (
@@ -554,7 +576,9 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             ):
                 await mcp_transport.brain_delete("mem-1")
 
-    async def test_delete_missing_session_error_parity_between_stdio_and_http(self) -> None:
+    async def test_delete_missing_session_error_parity_between_stdio_and_http(
+        self,
+    ) -> None:
         class _GatewayDelete400(_GatewayClient):
             async def delete(self, path: str):
                 if path == "/api/v1/memory/mem-1":
@@ -568,9 +592,7 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
                     return _FakeResponse(400, {"detail": "Missing session ID"})
                 return await super().request(method, path, **kwargs)
 
-        expected = (
-            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
-        )
+        expected = "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
         with (
             patch("_gateway_src.main._client", return_value=_GatewayDelete400()),
             patch.object(mcp_transport, "_client", return_value=_TransportDelete400()),
@@ -619,7 +641,9 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(transport_result, gateway_result)
 
-    async def test_admin_tool_parameter_bounds_parity_between_stdio_and_http(self) -> None:
+    async def test_admin_tool_parameter_bounds_parity_between_stdio_and_http(
+        self,
+    ) -> None:
         with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
             await gateway.brain_test_data_report(sample_limit=0)
         with self.assertRaisesRegex(ValueError, "sample_limit must be 1"):
@@ -671,9 +695,7 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
                     return _FakeResponse(400, {"detail": "Missing session ID"})
                 return await super().request(method, path, **kwargs)
 
-        expected = (
-            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
-        )
+        expected = "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
         with (
             patch("_gateway_src.main._client", return_value=_GatewayReport400()),
             patch.object(mcp_transport, "_client", return_value=_TransportReport400()),
@@ -702,9 +724,7 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
                     return _FakeResponse(400, {"detail": "Missing session ID"})
                 return await super().request(method, path, **kwargs)
 
-        expected = (
-            "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
-        )
+        expected = "Backend 400: Missing MCP session context; reconnect the MCP HTTP client and retry."
         with (
             patch("_gateway_src.main._client", return_value=_GatewayCleanup400()),
             patch.object(mcp_transport, "_client", return_value=_TransportCleanup400()),
@@ -712,7 +732,9 @@ class TransportParityTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, expected):
                 await gateway.brain_cleanup_build_test_data(dry_run=True, limit=10)
             with self.assertRaisesRegex(ValueError, expected):
-                await mcp_transport.brain_cleanup_build_test_data(dry_run=True, limit=10)
+                await mcp_transport.brain_cleanup_build_test_data(
+                    dry_run=True, limit=10
+                )
 
     async def test_actor_normalization_parity_between_stdio_and_http(self) -> None:
         hits = [

@@ -48,7 +48,9 @@ async def test_handle_memory_write_fails_on_mode_violation():
     )
     req = MemoryWriteRequest(record=rec, write_mode=WriteMode.create_only)
 
-    with patch("src.memory_writes._find_existing_memory", AsyncMock(return_value=mock_existing)):
+    with patch(
+        "src.memory_writes._find_existing_memory", AsyncMock(return_value=mock_existing)
+    ):
         result = await handle_memory_write(session, req)
 
     assert result.status == "failed"
@@ -65,7 +67,12 @@ async def test_handle_memory_write_skipped_when_content_unchanged():
     """_record_matches_existing returns True → status='skipped' (line 438)."""
     from datetime import datetime, timezone
     from src.memory_writes import handle_memory_write
-    from src.schemas import MemoryRecord, MemoryWriteRecord, MemoryWriteRequest, WriteMode
+    from src.schemas import (
+        MemoryRecord,
+        MemoryWriteRecord,
+        MemoryWriteRequest,
+        WriteMode,
+    )
 
     session = _make_session()
     mock_existing = MagicMock()
@@ -97,7 +104,10 @@ async def test_handle_memory_write_skipped_when_content_unchanged():
     )
 
     with (
-        patch("src.memory_writes._find_existing_memory", AsyncMock(return_value=mock_existing)),
+        patch(
+            "src.memory_writes._find_existing_memory",
+            AsyncMock(return_value=mock_existing),
+        ),
         patch("src.memory_writes._record_matches_existing", return_value=True),
         patch("src.memory_writes._to_record", return_value=record_out),
     ):

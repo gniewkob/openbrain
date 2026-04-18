@@ -199,8 +199,7 @@ class TestBrainUpsertBulkContract:
         from src.schemas import MemoryUpsertItem
 
         items = [
-            self._item(content=f"record {i}", match_key=f"mk:{i}")
-            for i in range(5)
+            self._item(content=f"record {i}", match_key=f"mk:{i}") for i in range(5)
         ]
         for item in items:
             MemoryUpsertItem.model_validate(item)

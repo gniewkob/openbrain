@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -84,7 +85,7 @@ async def _get_sync_engine(strategy: str = "domain_based") -> BidirectionalSyncE
 
 @router.get("/vaults")
 async def v1_obsidian_vaults(
-    _user: dict = Depends(require_auth),
+    _user: dict[str, Any] = Depends(require_auth),
 ) -> list[str]:
     """List available Obsidian vaults."""
     require_admin(_user)
@@ -98,7 +99,7 @@ async def v1_obsidian_vaults(
 @router.post("/read-note")
 async def v1_obsidian_read_note(
     req: ObsidianReadRequest,
-    _user: dict = Depends(require_auth),
+    _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianNoteResponse:
     """Read a note from Obsidian vault."""
     require_admin(_user)
@@ -122,7 +123,7 @@ async def v1_obsidian_read_note(
 async def v1_obsidian_sync(
     req: ObsidianSyncRequest,
     session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
+    _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianSyncResponse:
     """Sync notes from Obsidian to OpenBrain."""
     require_admin(_user)
@@ -167,7 +168,7 @@ async def v1_obsidian_sync(
 @router.post("/write-note")
 async def v1_obsidian_write_note(
     req: ObsidianWriteRequest,
-    _user: dict = Depends(require_auth),
+    _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianWriteResponse:
     """Write a single note to Obsidian vault."""
     require_admin(_user)
@@ -202,7 +203,7 @@ async def v1_obsidian_write_note(
 async def v1_obsidian_export(
     req: ObsidianExportRequest,
     session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
+    _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianExportResponse:
     """Export memories from OpenBrain to Obsidian notes."""
     require_admin(_user)
@@ -234,7 +235,7 @@ async def v1_obsidian_export(
 
     log = structlog.get_logger()
     adapter = ObsidianCliAdapter()
-    exported: list = []
+    exported: list[Any] = []
     errors: list[dict[str, str]] = []
 
     for memory in memories:
@@ -282,7 +283,7 @@ async def v1_obsidian_export(
 async def v1_obsidian_collection(
     req: ObsidianCollectionRequest,
     session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
+    _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianCollectionResponse:
     """Create a collection (index note) from memories."""
     require_admin(_user)
@@ -353,7 +354,7 @@ async def v1_obsidian_collection(
 async def v1_obsidian_bidirectional_sync(
     req: ObsidianBidirectionalSyncRequest,
     session: AsyncSession = Depends(get_session),
-    _user: dict = Depends(require_auth),
+    _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianBidirectionalSyncResponse:
     """Perform bidirectional synchronization between OpenBrain and Obsidian."""
     require_admin(_user)
@@ -402,7 +403,7 @@ async def v1_obsidian_bidirectional_sync(
 
 @router.get("/sync-status")
 async def v1_obsidian_sync_status(
-    _user: dict = Depends(require_auth),
+    _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianSyncStatus:
     """Get status of sync tracking."""
     require_admin(_user)
@@ -420,7 +421,7 @@ async def v1_obsidian_update_note(
     content: str | None = None,
     append: bool = False,
     tags: list[str] | None = None,
-    _user: dict = Depends(require_auth),
+    _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianWriteResponse:
     """Update an existing note in Obsidian."""
     require_admin(_user)

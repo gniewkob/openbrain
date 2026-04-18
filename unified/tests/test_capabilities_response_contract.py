@@ -35,18 +35,14 @@ def _contract() -> dict:
 
 def _cap_metadata() -> dict:
     path = (
-        Path(__file__).resolve().parents[1]
-        / "contracts"
-        / "capabilities_metadata.json"
+        Path(__file__).resolve().parents[1] / "contracts" / "capabilities_metadata.json"
     )
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _cap_manifest() -> dict:
     path = (
-        Path(__file__).resolve().parents[1]
-        / "contracts"
-        / "capabilities_manifest.json"
+        Path(__file__).resolve().parents[1] / "contracts" / "capabilities_manifest.json"
     )
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -64,7 +60,9 @@ async def test_http_transport_capabilities_follow_response_contract() -> None:
         "probe": "readyz",
     }
     with (
-        patch.object(mcp_transport, "_get_backend_status", AsyncMock(return_value=backend)),
+        patch.object(
+            mcp_transport, "_get_backend_status", AsyncMock(return_value=backend)
+        ),
         patch.object(mcp_transport, "ENABLE_HTTP_OBSIDIAN_TOOLS", False),
     ):
         caps = await mcp_transport.brain_capabilities()
@@ -111,7 +109,9 @@ async def test_gateway_capabilities_follow_response_contract_when_available() ->
         "vector_store": "ok",
         "probe": "readyz",
     }
-    with patch("_gateway_src.main._get_backend_status", AsyncMock(return_value=backend)):
+    with patch(
+        "_gateway_src.main._get_backend_status", AsyncMock(return_value=backend)
+    ):
         caps = await _gateway.brain_capabilities()
 
     for key in contract["required_top_level_keys"]:

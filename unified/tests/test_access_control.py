@@ -54,11 +54,24 @@ class AccessControlTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_v1_write_forces_owner_to_subject_for_scoped_user(self) -> None:
         from src.api.v1.memory import v1_write
-        req = MemoryWriteRequest(record=MemoryWriteRecord(content="x", domain="build", entity_type="Note", owner=""))
-        with patch("src.api.v1.memory.handle_memory_write", new=AsyncMock(return_value=type("R", (), {"status": "created"})())) as handle_memory_write, patch(
-            f"{_POLICY}.PUBLIC_MODE", True
-        ), patch(f"{_POLICY}.is_privileged_user", return_value=False), patch(f"{_POLICY}.get_subject", return_value="user-1"), patch(
-            f"{_POLICY}._effective_domain_scope", return_value={"build", "corporate", "personal"}
+
+        req = MemoryWriteRequest(
+            record=MemoryWriteRecord(
+                content="x", domain="build", entity_type="Note", owner=""
+            )
+        )
+        with (
+            patch(
+                "src.api.v1.memory.handle_memory_write",
+                new=AsyncMock(return_value=type("R", (), {"status": "created"})()),
+            ) as handle_memory_write,
+            patch(f"{_POLICY}.PUBLIC_MODE", True),
+            patch(f"{_POLICY}.is_privileged_user", return_value=False),
+            patch(f"{_POLICY}.get_subject", return_value="user-1"),
+            patch(
+                f"{_POLICY}._effective_domain_scope",
+                return_value={"build", "corporate", "personal"},
+            ),
         ):
             await v1_write(req=req, session=object(), _user={"sub": "user-1"})
 
@@ -66,17 +79,27 @@ class AccessControlTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(passed.record.owner, "user-1")
 
     async def test_effective_domain_scope_intersects_claims_and_registry(self) -> None:
-        with patch(f"{_POLICY}.get_subject", return_value="user-1"), patch(f"{_POLICY}.get_tenant_id", return_value="tenant-a"), patch(
-            f"{_POLICY}.get_domain_scope", return_value={"build", "corporate"}
-        ), patch(f"{_POLICY}.get_registry_domain_scope", return_value={"build"}):
-            scope = _effective_domain_scope({"sub": "user-1", "tenant_id": "tenant-a"}, "read")
+        with (
+            patch(f"{_POLICY}.get_subject", return_value="user-1"),
+            patch(f"{_POLICY}.get_tenant_id", return_value="tenant-a"),
+            patch(f"{_POLICY}.get_domain_scope", return_value={"build", "corporate"}),
+            patch(f"{_POLICY}.get_registry_domain_scope", return_value={"build"}),
+        ):
+            scope = _effective_domain_scope(
+                {"sub": "user-1", "tenant_id": "tenant-a"}, "read"
+            )
         self.assertEqual(scope, {"build"})
 
     async def test_effective_domain_scope_uses_registry_when_claims_empty(self) -> None:
-        with patch(f"{_POLICY}.get_subject", return_value="user-1"), patch(f"{_POLICY}.get_tenant_id", return_value="tenant-a"), patch(
-            f"{_POLICY}.get_domain_scope", return_value=set()
-        ), patch(f"{_POLICY}.get_registry_domain_scope", return_value={"personal"}):
-            scope = _effective_domain_scope({"sub": "user-1", "tenant_id": "tenant-a"}, "read")
+        with (
+            patch(f"{_POLICY}.get_subject", return_value="user-1"),
+            patch(f"{_POLICY}.get_tenant_id", return_value="tenant-a"),
+            patch(f"{_POLICY}.get_domain_scope", return_value=set()),
+            patch(f"{_POLICY}.get_registry_domain_scope", return_value={"personal"}),
+        ):
+            scope = _effective_domain_scope(
+                {"sub": "user-1", "tenant_id": "tenant-a"}, "read"
+            )
         self.assertEqual(scope, {"personal"})
 
 

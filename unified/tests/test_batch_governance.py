@@ -9,16 +9,30 @@ from src.schemas import MemoryWriteManyRequest, MemoryWriteRecord
 
 
 class BatchGovernanceTests(unittest.IsolatedAsyncioTestCase):
-    async def test_handle_memory_write_many_exposes_status_and_previous_record_id(self) -> None:
+    async def test_handle_memory_write_many_exposes_status_and_previous_record_id(
+        self,
+    ) -> None:
         session = AsyncMock()
         # Batch lookup returns a result with .all() method returning tuples of (match_key, id)
         session.execute.side_effect = [
-            SimpleNamespace(all=lambda: [("mk-versioned", "mem-old-1"), ("mk-created", None)]),
+            SimpleNamespace(
+                all=lambda: [("mk-versioned", "mem-old-1"), ("mk-created", None)]
+            ),
         ]
 
         records = [
-            MemoryWriteRecord(content="versioned", domain="corporate", entity_type="Decision", match_key="mk-versioned"),
-            MemoryWriteRecord(content="created", domain="build", entity_type="Note", match_key="mk-created"),
+            MemoryWriteRecord(
+                content="versioned",
+                domain="corporate",
+                entity_type="Decision",
+                match_key="mk-versioned",
+            ),
+            MemoryWriteRecord(
+                content="created",
+                domain="build",
+                entity_type="Note",
+                match_key="mk-created",
+            ),
         ]
 
         responses = [
@@ -36,7 +50,9 @@ class BatchGovernanceTests(unittest.IsolatedAsyncioTestCase):
             ),
         ]
 
-        with patch.object(memory_writes, "handle_memory_write", new=AsyncMock(side_effect=responses)):
+        with patch.object(
+            memory_writes, "handle_memory_write", new=AsyncMock(side_effect=responses)
+        ):
             result = await memory_writes.handle_memory_write_many(
                 session,
                 MemoryWriteManyRequest(records=records, write_mode="upsert"),

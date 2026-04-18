@@ -115,7 +115,10 @@ def test_v1_get_context_with_domain_calls_enforce():
 
         with (
             patch("src.api.v1.memory.enforce_domain_access") as mock_enf,
-            patch("src.api.v1.memory.get_grounding_pack", AsyncMock(return_value=mock_response)),
+            patch(
+                "src.api.v1.memory.get_grounding_pack",
+                AsyncMock(return_value=mock_response),
+            ),
         ):
             r = client.post(
                 "/api/v1/memory/get-context",

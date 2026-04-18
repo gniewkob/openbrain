@@ -7,9 +7,7 @@ import sys
 
 def _load_capabilities_tools_truthfulness_module():
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = (
-        repo_root / "scripts" / "check_capabilities_tools_truthfulness.py"
-    )
+    script_path = repo_root / "scripts" / "check_capabilities_tools_truthfulness.py"
     spec = importlib.util.spec_from_file_location(
         "check_capabilities_tools_truthfulness", script_path
     )

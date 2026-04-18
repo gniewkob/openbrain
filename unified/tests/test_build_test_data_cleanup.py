@@ -11,7 +11,9 @@ from src import memory_writes
 
 
 class BuildTestDataCleanupWriteTests(unittest.IsolatedAsyncioTestCase):
-    async def test_cleanup_build_test_data_dry_run_returns_candidates_only(self) -> None:
+    async def test_cleanup_build_test_data_dry_run_returns_candidates_only(
+        self,
+    ) -> None:
         now = datetime.now(timezone.utc)
         session = AsyncMock()
         session.execute = AsyncMock(
@@ -23,7 +25,9 @@ class BuildTestDataCleanupWriteTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        with patch.object(memory_writes, "delete_memory", new=AsyncMock()) as delete_mock:
+        with patch.object(
+            memory_writes, "delete_memory", new=AsyncMock()
+        ) as delete_mock:
             result = await memory_writes.cleanup_build_test_data(
                 session,
                 dry_run=True,
@@ -37,7 +41,9 @@ class BuildTestDataCleanupWriteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.candidate_ids, ["mem-1", "mem-2"])
         delete_mock.assert_not_called()
 
-    async def test_cleanup_build_test_data_executes_delete_and_collects_skips(self) -> None:
+    async def test_cleanup_build_test_data_executes_delete_and_collects_skips(
+        self,
+    ) -> None:
         now = datetime.now(timezone.utc)
         session = AsyncMock()
         session.execute = AsyncMock(
@@ -52,7 +58,12 @@ class BuildTestDataCleanupWriteTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(
             memory_writes,
             "delete_memory",
-            new=AsyncMock(side_effect=[True, ValueError("Cannot hard-delete append-only memories.")]),
+            new=AsyncMock(
+                side_effect=[
+                    True,
+                    ValueError("Cannot hard-delete append-only memories."),
+                ]
+            ),
         ):
             result = await memory_writes.cleanup_build_test_data(
                 session,
@@ -78,7 +89,9 @@ class BuildTestDataCleanupEndpointTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(
             mem_module,
             "require_admin",
-            side_effect=HTTPException(status_code=403, detail="Admin privileges required"),
+            side_effect=HTTPException(
+                status_code=403, detail="Admin privileges required"
+            ),
         ):
             with self.assertRaises(HTTPException) as ctx:
                 await mem_module.cleanup_build_test_data(

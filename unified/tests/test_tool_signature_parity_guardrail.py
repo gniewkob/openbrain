@@ -38,7 +38,9 @@ async def brain_update(memory_id, content, title=None, updated_by="agent"):
     assert any("brain_update signature drift" in err for err in errors)
 
 
-def test_tool_signature_guardrail_contract_loader_validates_shape(tmp_path: Path) -> None:
+def test_tool_signature_guardrail_contract_loader_validates_shape(
+    tmp_path: Path,
+) -> None:
     module = _load_tool_signature_parity_module()
     broken = tmp_path / "tool_signature_guardrail_contract.json"
     broken.write_text("{}", encoding="utf-8")

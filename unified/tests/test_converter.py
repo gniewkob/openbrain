@@ -37,7 +37,9 @@ def _memory(**kwargs):
     return mem
 
 
-def _export_item(memory_id="mem-1", path="Notes/note.md", title="Note") -> ObsidianExportItem:
+def _export_item(
+    memory_id="mem-1", path="Notes/note.md", title="Note"
+) -> ObsidianExportItem:
     return ObsidianExportItem(memory_id=memory_id, path=path, title=title, created=True)
 
 
@@ -129,7 +131,15 @@ def test_note_content_template_fallback_on_bad_template():
 def test_frontmatter_has_required_keys():
     mem = _memory()
     fm = memory_to_frontmatter(mem)
-    for key in ("openbrain_id", "domain", "entity_type", "owner", "version", "status", "tags"):
+    for key in (
+        "openbrain_id",
+        "domain",
+        "entity_type",
+        "owner",
+        "version",
+        "status",
+        "tags",
+    ):
         assert key in fm
 
 
@@ -160,7 +170,10 @@ def test_frontmatter_source_is_openbrain_export():
 
 
 def test_collection_index_no_grouping_lists_items():
-    exported = [_export_item("m1", "Notes/a.md", "Alpha"), _export_item("m2", "Notes/b.md", "Beta")]
+    exported = [
+        _export_item("m1", "Notes/a.md", "Alpha"),
+        _export_item("m2", "Notes/b.md", "Beta"),
+    ]
     result = build_collection_index("MyCol", "test query", exported, [], None)
     assert "MyCol" in result
     assert "Alpha" in result

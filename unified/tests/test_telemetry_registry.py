@@ -77,12 +77,15 @@ def test_histogram_from_snapshot_uses_default_buckets_when_empty():
 
 def test_histogram_from_snapshot_raises_on_bad_shape():
     with pytest.raises(ValueError, match="Invalid persisted histogram"):
-        Histogram.from_snapshot("lat", {
-            "buckets": ["inf"],
-            "counts": [1, 2, 3],  # wrong length
-            "sum": 0,
-            "count": 0,
-        })
+        Histogram.from_snapshot(
+            "lat",
+            {
+                "buckets": ["inf"],
+                "counts": [1, 2, 3],  # wrong length
+                "sum": 0,
+                "count": 0,
+            },
+        )
 
 
 def test_histogram_from_snapshot_handles_inf_string():
@@ -193,9 +196,9 @@ def test_bulk_load_metrics():
 
 def test_bulk_load_histograms_fn():
     reset_metrics()
-    bulk_load_histograms({
-        "req_lat": {"buckets": [0.1, "inf"], "counts": [2, 4], "sum": 1.0, "count": 4}
-    })
+    bulk_load_histograms(
+        {"req_lat": {"buckets": [0.1, "inf"], "counts": [2, 4], "sum": 1.0, "count": 4}}
+    )
     snap = get_metrics_snapshot()
     assert "req_lat" in snap["histograms"]
     reset_metrics()

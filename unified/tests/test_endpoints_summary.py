@@ -13,12 +13,14 @@ from fastapi.testclient import TestClient
 def client(monkeypatch) -> TestClient:
     """Create test client."""
     from src import config, auth
+
     monkeypatch.setenv("PUBLIC_MODE", "false")
     monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
     config.get_config.cache_clear()
     import importlib
+
     importlib.reload(auth)
-    
+
     from src.main import app
 
     return TestClient(app, raise_server_exceptions=False)
@@ -99,7 +101,9 @@ class TestEndpointsV1Core:
         # Returns 401/403 without auth or 404/503 with auth but no DB
         assert response.status_code in [200, 401, 403, 404, 500, 503]
 
-    def test_v1_test_data_hygiene_report_requires_auth(self, client: TestClient) -> None:
+    def test_v1_test_data_hygiene_report_requires_auth(
+        self, client: TestClient
+    ) -> None:
         """V1 admin test-data report is protected by auth/admin policy."""
         response = client.get("/api/v1/memory/admin/test-data/report")
         assert response.status_code in [200, 401, 403, 500, 503]
@@ -266,9 +270,7 @@ class TestAllRoutesRegistered:
         assert schema.get("minimum") == 1
         assert schema.get("maximum") == 100
 
-    def test_cleanup_build_request_bounds_in_openapi(
-        self, client: TestClient
-    ) -> None:
+    def test_cleanup_build_request_bounds_in_openapi(self, client: TestClient) -> None:
         """OpenAPI keeps cleanup request body bounds/defaults stable."""
         response = client.get("/openapi.json")
         data = response.json()

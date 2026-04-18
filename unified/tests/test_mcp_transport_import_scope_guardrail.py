@@ -36,7 +36,9 @@ def test_import_scope_rejects_non_test_importers() -> None:
 def test_import_scope_requires_combined_import() -> None:
     module = _load_guardrail_module()
     contract = module._load_contract()
-    errors = module._check_import_scope(["unified/tests/test_mcp_transport.py"], contract)
+    errors = module._check_import_scope(
+        ["unified/tests/test_mcp_transport.py"], contract
+    )
     assert "unified/src/combined.py must import mcp_transport" in errors
 
 

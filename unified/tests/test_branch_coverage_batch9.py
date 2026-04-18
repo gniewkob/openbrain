@@ -1,17 +1,17 @@
 """Final coverage batch — reaches 99%+ across all remaining files.
 
 Covers:
-- memory_writes.py:68      _session_add awaitable return path
-- memory_writes.py:231     await maybe_add in _create_new_memory
-- memory_writes.py:306     await maybe_add in _version_memory
-- memory_writes.py:769-801 upsert_memories_bulk happy path
-- memory_writes.py:1022    await maybe_result in _audit (crud_common)
-- api/v1/health.py:36      non-200 → "degraded" (ternary false branch)
-- api/v1/obsidian.py:73-81 _get_sync_engine inner double-check-lock
-- auth.py:85               OIDCVerifier.metadata() cache-hit return path
-- auth.py:531              _get_redis_client double-check-lock inside lock
-- config.py:85             AppConfig validator ValueError (no OIDC or key)
-- crud_common.py:237       _audit await maybe_result path
+- memory_writes.py          _session_add delegates to session.add
+- memory_writes.py          _create_new_memory uses get_embedding directly
+- memory_writes.py          _version_memory uses get_embedding directly
+- memory_writes.py:769-801  upsert_memories_bulk happy path
+- memory_writes.py          _run_maintenance_inner creates audit log entry
+- api/v1/health.py:36       non-200 → "degraded" (ternary false branch)
+- api/v1/obsidian.py:73-81  _get_sync_engine inner double-check-lock
+- auth.py:85                OIDCVerifier.metadata() cache-hit return path
+- auth.py:531               _get_redis_client double-check-lock inside lock
+- config.py:85              AppConfig validator ValueError (no OIDC or key)
+- crud_common.py:237        _audit await maybe_result path
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ import pytest
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_session():
     s = AsyncMock()
     s.execute = AsyncMock()
@@ -40,80 +41,73 @@ def _make_session():
 
 
 # ---------------------------------------------------------------------------
-# memory_writes._session_add — line 68 (awaitable return)
+# memory_writes._session_add — delegates directly to session.add
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
-async def test_session_add_returns_awaitable_when_add_is_coroutine():
-    """_session_add returns the awaitable when session.add() returns one (line 68)."""
+
+def test_session_add_calls_session_add():
+    """_session_add delegates to session.add and returns None."""
     from src.memory_writes import _session_add
 
-    awaited = []
-
-    async def _coro():
-        awaited.append(True)
-
     mock_session = MagicMock()
-    coro = _coro()
-    mock_session.add = MagicMock(return_value=coro)
+    obj = object()
+    result = _session_add(mock_session, obj)
 
-    result = _session_add(mock_session, object())
-    assert result is coro
-    await result
-    assert awaited
+    mock_session.add.assert_called_once_with(obj)
+    assert result is None
 
 
 # ---------------------------------------------------------------------------
-# memory_writes._create_new_memory — line 231 (await maybe_add)
+# memory_writes._create_new_memory — uses get_embedding directly
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
-async def test_create_new_memory_awaits_when_session_add_is_awaitable():
-    """_create_new_memory awaits the result of _session_add when it returns a coroutine (line 231)."""
+async def test_create_new_memory_calls_get_embedding():
+    """_create_new_memory calls get_embedding (not a compat shim) to embed content."""
     from src.memory_writes import _create_new_memory
     from src.schemas import MemoryWriteRecord
 
     session = _make_session()
-    awaited = []
-
-    async def _async_add():
-        awaited.append(True)
-
-    session.add = MagicMock(return_value=_async_add())
-
     mock_memory = MagicMock()
     mock_memory.id = "test-id"
     mock_memory.metadata_ = {}
 
-    with patch("src.memory_writes._get_embedding_compat", new=AsyncMock(return_value=[0.1])):
+    with patch(
+        "src.memory_writes.get_embedding", new=AsyncMock(return_value=[0.1])
+    ) as mock_embed:
         with patch("src.memory_writes.Memory", return_value=mock_memory):
             with patch("src.memory_writes._build_memory_metadata", return_value={}):
-                with patch("src.memory_writes._audit_compat", new=AsyncMock()):
-                    with patch("src.memory_writes._to_record", return_value=MagicMock()):
-                        with patch("src.memory_writes.MemoryWriteResponse", return_value=MagicMock()):
-                            rec = MemoryWriteRecord(content="test", domain="build", entity_type="Note")
-                            await _create_new_memory(session, rec, "agent", "abc123", False, False)
+                with patch("src.memory_writes._audit", new=AsyncMock()):
+                    with patch(
+                        "src.memory_writes._to_record", return_value=MagicMock()
+                    ):
+                        with patch(
+                            "src.memory_writes.MemoryWriteResponse",
+                            return_value=MagicMock(),
+                        ):
+                            rec = MemoryWriteRecord(
+                                content="test", domain="build", entity_type="Note"
+                            )
+                            await _create_new_memory(
+                                session, rec, "agent", "abc123", False, False
+                            )
 
-    assert awaited, "session.add coroutine should have been awaited"
+    mock_embed.assert_called_once_with("test")
 
 
 # ---------------------------------------------------------------------------
 # memory_writes._version_memory — line 306 (await maybe_add)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
-async def test_version_memory_awaits_when_session_add_is_awaitable():
-    """_version_memory awaits the result of _session_add (line 306)."""
+async def test_version_memory_calls_session_add():
+    """_version_memory calls session.add directly for the new versioned memory."""
     from src.memory_writes import _version_memory
     from src.schemas import MemoryWriteRecord
 
     session = _make_session()
-    awaited = []
-
-    async def _async_add():
-        awaited.append(True)
-
-    session.add = MagicMock(return_value=_async_add())
 
     existing = MagicMock()
     existing.id = "old-id"
@@ -137,20 +131,28 @@ async def test_version_memory_awaits_when_session_add_is_awaitable():
     new_memory.id = "new-id"
     new_memory.metadata_ = {}
 
-    with patch("src.memory_writes._get_embedding_compat", new=AsyncMock(return_value=[0.1])):
+    with patch("src.memory_writes.get_embedding", new=AsyncMock(return_value=[0.1])):
         with patch("src.memory_writes.Memory", return_value=new_memory):
-            with patch("src.memory_writes._audit_compat", new=AsyncMock()):
+            with patch("src.memory_writes._audit", new=AsyncMock()):
                 with patch("src.memory_writes._to_record", return_value=MagicMock()):
-                    with patch("src.memory_writes.MemoryWriteResponse", return_value=MagicMock()):
-                        rec = MemoryWriteRecord(content="new content", domain="build", entity_type="Note")
-                        await _version_memory(session, existing, rec, "agent", "hash456", False)
+                    with patch(
+                        "src.memory_writes.MemoryWriteResponse",
+                        return_value=MagicMock(),
+                    ):
+                        rec = MemoryWriteRecord(
+                            content="new content", domain="build", entity_type="Note"
+                        )
+                        await _version_memory(
+                            session, existing, rec, "agent", "hash456", False
+                        )
 
-    assert awaited, "session.add coroutine should have been awaited in _version_memory"
+    session.add.assert_called()
 
 
 # ---------------------------------------------------------------------------
 # memory_writes.upsert_memories_bulk — lines 769-801 (happy path)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_upsert_memories_bulk_happy_path_with_ids():
@@ -168,9 +170,7 @@ async def test_upsert_memories_bulk_happy_path_with_ids():
     rid = str(uuid.uuid4())
 
     mock_response = MemoryWriteManyResponse(
-        results=[
-            BatchResultItem(input_index=0, status="created", record_id=rid)
-        ],
+        results=[BatchResultItem(input_index=0, status="created", record_id=rid)],
         status="success",
         summary={"created": 1},
     )
@@ -199,9 +199,14 @@ async def test_upsert_memories_bulk_happy_path_with_ids():
 
     items = [MemoryUpsertItem(content="test", domain="build", match_key="key1")]
 
-    with patch("src.memory_writes.handle_memory_write_many", new=AsyncMock(return_value=mock_response)):
+    with patch(
+        "src.memory_writes.handle_memory_write_many",
+        new=AsyncMock(return_value=mock_response),
+    ):
         with patch("src.memory_writes._to_out", return_value=MagicMock()):
-            with patch("src.memory_writes._classify_bulk_results", return_value=([], [], [])):
+            with patch(
+                "src.memory_writes._classify_bulk_results", return_value=([], [], [])
+            ):
                 result = await upsert_memories_bulk(session, items)
 
     assert isinstance(result, BulkUpsertResult)
@@ -221,16 +226,17 @@ async def test_upsert_memories_bulk_no_ids_empty_map():
     session = _make_session()
 
     mock_response = MemoryWriteManyResponse(
-        results=[
-            BatchResultItem(input_index=0, status="skipped", record_id=None)
-        ],
+        results=[BatchResultItem(input_index=0, status="skipped", record_id=None)],
         status="success",
         summary={"skipped": 1},
     )
 
     items = [MemoryUpsertItem(content="test", domain="build", match_key="key1")]
 
-    with patch("src.memory_writes.handle_memory_write_many", new=AsyncMock(return_value=mock_response)):
+    with patch(
+        "src.memory_writes.handle_memory_write_many",
+        new=AsyncMock(return_value=mock_response),
+    ):
         result = await upsert_memories_bulk(session, items)
 
     assert isinstance(result, BulkUpsertResult)
@@ -240,6 +246,7 @@ async def test_upsert_memories_bulk_no_ids_empty_map():
 # ---------------------------------------------------------------------------
 # crud_common._audit — line 237 (await maybe_result)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_crud_common_audit_awaits_when_add_is_awaitable():
@@ -270,6 +277,7 @@ async def test_crud_common_audit_awaits_when_add_is_awaitable():
 # api/v1/health.py:36 — non-200 response → "degraded"
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_check_vector_store_non_200_returns_degraded():
     """Status != 200 → 'degraded' (line 36 ternary false branch)."""
@@ -298,6 +306,7 @@ async def test_check_vector_store_non_200_returns_degraded():
 # ---------------------------------------------------------------------------
 
 import src.api.v1.obsidian as _obsidian_mod
+
 _REAL_GET_SYNC_ENGINE = _obsidian_mod._get_sync_engine
 
 
@@ -311,8 +320,13 @@ async def test_get_sync_engine_creates_engine_on_first_call():
     _obsidian_mod._sync_engine = None
 
     try:
-        with patch("src.api.v1.obsidian._get_sync_tracker", new=AsyncMock(return_value=mock_tracker)):
-            with patch("src.api.v1.obsidian.BidirectionalSyncEngine", return_value=mock_engine):
+        with patch(
+            "src.api.v1.obsidian._get_sync_tracker",
+            new=AsyncMock(return_value=mock_tracker),
+        ):
+            with patch(
+                "src.api.v1.obsidian.BidirectionalSyncEngine", return_value=mock_engine
+            ):
                 result = await _REAL_GET_SYNC_ENGINE("domain_based")
         assert result is mock_engine
     finally:
@@ -323,13 +337,17 @@ async def test_get_sync_engine_creates_engine_on_first_call():
 # auth.py:85 — OIDCVerifier.metadata() cache-hit return
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_oidc_metadata_cache_hit():
     """Cached metadata within TTL is returned immediately (line 85)."""
     from src.auth import OIDCVerifier
 
     verifier = OIDCVerifier(issuer_url="https://example.com", audience="test")
-    cached = {"issuer": "https://example.com", "jwks_uri": "https://example.com/.well-known/jwks.json"}
+    cached = {
+        "issuer": "https://example.com",
+        "jwks_uri": "https://example.com/.well-known/jwks.json",
+    }
     verifier._metadata = cached
     verifier._metadata_fetched_at = time.time()  # fresh — within TTL
 
@@ -342,6 +360,7 @@ async def test_oidc_metadata_cache_hit():
 # auth.py:531 — _get_redis_client double-check inside lock
 # ---------------------------------------------------------------------------
 
+
 def test_get_redis_client_double_check_inside_lock():
     """Second if-check inside lock returns pre-set _redis_client (line 531)."""
     import src.auth as auth_mod
@@ -351,6 +370,7 @@ def test_get_redis_client_double_check_inside_lock():
 
     class _SetBeforeAcquire:
         """Simulates another thread setting _redis_client before this one acquires the lock."""
+
         def __enter__(self):
             auth_mod._redis_client = fake_client
             return self
@@ -371,24 +391,30 @@ def test_get_redis_client_double_check_inside_lock():
 # config.py:85 — AppConfig validator raises when PUBLIC_MODE + no OIDC/key
 # ---------------------------------------------------------------------------
 
+
 def test_public_mode_config_raises_when_no_oidc_and_no_key():
     """PUBLIC_MODE=true without OIDC_ISSUER_URL or INTERNAL_API_KEY → ValueError (line 85)."""
     from pydantic import ValidationError
 
     clean_env = {
-        k: v for k, v in os.environ.items()
-        if k not in {"OIDC_ISSUER_URL", "INTERNAL_API_KEY", "PUBLIC_MODE", "PUBLIC_BASE_URL"}
+        k: v
+        for k, v in os.environ.items()
+        if k
+        not in {"OIDC_ISSUER_URL", "INTERNAL_API_KEY", "PUBLIC_MODE", "PUBLIC_BASE_URL"}
     }
-    clean_env.update({
-        "PUBLIC_MODE": "true",
-        "PUBLIC_BASE_URL": "https://example.com",
-        "OIDC_ISSUER_URL": "",
-        "INTERNAL_API_KEY": "",
-    })
+    clean_env.update(
+        {
+            "PUBLIC_MODE": "true",
+            "PUBLIC_BASE_URL": "https://example.com",
+            "OIDC_ISSUER_URL": "",
+            "INTERNAL_API_KEY": "",
+        }
+    )
 
     with patch.dict(os.environ, clean_env, clear=True):
         with pytest.raises((ValidationError, ValueError)):
             from src.config import AppConfig
+
             AppConfig()
 
 
@@ -396,13 +422,17 @@ def test_public_mode_config_raises_when_no_oidc_and_no_key():
 # auth.py:95 — OIDCVerifier.metadata() inner double-check cache hit
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_oidc_metadata_inner_cache_hit():
     """Inner double-check inside lock returns cached metadata (auth.py:95)."""
     from src.auth import OIDCVerifier
 
     verifier = OIDCVerifier(issuer_url="https://example.com", audience="test")
-    cached = {"issuer": "https://example.com", "jwks_uri": "https://example.com/.well-known/jwks.json"}
+    cached = {
+        "issuer": "https://example.com",
+        "jwks_uri": "https://example.com/.well-known/jwks.json",
+    }
 
     class _MockRefreshLock:
         async def __aenter__(self):
@@ -425,38 +455,38 @@ async def test_oidc_metadata_inner_cache_hit():
 # memory_writes._run_maintenance_inner:1022 — await maybe_add
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
-async def test_run_maintenance_inner_awaits_when_session_add_is_awaitable():
-    """_run_maintenance_inner awaits session.add if it returns awaitable (line 1022)."""
+async def test_run_maintenance_inner_creates_audit_log():
+    """_run_maintenance_inner calls session.add with an AuditLog entry."""
     from src.memory_writes import _run_maintenance_inner
     from src.schemas import MaintenanceRequest
 
     session = _make_session()
-    awaited = []
 
-    async def _async_add():
-        awaited.append(True)
-
-    session.add = MagicMock(return_value=_async_add())
-
-    # scalar_one() returns 0 (no memories)
     total_result = MagicMock()
     total_result.scalar_one.return_value = 0
     session.execute = AsyncMock(return_value=total_result)
 
     req = MaintenanceRequest(dry_run=False, fix_superseded_links=False)
+    audit_entry = MagicMock()
 
-    with patch("src.memory_writes._process_duplicates", new=AsyncMock(return_value=([], 0))):
-        with patch("src.memory_writes._normalize_owners", new=AsyncMock(return_value=([], 0))):
-            with patch("src.memory_writes.AuditLog", return_value=MagicMock()):
+    with patch(
+        "src.memory_writes._process_duplicates", new=AsyncMock(return_value=([], 0))
+    ):
+        with patch(
+            "src.memory_writes._normalize_owners", new=AsyncMock(return_value=([], 0))
+        ):
+            with patch("src.memory_writes.AuditLog", return_value=audit_entry):
                 await _run_maintenance_inner(session, req, "agent")
 
-    assert awaited, "session.add coroutine should have been awaited in _run_maintenance_inner"
+    session.add.assert_called_once_with(audit_entry)
 
 
 # ---------------------------------------------------------------------------
 # obsidian_adapter.py:459-461 — except Exception fallback when aiofiles.open raises
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_read_note_falls_back_to_cli_when_aiofiles_raises(tmp_path):
@@ -478,4 +508,3 @@ async def test_read_note_falls_back_to_cli_when_aiofiles_raises(tmp_path):
                 result = await adapter.read_note("testvault", "note.md")
 
     assert result.title == "CLI Fallback"
-

@@ -26,7 +26,9 @@ def test_capabilities_health_parity_guardrail_passes_for_current_sources() -> No
 def test_capabilities_health_parity_guardrail_detects_build_logic_drift() -> None:
     module = _load_capabilities_health_parity_module()
     contract = module._load_contract()
-    required_function_names = [str(name) for name in contract["required_function_names"]]
+    required_function_names = [
+        str(name) for name in contract["required_function_names"]
+    ]
     http_src = """
 def _api_component(api):
     return "healthy"
@@ -44,7 +46,9 @@ def build_capabilities_health(backend, obsidian_status):
     return {"overall": "healthy"}
 """
     errors = module._check_health_parity(http_src, gateway_src, required_function_names)
-    assert any("build_capabilities_health logic must stay identical" in err for err in errors)
+    assert any(
+        "build_capabilities_health logic must stay identical" in err for err in errors
+    )
 
 
 def test_capabilities_health_guardrail_contract_loader_validates_shape(

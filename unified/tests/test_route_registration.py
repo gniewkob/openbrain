@@ -83,8 +83,11 @@ class AppFactoryTests(unittest.TestCase):
 
         with patch.dict("os.environ", {"PUBLIC_MODE": "false", "PUBLIC_BASE_URL": ""}):
             from src import config
+
             config.get_config.cache_clear()
-            app = create_app(public_base_url="https://brain.example.com", lifespan=_lifespan)
+            app = create_app(
+                public_base_url="https://brain.example.com", lifespan=_lifespan
+            )
 
         self.assertEqual(app.title, "OpenBrain Unified Memory Service")
         self.assertEqual(app.version, "2.0.0")

@@ -50,7 +50,9 @@ class SyncCheckTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_sync_check_returns_exists_without_file_hash(self) -> None:
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: _memory())
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: _memory()
+        )
 
         result = await sync_check(session, memory_id="mem-1")
 
@@ -61,16 +63,22 @@ class SyncCheckTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_sync_check_returns_synced_for_matching_hash(self) -> None:
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: _memory())
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: _memory()
+        )
 
-        result = await sync_check(session, obsidian_ref="notes/openbrain.md", file_hash="hash-123")
+        result = await sync_check(
+            session, obsidian_ref="notes/openbrain.md", file_hash="hash-123"
+        )
 
         self.assertEqual(result["status"], "synced")
         self.assertEqual(result["provided_hash"], "hash-123")
 
     async def test_sync_check_returns_outdated_for_hash_mismatch(self) -> None:
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: _memory())
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: _memory()
+        )
 
         result = await sync_check(session, match_key="mk-1", file_hash="hash-999")
 

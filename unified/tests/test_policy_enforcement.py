@@ -18,11 +18,17 @@ from src.schemas import (
 
 
 class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
-    async def test_upsert_memories_bulk_requires_match_key_for_every_record(self) -> None:
+    async def test_upsert_memories_bulk_requires_match_key_for_every_record(
+        self,
+    ) -> None:
         session = AsyncMock()
         items = [
-            MemoryUpsertItem(content="x", domain="build", entity_type="Note", match_key="mk-1"),
-            MemoryUpsertItem(content="y", domain="build", entity_type="Note", match_key=None),
+            MemoryUpsertItem(
+                content="x", domain="build", entity_type="Note", match_key="mk-1"
+            ),
+            MemoryUpsertItem(
+                content="y", domain="build", entity_type="Note", match_key=None
+            ),
         ]
 
         with self.assertRaisesRegex(ValueError, "bulk-upsert requires match_key"):
@@ -53,6 +59,7 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
     async def test_handle_memory_write_accepts_corporate_with_match_key(self) -> None:
         """Corporate write with match_key and owner must succeed (create path)."""
         from datetime import datetime, timezone as tz
+
         now = datetime.now(tz.utc)
 
         session = AsyncMock()
@@ -76,17 +83,23 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             owner="alice",
             match_key="corp:decision:approved-2026",
         )
-        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(
+            memory_writes, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])
+        ):
             result = await memory_writes.handle_memory_write(
                 session, MemoryWriteRequest(record=rec, write_mode="upsert")
             )
 
         self.assertIn(result.status, {"created", "versioned"})
 
-    async def test_handle_memory_write_sets_append_only_governance_for_corporate_domain(self) -> None:
+    async def test_handle_memory_write_sets_append_only_governance_for_corporate_domain(
+        self,
+    ) -> None:
         """Only corporate domain records get append_only=True governance, regardless of entity_type."""
         session = AsyncMock()
-        session.execute.return_value = type("Result", (), {"scalar_one_or_none": lambda self: None})()
+        session.execute.return_value = type(
+            "Result", (), {"scalar_one_or_none": lambda self: None}
+        )()
         session.commit = AsyncMock()
         session.refresh = AsyncMock()
         added = []
@@ -104,7 +117,9 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
         session.flush = AsyncMock(side_effect=_flush)
 
-        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(
+            memory_writes, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])
+        ):
             result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
@@ -128,7 +143,9 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
     async def test_handle_memory_write_build_decision_is_mutable(self) -> None:
         """build domain Decision must NOT be append-only — entity_type does not override domain governance."""
         session = AsyncMock()
-        session.execute.return_value = type("Result", (), {"scalar_one_or_none": lambda self: None})()
+        session.execute.return_value = type(
+            "Result", (), {"scalar_one_or_none": lambda self: None}
+        )()
         session.commit = AsyncMock()
         session.refresh = AsyncMock()
         added = []
@@ -146,7 +163,9 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
         session.flush = AsyncMock(side_effect=_flush)
 
-        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(
+            memory_writes, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])
+        ):
             result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
@@ -190,7 +209,9 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: existing
+        )
 
         with self.assertRaisesRegex(ValueError, "append-only"):
             await memory_writes.delete_memory(session, "mem-1")
@@ -220,10 +241,14 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: existing
+        )
 
-        with patch.object(memory_writes, "_audit_compat", new=AsyncMock()) as audit:
-            deleted = await memory_writes.delete_memory(session, "mem-1", actor="admin-user")
+        with patch.object(memory_writes, "_audit", new=AsyncMock()) as audit:
+            deleted = await memory_writes.delete_memory(
+                session, "mem-1", actor="admin-user"
+            )
 
         self.assertTrue(deleted)
         audit.assert_awaited_once()
@@ -235,7 +260,9 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session.delete.assert_awaited_once_with(existing)
         session.commit.assert_awaited_once()
 
-    async def test_maintain_non_dry_run_skips_mutation_for_append_only_duplicates(self) -> None:
+    async def test_maintain_non_dry_run_skips_mutation_for_append_only_duplicates(
+        self,
+    ) -> None:
         now = datetime.now(timezone.utc)
         primary = Memory(
             id="mem-1",
@@ -284,46 +311,12 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         session = AsyncMock()
         session.execute.side_effect = [
             SimpleNamespace(scalar_one=lambda: 2),
-            SimpleNamespace(all=lambda: [("hash-same", "Decision", DomainEnum.corporate)]),
-            SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [primary, duplicate])),
-        ]
-        session.add = lambda obj: None
-        session.flush = AsyncMock()
-        session.commit = AsyncMock()
-
-        report = await memory_writes.run_maintenance(
-            session,
-            MaintenanceRequest(dry_run=False, dedup_threshold=0.05, fix_superseded_links=False),
-            actor="tester",
-        )
-
-        self.assertEqual(report.dedup_found, 1)
-        self.assertEqual(duplicate.status, "duplicate")
-        self.assertEqual(duplicate.metadata_["duplicate_of"], primary.id)
-        self.assertTrue(any(action.action == "dedup_remediate" for action in report.actions))
-
-    async def test_maintenance_dedup_override_supersedes_append_only_exact_duplicates(self) -> None:
-        """New behavior: exact duplicates in corporate are remediated via 'duplicate' status regardless of override."""
-        now = datetime.now(timezone.utc)
-
-        def _make_mem(mem_id, match_key):
-            return Memory(
-                id=mem_id, domain=DomainEnum.corporate, entity_type="Decision",
-                content="same corporate content", embedding=[0.1, 0.2],
-                owner="owner-a", created_by="tester", status="active", version=1,
-                sensitivity="internal", superseded_by=None, tags=[], relations={},
-                metadata_={}, obsidian_ref=None, content_hash="hash-corp",
-                match_key=match_key, valid_from=None, created_at=now, updated_at=now,
-            )
-
-        canonical = _make_mem("corp-1", "corp:decision:1")
-        duplicate = _make_mem("corp-2", "corp:decision:2")
-
-        session = AsyncMock()
-        session.execute.side_effect = [
-            SimpleNamespace(scalar_one=lambda: 2),
-            SimpleNamespace(all=lambda: [("hash-corp", "Decision", DomainEnum.corporate)]),
-            SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [canonical, duplicate])),
+            SimpleNamespace(
+                all=lambda: [("hash-same", "Decision", DomainEnum.corporate)]
+            ),
+            SimpleNamespace(
+                scalars=lambda: SimpleNamespace(all=lambda: [primary, duplicate])
+            ),
         ]
         session.add = lambda obj: None
         session.flush = AsyncMock()
@@ -332,8 +325,72 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         report = await memory_writes.run_maintenance(
             session,
             MaintenanceRequest(
-                dry_run=False, dedup_threshold=0.05,
-                fix_superseded_links=False, allow_exact_dedup_override=True,
+                dry_run=False, dedup_threshold=0.05, fix_superseded_links=False
+            ),
+            actor="tester",
+        )
+
+        self.assertEqual(report.dedup_found, 1)
+        self.assertEqual(duplicate.status, "duplicate")
+        self.assertEqual(duplicate.metadata_["duplicate_of"], primary.id)
+        self.assertTrue(
+            any(action.action == "dedup_remediate" for action in report.actions)
+        )
+
+    async def test_maintenance_dedup_override_supersedes_append_only_exact_duplicates(
+        self,
+    ) -> None:
+        """New behavior: exact duplicates in corporate are remediated via 'duplicate' status regardless of override."""
+        now = datetime.now(timezone.utc)
+
+        def _make_mem(mem_id, match_key):
+            return Memory(
+                id=mem_id,
+                domain=DomainEnum.corporate,
+                entity_type="Decision",
+                content="same corporate content",
+                embedding=[0.1, 0.2],
+                owner="owner-a",
+                created_by="tester",
+                status="active",
+                version=1,
+                sensitivity="internal",
+                superseded_by=None,
+                tags=[],
+                relations={},
+                metadata_={},
+                obsidian_ref=None,
+                content_hash="hash-corp",
+                match_key=match_key,
+                valid_from=None,
+                created_at=now,
+                updated_at=now,
+            )
+
+        canonical = _make_mem("corp-1", "corp:decision:1")
+        duplicate = _make_mem("corp-2", "corp:decision:2")
+
+        session = AsyncMock()
+        session.execute.side_effect = [
+            SimpleNamespace(scalar_one=lambda: 2),
+            SimpleNamespace(
+                all=lambda: [("hash-corp", "Decision", DomainEnum.corporate)]
+            ),
+            SimpleNamespace(
+                scalars=lambda: SimpleNamespace(all=lambda: [canonical, duplicate])
+            ),
+        ]
+        session.add = lambda obj: None
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+
+        report = await memory_writes.run_maintenance(
+            session,
+            MaintenanceRequest(
+                dry_run=False,
+                dedup_threshold=0.05,
+                fix_superseded_links=False,
+                allow_exact_dedup_override=True,
             ),
             actor="tester",
         )
@@ -342,30 +399,66 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(duplicate.status, "duplicate")
         self.assertEqual(duplicate.metadata_["duplicate_of"], "corp-1")
         self.assertEqual(canonical.status, "active")
-        self.assertTrue(any(action.action == "dedup_remediate" for action in report.actions))
+        self.assertTrue(
+            any(action.action == "dedup_remediate" for action in report.actions)
+        )
 
-    async def test_maintenance_dedup_override_false_still_remediates_append_only(self) -> None:
+    async def test_maintenance_dedup_override_false_still_remediates_append_only(
+        self,
+    ) -> None:
         """New behavior: exact duplicates in corporate are remediated via 'duplicate' status without override."""
         now = datetime.now(timezone.utc)
         canonical = Memory(
-            id="corp-1", domain=DomainEnum.corporate, entity_type="Decision",
-            content="x", embedding=[0.1], owner="owner-a", created_by="tester",
-            status="active", version=1, sensitivity="internal", superseded_by=None,
-            tags=[], relations={}, metadata_={}, obsidian_ref=None, content_hash="h",
-            match_key="corp:1", valid_from=None, created_at=now, updated_at=now,
+            id="corp-1",
+            domain=DomainEnum.corporate,
+            entity_type="Decision",
+            content="x",
+            embedding=[0.1],
+            owner="owner-a",
+            created_by="tester",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=[],
+            relations={},
+            metadata_={},
+            obsidian_ref=None,
+            content_hash="h",
+            match_key="corp:1",
+            valid_from=None,
+            created_at=now,
+            updated_at=now,
         )
         duplicate = Memory(
-            id="corp-2", domain=DomainEnum.corporate, entity_type="Decision",
-            content="x", embedding=[0.1], owner="owner-a", created_by="tester",
-            status="active", version=1, sensitivity="internal", superseded_by=None,
-            tags=[], relations={}, metadata_={}, obsidian_ref=None, content_hash="h",
-            match_key="corp:2", valid_from=None, created_at=now, updated_at=now,
+            id="corp-2",
+            domain=DomainEnum.corporate,
+            entity_type="Decision",
+            content="x",
+            embedding=[0.1],
+            owner="owner-a",
+            created_by="tester",
+            status="active",
+            version=1,
+            sensitivity="internal",
+            superseded_by=None,
+            tags=[],
+            relations={},
+            metadata_={},
+            obsidian_ref=None,
+            content_hash="h",
+            match_key="corp:2",
+            valid_from=None,
+            created_at=now,
+            updated_at=now,
         )
         session = AsyncMock()
         session.execute.side_effect = [
             SimpleNamespace(scalar_one=lambda: 2),
             SimpleNamespace(all=lambda: [("h", "Decision", DomainEnum.corporate)]),
-            SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [canonical, duplicate])),
+            SimpleNamespace(
+                scalars=lambda: SimpleNamespace(all=lambda: [canonical, duplicate])
+            ),
         ]
         session.add = lambda obj: None
         session.flush = AsyncMock()
@@ -373,13 +466,19 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
 
         report = await memory_writes.run_maintenance(
             session,
-            MaintenanceRequest(dry_run=False, dedup_threshold=0.05,
-                               fix_superseded_links=False, allow_exact_dedup_override=False),
+            MaintenanceRequest(
+                dry_run=False,
+                dedup_threshold=0.05,
+                fix_superseded_links=False,
+                allow_exact_dedup_override=False,
+            ),
             actor="tester",
         )
 
         self.assertEqual(duplicate.status, "duplicate")
-        self.assertTrue(any(action.action == "dedup_remediate" for action in report.actions))
+        self.assertTrue(
+            any(action.action == "dedup_remediate" for action in report.actions)
+        )
 
     async def test_ingest_warns_on_missing_match_key_for_build_domain(self) -> None:
         """build/personal writes without match_key must trigger a duplicate_risk_write warning."""
@@ -396,8 +495,11 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             warning_events.append(event)
 
         from unittest.mock import patch
+
         with patch.object(memory_writes.log, "warning", side_effect=_capture_warning):
-            with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1])):
+            with patch.object(
+                memory_writes, "get_embedding", new=AsyncMock(return_value=[0.1])
+            ):
                 rec = MemoryWriteRecord(
                     content="no match key write",
                     domain="build",
@@ -411,8 +513,11 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
                 except Exception:
                     pass  # May fail without full DB; we only check the warning
 
-        self.assertIn("duplicate_risk_write", warning_events,
-                      "Expected duplicate_risk_write warning for build write without match_key")
+        self.assertIn(
+            "duplicate_risk_write",
+            warning_events,
+            "Expected duplicate_risk_write warning for build write without match_key",
+        )
 
     async def test_policy_update_semantics_corporate_uses_append_version(self) -> None:
         """Domain policy: corporate updates must use append-version semantics."""
@@ -440,13 +545,17 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: existing
+        )
 
         with (
             patch.object(
                 memory_writes,
                 "handle_memory_write",
-                new=AsyncMock(return_value=SimpleNamespace(status="versioned", record=None)),
+                new=AsyncMock(
+                    return_value=SimpleNamespace(status="versioned", record=None)
+                ),
             ) as handle_write,
             patch.object(
                 memory_writes,
@@ -514,13 +623,17 @@ class PolicyEnforcementTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: existing
+        )
 
         with (
             patch.object(
                 memory_writes,
                 "handle_memory_write",
-                new=AsyncMock(return_value=SimpleNamespace(status="updated", record=None)),
+                new=AsyncMock(
+                    return_value=SimpleNamespace(status="updated", record=None)
+                ),
             ) as handle_write,
             patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=None)),
         ):

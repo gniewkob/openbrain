@@ -11,7 +11,7 @@ Provides unified error handling with:
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -277,7 +277,7 @@ async def http_exception_handler(
 
     # If detail is already an ErrorDetail envelope (e.g. raised internally),
     # extract the code and message rather than clobbering them.
-    detail = exc.detail
+    detail: Any = exc.detail
     if isinstance(detail, dict) and "code" in detail:
         code = detail["code"]
         message = detail.get("message", str(exc.status_code))
@@ -343,9 +343,9 @@ def register_exception_handlers(app: Any) -> None:
         raise TypeError("app must be a FastAPI instance")
 
     # Most-specific handlers first
-    app.add_exception_handler(OpenBrainError, openbrain_exception_handler)
-    app.add_exception_handler(HTTPException, http_exception_handler)
-    app.add_exception_handler(ValueError, value_error_handler)
+    app.add_exception_handler(OpenBrainError, openbrain_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(ValueError, value_error_handler)  # type: ignore[arg-type]
 
     # Generic handler for unexpected exceptions
     app.add_exception_handler(Exception, generic_exception_handler)
@@ -401,7 +401,7 @@ class ErrorContext:
     def __enter__(self) -> ErrorContext:
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Literal[False]:
         if exc_val is not None and not isinstance(exc_val, OpenBrainError):
             raise self.error_class(
                 f"{self.operation} failed: {exc_val}",

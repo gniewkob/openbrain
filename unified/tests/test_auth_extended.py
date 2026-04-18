@@ -390,7 +390,9 @@ def test_is_privileged_local_dev():
 def test_is_privileged_internal_via_key():
     from src.auth import is_privileged_user
 
-    assert is_privileged_user({"sub": "internal", "_auth_via_internal_key": True}) is True
+    assert (
+        is_privileged_user({"sub": "internal", "_auth_via_internal_key": True}) is True
+    )
 
 
 def test_is_privileged_internal_without_key_marker_is_not():

@@ -4,7 +4,7 @@ import os
 from collections import Counter
 from dataclasses import dataclass
 from threading import Lock
-from typing import Protocol
+from typing import Protocol, cast
 
 
 class CounterBackend(Protocol):
@@ -105,7 +105,7 @@ class RedisCounterBackend:
     def _seed(self) -> None:
         pipe = self._client.pipeline(transaction=False)
         for name in self._known_counters:
-            pipe.hsetnx(self._hash_key, name, 0)
+            pipe.hsetnx(self._hash_key, name, "0")
         pipe.execute()
 
     def incr(self, name: str, value: int = 1) -> None:
@@ -114,7 +114,9 @@ class RedisCounterBackend:
 
     def snapshot(self) -> dict[str, int]:
         """Fetch all counter values from Redis, defaulting missing known counters to 0."""
-        payload = self._client.hgetall(self._hash_key)
+        payload: dict[str, str] = cast(
+            dict[str, str], self._client.hgetall(self._hash_key)
+        )
         result: dict[str, int] = {}
         for name, raw in payload.items():
             try:
@@ -132,7 +134,7 @@ class RedisCounterBackend:
         pipe = self._client.pipeline(transaction=False)
         for name, val in values.items():
             if name in self._known_counters or name.startswith("http_requests_total_"):
-                pipe.hset(self._hash_key, name, int(val))
+                pipe.hset(self._hash_key, name, str(val))
         pipe.execute()
 
     def reset(self) -> None:

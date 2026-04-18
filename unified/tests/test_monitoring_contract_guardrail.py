@@ -9,7 +9,9 @@ import sys
 def _load_monitoring_contract_module():
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "validate_monitoring_contract.py"
-    spec = importlib.util.spec_from_file_location("validate_monitoring_contract", script_path)
+    spec = importlib.util.spec_from_file_location(
+        "validate_monitoring_contract", script_path
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     sys.modules[spec.name] = module
@@ -21,7 +23,7 @@ def test_extract_metric_tokens_ignores_promql_keywords() -> None:
     module = _load_monitoring_contract_module()
     expr = (
         'sum(rate(http_requests_total_500{job="openbrain-unified"}[5m])) '
-        "/ clamp_min(rate(http_requests_total_200{job=\"openbrain-unified\"}[5m]), 0.000001)"
+        '/ clamp_min(rate(http_requests_total_200{job="openbrain-unified"}[5m]), 0.000001)'
     )
     tokens = module.extract_metric_tokens(expr)
     assert "http_requests_total_500" in tokens
@@ -38,7 +40,10 @@ def test_validate_monitoring_contract_flags_unexpected_metric(tmp_path: Path) ->
         json.dumps(
             {
                 "panels": [
-                    {"title": "Test", "targets": [{"expr": "mystery_metric_total{job=\"x\"}"}]}
+                    {
+                        "title": "Test",
+                        "targets": [{"expr": 'mystery_metric_total{job="x"}'}],
+                    }
                 ]
             }
         ),
@@ -53,7 +58,10 @@ def test_validate_monitoring_contract_flags_unexpected_metric(tmp_path: Path) ->
         check_live_metrics=False,
         metrics_url="http://127.0.0.1:9180/metrics",
     )
-    assert any("Monitoring expressions reference metrics not in contract" in err for err in errors)
+    assert any(
+        "Monitoring expressions reference metrics not in contract" in err
+        for err in errors
+    )
     assert "mystery_metric_total" in referenced
     assert live == set()
 
@@ -84,7 +92,10 @@ def test_validate_monitoring_contract_flags_unexpected_metric_from_alert_rule(
         check_live_metrics=False,
         metrics_url="http://127.0.0.1:9180/metrics",
     )
-    assert any("Monitoring expressions reference metrics not in contract" in err for err in errors)
+    assert any(
+        "Monitoring expressions reference metrics not in contract" in err
+        for err in errors
+    )
     assert "mystery_alert_metric_total" in referenced
 
 
@@ -99,8 +110,8 @@ def test_load_alert_rule_exprs_supports_multiline_expr_block(tmp_path: Path) -> 
                 "    rules:",
                 "      - alert: ComplexAlert",
                 "        expr: |",
-                "          increase(search_requests_total{job=\"openbrain-unified\"}[1h])",
-                "          / clamp_min(increase(sync_checks_total{job=\"openbrain-unified\"}[1h]), 1)",
+                '          increase(search_requests_total{job="openbrain-unified"}[1h])',
+                '          / clamp_min(increase(sync_checks_total{job="openbrain-unified"}[1h]), 1)',
             ]
         ),
         encoding="utf-8",
@@ -143,7 +154,9 @@ def test_validate_monitoring_contract_forbids_vector_zero_in_alert_rule(
     assert any("Forbidden vector(0) in rule" in err for err in errors)
 
 
-def test_validate_monitoring_contract_flags_missing_alert_rule_file(tmp_path: Path) -> None:
+def test_validate_monitoring_contract_flags_missing_alert_rule_file(
+    tmp_path: Path,
+) -> None:
     module = _load_monitoring_contract_module()
     missing_alert_path = tmp_path / "missing-alerts.yml"
     contract = {"required_metrics": ["http_requests_total_200"], "dashboard_files": []}
@@ -160,7 +173,11 @@ def test_validate_monitoring_contract_flags_missing_alert_rule_file(tmp_path: Pa
 
 def test_main_succeeds_without_live_metrics_check(monkeypatch) -> None:
     module = _load_monitoring_contract_module()
-    monkeypatch.setattr(module, "validate_monitoring_contract", lambda *_args, **_kwargs: ([], {"a"}, set()))
+    monkeypatch.setattr(
+        module,
+        "validate_monitoring_contract",
+        lambda *_args, **_kwargs: ([], {"a"}, set()),
+    )
     monkeypatch.setattr(sys, "argv", ["validate_monitoring_contract.py"])
     assert module.main() == 0
 
@@ -170,9 +187,15 @@ def test_main_fails_when_live_metrics_check_errors(monkeypatch) -> None:
     monkeypatch.setattr(
         module,
         "validate_monitoring_contract",
-        lambda *_args, **_kwargs: (["Failed to fetch live metrics from x"], set(), set()),
+        lambda *_args, **_kwargs: (
+            ["Failed to fetch live metrics from x"],
+            set(),
+            set(),
+        ),
     )
-    monkeypatch.setattr(sys, "argv", ["validate_monitoring_contract.py", "--check-live"])
+    monkeypatch.setattr(
+        sys, "argv", ["validate_monitoring_contract.py", "--check-live"]
+    )
     assert module.main() == 1
 
 
@@ -199,6 +222,8 @@ def test_main_can_allow_vector_zero(monkeypatch) -> None:
         return [], set(), set()
 
     monkeypatch.setattr(module, "validate_monitoring_contract", _validate)
-    monkeypatch.setattr(sys, "argv", ["validate_monitoring_contract.py", "--allow-vector-zero"])
+    monkeypatch.setattr(
+        sys, "argv", ["validate_monitoring_contract.py", "--allow-vector-zero"]
+    )
     assert module.main() == 0
     assert seen["forbid_vector_zero"] is False

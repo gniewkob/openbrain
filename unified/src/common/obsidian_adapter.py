@@ -279,7 +279,7 @@ def note_to_memory_write_record(
 
     return MemoryWriteRecord(
         match_key=f"obsidian:{note.vault}:{note.path}",
-        domain=domain,
+        domain=domain,  # type: ignore[arg-type]
         entity_type=entity_type,
         title=note.title,
         content=note.content,
@@ -415,7 +415,7 @@ class ObsidianCliAdapter:
             full_path = Path(vault_root) / path
             if full_path.exists() and full_path.is_file():
                 try:
-                    import aiofiles
+                    import aiofiles  # type: ignore[import-untyped]
 
                     async with aiofiles.open(
                         full_path, mode="r", encoding="utf-8"

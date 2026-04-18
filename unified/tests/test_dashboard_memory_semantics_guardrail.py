@@ -54,7 +54,9 @@ def test_dashboard_memory_semantics_detects_wrong_active_expr(tmp_path: Path) ->
                     },
                     {
                         "title": active["title"],
-                        "targets": [{"expr": 'active_memories_total{job="openbrain-unified"}'}],
+                        "targets": [
+                            {"expr": 'active_memories_total{job="openbrain-unified"}'}
+                        ],
                     },
                     {
                         "title": hidden["title"],
@@ -125,7 +127,9 @@ def test_dashboard_memory_semantics_detects_wrong_visible_expr(tmp_path: Path) -
                     {
                         "title": visible["title"],
                         "targets": [
-                            {"expr": 'active_memories_all_total{job="openbrain-unified"}'}
+                            {
+                                "expr": 'active_memories_all_total{job="openbrain-unified"}'
+                            }
                         ],
                     },
                     {
@@ -192,7 +196,9 @@ def test_dashboard_memory_semantics_detects_wrong_hidden_share_expr(
                     {
                         "title": hidden_share["title"],
                         "targets": [
-                            {"expr": 'hidden_test_data_active_total{job="openbrain-unified"}'}
+                            {
+                                "expr": 'hidden_test_data_active_total{job="openbrain-unified"}'
+                            }
                         ],
                     },
                 ]

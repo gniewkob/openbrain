@@ -1,4 +1,5 @@
 """Tests for obsidian_sync module."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -23,7 +24,7 @@ class TestObsidianChangeTracker:
         """Test that tracker initializes with empty state."""
         storage_path = tmp_path / "sync_state.json"
         tracker = ObsidianChangeTracker(storage_path=str(storage_path))
-        
+
         assert tracker.get_all_states() == []
         assert tracker.get_stats()["total_tracked"] == 0
 
@@ -31,7 +32,7 @@ class TestObsidianChangeTracker:
         """Test updating and retrieving state."""
         storage_path = tmp_path / "sync_state.json"
         tracker = ObsidianChangeTracker(storage_path=str(storage_path))
-        
+
         state = SyncState(
             memory_id="mem-1",
             obsidian_path="test.md",
@@ -40,9 +41,9 @@ class TestObsidianChangeTracker:
             memory_updated_at=datetime.now(timezone.utc),
             obsidian_modified_at=datetime.now(timezone.utc),
         )
-        
+
         tracker.update_state(state)
-        
+
         retrieved = tracker.get_state("Documents", "test.md")
         assert retrieved is not None
         assert retrieved.memory_id == "mem-1"
@@ -52,7 +53,7 @@ class TestObsidianChangeTracker:
         """Test removing state."""
         storage_path = tmp_path / "sync_state.json"
         tracker = ObsidianChangeTracker(storage_path=str(storage_path))
-        
+
         state = SyncState(
             memory_id="mem-1",
             obsidian_path="test.md",
@@ -61,17 +62,17 @@ class TestObsidianChangeTracker:
             memory_updated_at=datetime.now(timezone.utc),
             obsidian_modified_at=datetime.now(timezone.utc),
         )
-        
+
         tracker.update_state(state)
         assert tracker.get_state("Documents", "test.md") is not None
-        
+
         tracker.remove_state("Documents", "test.md")
         assert tracker.get_state("Documents", "test.md") is None
 
     def test_persistence(self, tmp_path):
         """Test that state is persisted to disk."""
         storage_path = tmp_path / "sync_state.json"
-        
+
         # Create tracker and add state
         tracker1 = ObsidianChangeTracker(storage_path=str(storage_path))
         state = SyncState(
@@ -83,11 +84,11 @@ class TestObsidianChangeTracker:
             obsidian_modified_at=datetime.now(timezone.utc),
         )
         tracker1.update_state(state)
-        
+
         # Create new tracker instance with same storage
         tracker2 = ObsidianChangeTracker(storage_path=str(storage_path))
         retrieved = tracker2.get_state("Documents", "test.md")
-        
+
         assert retrieved is not None
         assert retrieved.memory_id == "mem-1"
 
@@ -98,21 +99,21 @@ class TestBidirectionalSyncEngineInit:
     def test_default_initialization(self):
         """Test default engine initialization."""
         engine = BidirectionalSyncEngine()
-        
+
         assert engine.strategy == SyncStrategy.DOMAIN_BASED
         assert engine.tracker is not None
 
     def test_custom_strategy(self):
         """Test engine with custom strategy."""
         engine = BidirectionalSyncEngine(strategy=SyncStrategy.LAST_WRITE_WINS)
-        
+
         assert engine.strategy == SyncStrategy.LAST_WRITE_WINS
 
     def test_custom_tracker(self, tmp_path):
         """Test engine with custom tracker."""
         tracker = ObsidianChangeTracker(storage_path=str(tmp_path / "sync.json"))
         engine = BidirectionalSyncEngine(tracker=tracker)
-        
+
         assert engine.tracker is tracker
 
 
@@ -124,7 +125,7 @@ class TestComputeContentHash:
         content = "Test content"
         hash1 = BidirectionalSyncEngine.compute_content_hash(content)
         hash2 = BidirectionalSyncEngine.compute_content_hash(content)
-        
+
         assert hash1 == hash2
         assert len(hash1) == 32  # First 32 chars of SHA256
 
@@ -132,7 +133,7 @@ class TestComputeContentHash:
         """Test that different content produces different hash."""
         hash1 = BidirectionalSyncEngine.compute_content_hash("Content A")
         hash2 = BidirectionalSyncEngine.compute_content_hash("Content B")
-        
+
         assert hash1 != hash2
 
 
@@ -164,30 +165,32 @@ class TestDetectChangesEmptyState:
             changes = await engine.detect_changes(
                 mock_session, mock_adapter, "Documents"
             )
-        
+
         assert changes == []
 
     @pytest.mark.asyncio
-    async def test_detect_new_openbrain_memory(self, engine, mock_session, mock_adapter):
+    async def test_detect_new_openbrain_memory(
+        self, engine, mock_session, mock_adapter
+    ):
         """Test detecting new memory in OpenBrain."""
         # Use past date for 'since' to include the new memory
         past = datetime.min.replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
-        
+
         # Mock memory in OpenBrain
         mock_memory = MagicMock()
         mock_memory.id = "mem-1"
         mock_memory.obsidian_ref = "test.md"
         mock_memory.content = "Test content"
         mock_memory.updated_at = now
-        
+
         with patch(
             "src.obsidian_sync.list_memories", new=AsyncMock(return_value=[mock_memory])
         ):
             changes = await engine.detect_changes(
                 mock_session, mock_adapter, "Documents", since=past
             )
-        
+
         # Should detect as new OpenBrain memory
         openbrain_changes = [c for c in changes if c.source == "openbrain"]
         assert len(openbrain_changes) == 1
@@ -199,12 +202,12 @@ class TestDetectChangesEmptyState:
     async def test_detect_new_obsidian_file(self, engine, mock_session, mock_adapter):
         """Test detecting new file in Obsidian."""
         mock_adapter.list_files = AsyncMock(return_value=["new_file.md"])
-        
+
         with patch("src.obsidian_sync.list_memories", new=AsyncMock(return_value=[])):
             changes = await engine.detect_changes(
                 mock_session, mock_adapter, "Documents"
             )
-        
+
         # Should detect as new Obsidian file
         obsidian_changes = [c for c in changes if c.source == "obsidian"]
         assert len(obsidian_changes) >= 1
@@ -215,12 +218,12 @@ class TestDetectChangesEmptyState:
     async def test_list_files_failure_handled(self, engine, mock_session, mock_adapter):
         """Test that list_files failure is handled gracefully."""
         mock_adapter.list_files = AsyncMock(side_effect=Exception("Connection error"))
-        
+
         with patch("src.obsidian_sync.list_memories", new=AsyncMock(return_value=[])):
             changes = await engine.detect_changes(
                 mock_session, mock_adapter, "Documents"
             )
-        
+
         # Should return empty list when Obsidian is unreachable
         assert changes == []
 
@@ -232,18 +235,20 @@ class TestDetectChangesWithTrackedState:
     def engine(self, tmp_path):
         """Create engine with temp storage and tracked state."""
         tracker = ObsidianChangeTracker(storage_path=str(tmp_path / "sync.json"))
-        
+
         # Add tracked state
         state = SyncState(
             memory_id="mem-1",
             obsidian_path="tracked.md",
             vault="Documents",
-            content_hash=BidirectionalSyncEngine.compute_content_hash("Original content"),
+            content_hash=BidirectionalSyncEngine.compute_content_hash(
+                "Original content"
+            ),
             memory_updated_at=datetime.now(timezone.utc),
             obsidian_modified_at=datetime.now(timezone.utc),
         )
         tracker.update_state(state)
-        
+
         return BidirectionalSyncEngine(tracker=tracker)
 
     @pytest.fixture
@@ -272,14 +277,14 @@ class TestDetectChangesWithTrackedState:
         mock_memory.content = "Original content"
         # Use same updated_at as when state was created
         mock_memory.updated_at = datetime.min.replace(tzinfo=timezone.utc)
-        
+
         with patch(
             "src.obsidian_sync.list_memories", new=AsyncMock(return_value=[mock_memory])
         ):
             changes = await engine.detect_changes(
                 mock_session, mock_adapter, "Documents"
             )
-        
+
         # Should detect no changes
         assert changes == []
 
@@ -292,14 +297,14 @@ class TestDetectChangesWithTrackedState:
         mock_memory.obsidian_ref = "tracked.md"
         mock_memory.content = "Modified content"
         mock_memory.updated_at = datetime.now(timezone.utc)
-        
+
         with patch(
             "src.obsidian_sync.list_memories", new=AsyncMock(return_value=[mock_memory])
         ):
             changes = await engine.detect_changes(
                 mock_session, mock_adapter, "Documents"
             )
-        
+
         # Should detect content change from OpenBrain
         assert len(changes) == 1
         assert changes[0].change_type == ChangeType.UPDATED
@@ -337,24 +342,26 @@ class TestDetectChangesWithTrackedState:
         """Test detecting when both systems have deleted the item."""
         # No memory in OpenBrain and file not in Obsidian
         mock_adapter.list_files = AsyncMock(return_value=[])
-        
+
         with patch("src.obsidian_sync.list_memories", new=AsyncMock(return_value=[])):
             changes = await engine.detect_changes(
                 mock_session, mock_adapter, "Documents"
             )
-        
+
         assert len(changes) == 1
         assert changes[0].change_type == ChangeType.DELETED
         assert changes[0].source == "both"
 
     @pytest.mark.asyncio
-    async def test_state_removed_after_both_deleted(self, engine, mock_session, mock_adapter):
+    async def test_state_removed_after_both_deleted(
+        self, engine, mock_session, mock_adapter
+    ):
         """Test that tracked state is removed after detecting both deleted."""
         mock_adapter.list_files = AsyncMock(return_value=[])
-        
+
         with patch("src.obsidian_sync.list_memories", new=AsyncMock(return_value=[])):
             await engine.detect_changes(mock_session, mock_adapter, "Documents")
-        
+
         # State should be removed from tracker
         assert engine.tracker.get_state("Documents", "tracked.md") is None
 
@@ -371,9 +378,9 @@ class TestSyncChange:
             change_type=ChangeType.CREATED,
             source="openbrain",
         )
-        
+
         data = change.to_dict()
-        
+
         assert data["memory_id"] == "mem-1"
         assert data["obsidian_path"] == "test.md"
         assert data["vault"] == "Documents"
@@ -391,9 +398,9 @@ class TestSyncChange:
             source="both",
             conflict=True,
         )
-        
+
         data = change.to_dict()
-        
+
         assert data["conflict"] is True
         assert data["source"] == "both"
 
@@ -412,9 +419,9 @@ class TestResolveConflict:
             source="openbrain",
             conflict=False,
         )
-        
+
         result = engine.resolve_conflict(change)
-        
+
         assert result == "openbrain"
 
     def test_conflict_defaults_to_openbrain(self):
@@ -428,9 +435,9 @@ class TestResolveConflict:
             source="both",
             conflict=True,
         )
-        
+
         result = engine.resolve_conflict(change)
-        
+
         assert result == "openbrain"
 
 
@@ -512,12 +519,20 @@ class TestResolveConflictStrategies:
         now = datetime(2026, 6, 1, tzinfo=timezone.utc)
         old = datetime(2026, 1, 1, tzinfo=timezone.utc)
         change.openbrain_state = SyncState(
-            memory_id="m1", obsidian_path="test.md", vault="v",
-            content_hash="h", memory_updated_at=now, obsidian_modified_at=old,
+            memory_id="m1",
+            obsidian_path="test.md",
+            vault="v",
+            content_hash="h",
+            memory_updated_at=now,
+            obsidian_modified_at=old,
         )
         change.obsidian_state = SyncState(
-            memory_id="m1", obsidian_path="test.md", vault="v",
-            content_hash="h", memory_updated_at=old, obsidian_modified_at=old,
+            memory_id="m1",
+            obsidian_path="test.md",
+            vault="v",
+            content_hash="h",
+            memory_updated_at=old,
+            obsidian_modified_at=old,
         )
         assert engine.resolve_conflict(change) == "openbrain"
 
@@ -527,12 +542,20 @@ class TestResolveConflictStrategies:
         now = datetime(2026, 6, 1, tzinfo=timezone.utc)
         old = datetime(2026, 1, 1, tzinfo=timezone.utc)
         change.openbrain_state = SyncState(
-            memory_id="m1", obsidian_path="test.md", vault="v",
-            content_hash="h", memory_updated_at=old, obsidian_modified_at=old,
+            memory_id="m1",
+            obsidian_path="test.md",
+            vault="v",
+            content_hash="h",
+            memory_updated_at=old,
+            obsidian_modified_at=old,
         )
         change.obsidian_state = SyncState(
-            memory_id="m1", obsidian_path="test.md", vault="v",
-            content_hash="h", memory_updated_at=old, obsidian_modified_at=now,
+            memory_id="m1",
+            obsidian_path="test.md",
+            vault="v",
+            content_hash="h",
+            memory_updated_at=old,
+            obsidian_modified_at=now,
         )
         assert engine.resolve_conflict(change) == "obsidian"
 
@@ -598,9 +621,13 @@ class TestApplySync:
         engine = self._engine(tmp_path)
         session = AsyncMock()
         note = ObsidianNote(
-            vault="my-vault", path="Notes/test.md", title="Test",
-            content="# Test", frontmatter={"domain": "build", "owner": "alice"},
-            tags=["test"], file_hash="abc",
+            vault="my-vault",
+            path="Notes/test.md",
+            title="Test",
+            content="# Test",
+            frontmatter={"domain": "build", "owner": "alice"},
+            tags=["test"],
+            file_hash="abc",
         )
         adapter = MagicMock()
         adapter.read_note = AsyncMock(return_value=note)
@@ -612,7 +639,9 @@ class TestApplySync:
         mock_result.record.id = "new-id"
 
         # handle_memory_write is a local import inside apply_sync, patch at source module
-        with patch("src.memory_writes.handle_memory_write", AsyncMock(return_value=mock_result)):
+        with patch(
+            "src.memory_writes.handle_memory_write", AsyncMock(return_value=mock_result)
+        ):
             result = await engine.apply_sync(session, adapter, change)
         assert result is True
 
@@ -662,8 +691,12 @@ class TestSyncMethod:
         session = AsyncMock()
         adapter = MagicMock()
         change = SyncChange(
-            memory_id="m1", obsidian_path="test.md", vault="v",
-            change_type=ChangeType.UPDATED, source="openbrain", conflict=False,
+            memory_id="m1",
+            obsidian_path="test.md",
+            vault="v",
+            change_type=ChangeType.UPDATED,
+            source="openbrain",
+            conflict=False,
         )
         with patch.object(engine, "detect_changes", AsyncMock(return_value=[change])):
             result = await engine.sync(session, adapter, "my-vault", dry_run=True)
@@ -677,8 +710,12 @@ class TestSyncMethod:
         session = AsyncMock()
         adapter = MagicMock()
         change = SyncChange(
-            memory_id="m1", obsidian_path="test.md", vault="v",
-            change_type=ChangeType.UPDATED, source="openbrain", conflict=False,
+            memory_id="m1",
+            obsidian_path="test.md",
+            vault="v",
+            change_type=ChangeType.UPDATED,
+            source="openbrain",
+            conflict=False,
         )
         with (
             patch.object(engine, "detect_changes", AsyncMock(return_value=[change])),
@@ -694,8 +731,12 @@ class TestSyncMethod:
         session = AsyncMock()
         adapter = MagicMock()
         change = SyncChange(
-            memory_id="m1", obsidian_path="fail.md", vault="v",
-            change_type=ChangeType.UPDATED, source="openbrain", conflict=False,
+            memory_id="m1",
+            obsidian_path="fail.md",
+            vault="v",
+            change_type=ChangeType.UPDATED,
+            source="openbrain",
+            conflict=False,
         )
         with (
             patch.object(engine, "detect_changes", AsyncMock(return_value=[change])),
@@ -711,8 +752,12 @@ class TestSyncMethod:
         session = AsyncMock()
         adapter = MagicMock()
         change = SyncChange(
-            memory_id="m1", obsidian_path="conflict.md", vault="v",
-            change_type=ChangeType.UPDATED, source="both", conflict=True,
+            memory_id="m1",
+            obsidian_path="conflict.md",
+            vault="v",
+            change_type=ChangeType.UPDATED,
+            source="both",
+            conflict=True,
         )
         apply_mock = AsyncMock(return_value=True)
         with (

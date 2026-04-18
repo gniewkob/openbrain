@@ -45,7 +45,10 @@ _REAL_RUN = _adapter_mod.ObsidianCliAdapter._run  # unbound function, captured e
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_adapter(command: str = "/usr/bin/obsidian-cli") -> _adapter_mod.ObsidianCliAdapter:
+
+def _make_adapter(
+    command: str = "/usr/bin/obsidian-cli",
+) -> _adapter_mod.ObsidianCliAdapter:
     return _adapter_mod.ObsidianCliAdapter(command=command)
 
 
@@ -61,6 +64,7 @@ def _clear_vault_cache():
 # ---------------------------------------------------------------------------
 # _run — lines 305-334
 # ---------------------------------------------------------------------------
+
 
 class TestRun:
     @pytest.mark.asyncio
@@ -144,6 +148,7 @@ class TestRun:
 # _validate_vault_path — lines 357, 361
 # ---------------------------------------------------------------------------
 
+
 class TestValidateVaultPath:
     def test_invalid_vault_slash_raises(self):
         """Vault name with slash → ObsidianCliError (line 357)."""
@@ -179,6 +184,7 @@ class TestValidateVaultPath:
 # _get_vault_path — lines 572, 579-580, 585-588
 # ---------------------------------------------------------------------------
 
+
 class TestGetVaultPath:
     @pytest.mark.asyncio
     async def test_get_vault_path_from_cache(self):
@@ -207,8 +213,7 @@ class TestGetVaultPath:
         adapter = _make_adapter()
         # Use a vault name that has no individual env var
         clean_env = {
-            k: v for k, v in os.environ.items()
-            if "OBSIDIAN_VAULT_MAPV_PATH" not in k
+            k: v for k, v in os.environ.items() if "OBSIDIAN_VAULT_MAPV_PATH" not in k
         }
         clean_env["OBSIDIAN_VAULT_PATHS"] = "mapv:/tmp/mapv"
         with patch.dict(os.environ, clean_env, clear=True):
@@ -222,7 +227,8 @@ class TestGetVaultPath:
         _clear_vault_cache()
         adapter = _make_adapter()
         clean_env = {
-            k: v for k, v in os.environ.items()
+            k: v
+            for k, v in os.environ.items()
             if "OBSIDIAN_VAULT_NOTEXIST" not in k and "OBSIDIAN_VAULT_PATHS" not in k
         }
         with patch.dict(os.environ, clean_env, clear=True):
@@ -234,6 +240,7 @@ class TestGetVaultPath:
 # ---------------------------------------------------------------------------
 # list_files — lines 375-393, 398, 403
 # ---------------------------------------------------------------------------
+
 
 class TestListFiles:
     @pytest.mark.asyncio
@@ -287,7 +294,9 @@ class TestListFiles:
         """No vault path → CLI fallback with folder arg (line 398)."""
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=None):
-            with patch.object(adapter, "_run", return_value="Projects/note.md\nProjects/other.md"):
+            with patch.object(
+                adapter, "_run", return_value="Projects/note.md\nProjects/other.md"
+            ):
                 result = await adapter.list_files("myvault", folder="Projects")
         assert "Projects/note.md" in result
 
@@ -309,6 +318,7 @@ class TestListFiles:
 # read_note — lines 415-461, 471-488
 # (aiofiles not installed → sync executor path is the default)
 # ---------------------------------------------------------------------------
+
 
 class TestReadNote:
     @pytest.mark.asyncio
@@ -344,8 +354,9 @@ class TestReadNote:
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=None):
             with patch.object(
-                adapter, "_run",
-                side_effect=["# Note\nbody", '{"tag1": null, "tag2": null}']
+                adapter,
+                "_run",
+                side_effect=["# Note\nbody", '{"tag1": null, "tag2": null}'],
             ):
                 result = await adapter.read_note("myvault", "note.md")
         assert "tag1" in result.tags
@@ -357,8 +368,7 @@ class TestReadNote:
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=None):
             with patch.object(
-                adapter, "_run",
-                side_effect=["# Note\nbody", "not-json-at-all"]
+                adapter, "_run", side_effect=["# Note\nbody", "not-json-at-all"]
             ):
                 result = await adapter.read_note("myvault", "note.md")
         assert result.tags is not None
@@ -369,10 +379,7 @@ class TestReadNote:
         adapter = _make_adapter()
         # '42' is valid JSON but not list/dict → falls to else: cli_tags from lines
         with patch.object(adapter, "_get_vault_path", return_value=None):
-            with patch.object(
-                adapter, "_run",
-                side_effect=["# Note\nbody", "42"]
-            ):
+            with patch.object(adapter, "_run", side_effect=["# Note\nbody", "42"]):
                 result = await adapter.read_note("myvault", "note.md")
         # No tags from single-value JSON
         assert isinstance(result.tags, list)
@@ -381,6 +388,7 @@ class TestReadNote:
 # ---------------------------------------------------------------------------
 # write_note — lines 548-557
 # ---------------------------------------------------------------------------
+
 
 class TestWriteNote:
     @pytest.mark.asyncio
@@ -393,7 +401,9 @@ class TestWriteNote:
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
             with pytest.raises(_adapter_mod.ObsidianCliError, match="already exists"):
-                await adapter.write_note("myvault", "existing.md", "new content", overwrite=False)
+                await adapter.write_note(
+                    "myvault", "existing.md", "new content", overwrite=False
+                )
 
     @pytest.mark.asyncio
     async def test_write_note_no_overwrite_new_file(self, tmp_path):
@@ -420,7 +430,9 @@ class TestWriteNote:
                 return await original_read(self, vault, path)
 
             with patch.object(type(adapter), "read_note", new=read_note_side_effect):
-                result = await adapter.write_note("myvault", "new.md", "# New content", overwrite=False)
+                result = await adapter.write_note(
+                    "myvault", "new.md", "# New content", overwrite=False
+                )
 
         assert result.path == "new.md"
         assert (vault_dir / "new.md").exists()
@@ -434,7 +446,9 @@ class TestWriteNote:
 
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
-            result = await adapter.write_note("myvault", "note.md", "# Updated", overwrite=True)
+            result = await adapter.write_note(
+                "myvault", "note.md", "# Updated", overwrite=True
+            )
 
         assert "Updated" in (vault_dir / "note.md").read_text()
 
@@ -442,6 +456,7 @@ class TestWriteNote:
 # ---------------------------------------------------------------------------
 # note_exists — lines 565-566
 # ---------------------------------------------------------------------------
+
 
 class TestNoteExists:
     @pytest.mark.asyncio
@@ -460,7 +475,9 @@ class TestNoteExists:
     async def test_note_exists_returns_false(self):
         """read_note raises → False."""
         adapter = _make_adapter()
-        with patch.object(adapter, "read_note", side_effect=_adapter_mod.ObsidianCliError("not found")):
+        with patch.object(
+            adapter, "read_note", side_effect=_adapter_mod.ObsidianCliError("not found")
+        ):
             result = await adapter.note_exists("myvault", "missing.md")
         assert result is False
 
@@ -468,6 +485,7 @@ class TestNoteExists:
 # ---------------------------------------------------------------------------
 # update_note — lines 613-640
 # ---------------------------------------------------------------------------
+
 
 class TestUpdateNote:
     @pytest.mark.asyncio
@@ -492,7 +510,9 @@ class TestUpdateNote:
 
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
-            await adapter.update_note("myvault", "note.md", content="Appended", append=True)
+            await adapter.update_note(
+                "myvault", "note.md", content="Appended", append=True
+            )
 
         written = (vault_dir / "note.md").read_text()
         assert "Existing" in written
@@ -503,11 +523,15 @@ class TestUpdateNote:
         """frontmatter provided → merged with existing + updated_at added (lines 627-633)."""
         vault_dir = tmp_path / "vault"
         vault_dir.mkdir()
-        (vault_dir / "note.md").write_text("---\ntitle: Old Title\ntags: []\n---\n# Body")
+        (vault_dir / "note.md").write_text(
+            "---\ntitle: Old Title\ntags: []\n---\n# Body"
+        )
 
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
-            await adapter.update_note("myvault", "note.md", frontmatter={"title": "New Title"})
+            await adapter.update_note(
+                "myvault", "note.md", frontmatter={"title": "New Title"}
+            )
 
         written = (vault_dir / "note.md").read_text()
         assert "New Title" in written
@@ -532,13 +556,16 @@ class TestUpdateNote:
 # delete_note — lines 659-689
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteNote:
     @pytest.mark.asyncio
     async def test_delete_note_no_vault_path_raises(self):
         """No vault path → ObsidianCliError (line 663)."""
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=None):
-            with pytest.raises(_adapter_mod.ObsidianCliError, match="Cannot determine path"):
+            with pytest.raises(
+                _adapter_mod.ObsidianCliError, match="Cannot determine path"
+            ):
                 await adapter.delete_note("myvault", "note.md")
 
     @pytest.mark.asyncio
@@ -586,6 +613,7 @@ class TestDeleteNote:
     async def test_delete_note_exception_raises_obsidian_error(self, tmp_path):
         """Exception during delete → ObsidianCliError (lines 688-689)."""
         import shutil
+
         vault_dir = tmp_path / "vault"
         vault_dir.mkdir()
         (vault_dir / "note.md").write_text("# Note")
@@ -593,7 +621,9 @@ class TestDeleteNote:
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
             with patch.object(shutil, "move", side_effect=OSError("disk full")):
-                with pytest.raises(_adapter_mod.ObsidianCliError, match="Failed to delete"):
+                with pytest.raises(
+                    _adapter_mod.ObsidianCliError, match="Failed to delete"
+                ):
                     await adapter.delete_note("myvault", "note.md", backup=True)
 
 
@@ -601,13 +631,16 @@ class TestDeleteNote:
 # _write_note_to_filesystem — lines 701-740
 # ---------------------------------------------------------------------------
 
+
 class TestWriteNoteToFilesystem:
     @pytest.mark.asyncio
     async def test_no_vault_path_raises(self):
         """No vault path → ObsidianCliError (lines 703-707)."""
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=None):
-            with pytest.raises(_adapter_mod.ObsidianCliError, match="Cannot determine filesystem path"):
+            with pytest.raises(
+                _adapter_mod.ObsidianCliError, match="Cannot determine filesystem path"
+            ):
                 await adapter._write_note_to_filesystem("myvault", "note.md", "content")
 
     @pytest.mark.asyncio
@@ -639,7 +672,9 @@ class TestWriteNoteToFilesystem:
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
             with pytest.raises(_adapter_mod.ObsidianCliError):
-                await adapter._write_note_to_filesystem("myvault", "../outside.md", "evil")
+                await adapter._write_note_to_filesystem(
+                    "myvault", "../outside.md", "evil"
+                )
 
     @pytest.mark.asyncio
     async def test_write_via_sync_executor(self, tmp_path):
@@ -661,7 +696,9 @@ class TestWriteNoteToFilesystem:
 
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
-            await adapter._write_note_to_filesystem("myvault", "subdir/deep/note.md", "# Deep")
+            await adapter._write_note_to_filesystem(
+                "myvault", "subdir/deep/note.md", "# Deep"
+            )
 
         assert (vault_dir / "subdir" / "deep" / "note.md").read_text() == "# Deep"
 
@@ -669,6 +706,7 @@ class TestWriteNoteToFilesystem:
 # ---------------------------------------------------------------------------
 # _sync_write_file — line 748
 # ---------------------------------------------------------------------------
+
 
 def test_sync_write_file(tmp_path):
     """_sync_write_file writes content to path (line 748)."""
@@ -680,6 +718,7 @@ def test_sync_write_file(tmp_path):
 # ---------------------------------------------------------------------------
 # _build_note_content — lines 756-806
 # ---------------------------------------------------------------------------
+
 
 class TestBuildNoteContent:
     def test_no_frontmatter_returns_content_as_is(self):
@@ -742,7 +781,9 @@ class TestBuildNoteContent:
 
     def test_full_frontmatter_block_structure(self):
         """Full block structure: --- delimiters, blank line, content."""
-        result = _adapter_mod._build_note_content("Body text", {"title": "Test", "count": 1})
+        result = _adapter_mod._build_note_content(
+            "Body text", {"title": "Test", "count": 1}
+        )
         lines = result.splitlines()
         assert lines[0] == "---"
         assert "---" in lines[1:]

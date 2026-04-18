@@ -73,7 +73,9 @@ def test_validate_metadata_raises_when_changelog_not_dict():
     from src.capabilities_metadata import _validate_metadata
 
     with pytest.raises(ValueError, match="must be an object"):
-        _validate_metadata({"api_version": "1.0.0", "schema_changelog": ["not", "a", "dict"]})
+        _validate_metadata(
+            {"api_version": "1.0.0", "schema_changelog": ["not", "a", "dict"]}
+        )
 
 
 def test_validate_metadata_raises_when_changelog_key_not_semver():
@@ -129,7 +131,9 @@ def test_load_contract_uses_default_path_when_value_invalid(tmp_path):
     """path value not str or not starting with '/' → uses default (line 40)."""
     from src import memory_paths
 
-    bad_data = json.dumps({"memory_base": "/api/v1/memory", "paths": {"find": "no-slash"}})
+    bad_data = json.dumps(
+        {"memory_base": "/api/v1/memory", "paths": {"find": "no-slash"}}
+    )
     with patch.object(memory_paths.Path, "read_text", return_value=bad_data):
         _, paths = memory_paths._load_contract()
 

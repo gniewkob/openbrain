@@ -19,7 +19,9 @@ def _load_release_gate_module():
 def test_evaluate_release_gate_unprotected(monkeypatch):
     module = _load_release_gate_module()
 
-    monkeypatch.setattr(module, "_get_repo_and_branch", lambda: ("gniewkob/openbrain", "master"))
+    monkeypatch.setattr(
+        module, "_get_repo_and_branch", lambda: ("gniewkob/openbrain", "master")
+    )
     monkeypatch.setattr(module, "_get_branch_protection", lambda _repo, _branch: None)
 
     result = module.evaluate_release_gate()
@@ -32,11 +34,15 @@ def test_evaluate_release_gate_missing_single_check(monkeypatch):
     module = _load_release_gate_module()
     current_contexts = list(module.REQUIRED_CHECKS[:-1])
 
-    monkeypatch.setattr(module, "_get_repo_and_branch", lambda: ("gniewkob/openbrain", "master"))
+    monkeypatch.setattr(
+        module, "_get_repo_and_branch", lambda: ("gniewkob/openbrain", "master")
+    )
     monkeypatch.setattr(
         module,
         "_get_branch_protection",
-        lambda _repo, _branch: {"required_status_checks": {"contexts": current_contexts}},
+        lambda _repo, _branch: {
+            "required_status_checks": {"contexts": current_contexts}
+        },
     )
 
     result = module.evaluate_release_gate()
@@ -48,11 +54,15 @@ def test_evaluate_release_gate_missing_single_check(monkeypatch):
 def test_evaluate_release_gate_healthy(monkeypatch):
     module = _load_release_gate_module()
 
-    monkeypatch.setattr(module, "_get_repo_and_branch", lambda: ("gniewkob/openbrain", "master"))
+    monkeypatch.setattr(
+        module, "_get_repo_and_branch", lambda: ("gniewkob/openbrain", "master")
+    )
     monkeypatch.setattr(
         module,
         "_get_branch_protection",
-        lambda _repo, _branch: {"required_status_checks": {"contexts": list(module.REQUIRED_CHECKS)}},
+        lambda _repo, _branch: {
+            "required_status_checks": {"contexts": list(module.REQUIRED_CHECKS)}
+        },
     )
 
     result = module.evaluate_release_gate()

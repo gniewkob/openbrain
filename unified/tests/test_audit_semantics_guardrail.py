@@ -74,7 +74,10 @@ async def brain_update(memory_id: str, content: str, updated_by: str = "agent"):
     module.MCP_TRANSPORT = transport
     module.MCP_GATEWAY = gateway
     errors = module._check_mcp_updated_by_placeholder_binding(mcp_patterns)
-    assert any("mcp-gateway/src/main.py missing MCP audit placeholder pattern" in err for err in errors)
+    assert any(
+        "mcp-gateway/src/main.py missing MCP audit placeholder pattern" in err
+        for err in errors
+    )
 
 
 def test_audit_semantics_contract_loader_validates_shape(tmp_path: Path) -> None:

@@ -29,7 +29,9 @@ class McpTransportUtilsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(logger.events[0][1]["tool"], "broken")
 
     async def test_extract_record_from_write_response_validates_shape(self) -> None:
-        with self.assertRaisesRegex(ValueError, "Write response missing record payload"):
+        with self.assertRaisesRegex(
+            ValueError, "Write response missing record payload"
+        ):
             utils.extract_record_from_write_response({"status": "ok"}, lambda rec: rec)
 
     async def test_redact_logged_payload_redacts_nested_fields(self) -> None:

@@ -17,4 +17,3 @@ def test_memory_paths_contract_values() -> None:
 def test_memory_item_paths() -> None:
     assert memory_item_path("mem-1") == "/mem-1"
     assert memory_item_absolute_path("mem-1") == "/api/v1/memory/mem-1"
-

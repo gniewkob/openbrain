@@ -20,7 +20,9 @@ from src.schemas import (
 
 
 class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
-    async def test_update_memory_preserves_match_key_and_existing_metadata(self) -> None:
+    async def test_update_memory_preserves_match_key_and_existing_metadata(
+        self,
+    ) -> None:
         now = datetime.now(timezone.utc)
         existing = Memory(
             id="mem-1",
@@ -36,7 +38,12 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
             superseded_by=None,
             tags=["alpha"],
             relations={"related": ["x"]},
-            metadata_={"title": "Existing Title", "custom_fields": {"priority": "high"}, "root_id": "mem-1", "updated_by": "tester"},
+            metadata_={
+                "title": "Existing Title",
+                "custom_fields": {"priority": "high"},
+                "root_id": "mem-1",
+                "updated_by": "tester",
+            },
             obsidian_ref="note.md",
             content_hash="hash-before",
             match_key="build:arch:1",
@@ -45,7 +52,9 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: existing
+        )
 
         updated_record = MemoryRecord(
             id="mem-1",
@@ -99,8 +108,18 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="updated", record=updated_record))) as handle_write,
-            patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=expected_out)) as get_memory,
+            patch.object(
+                memory_writes,
+                "handle_memory_write",
+                new=AsyncMock(
+                    return_value=MemoryWriteResponse(
+                        status="updated", record=updated_record
+                    )
+                ),
+            ) as handle_write,
+            patch.object(
+                memory_writes, "get_memory", new=AsyncMock(return_value=expected_out)
+            ) as get_memory,
         ):
             result = await crud.update_memory(
                 session,
@@ -119,7 +138,9 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         get_memory.assert_awaited_once_with(session, "mem-1")
         self.assertEqual(handle_write.await_args.kwargs["actor"], "auth-sub")
 
-    async def test_update_memory_uses_append_version_for_corporate_records(self) -> None:
+    async def test_update_memory_uses_append_version_for_corporate_records(
+        self,
+    ) -> None:
         now = datetime.now(timezone.utc)
         existing = Memory(
             id="mem-1",
@@ -135,7 +156,12 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
             superseded_by=None,
             tags=["alpha"],
             relations={},
-            metadata_={"title": "Existing Title", "custom_fields": {"policy_area": "security"}, "root_id": "mem-1", "updated_by": "tester"},
+            metadata_={
+                "title": "Existing Title",
+                "custom_fields": {"policy_area": "security"},
+                "root_id": "mem-1",
+                "updated_by": "tester",
+            },
             obsidian_ref=None,
             content_hash="hash-before",
             match_key="corp:decision:1",
@@ -144,7 +170,9 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: existing
+        )
 
         versioned_record = MemoryRecord(
             id="mem-2",
@@ -175,32 +203,48 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="versioned", record=versioned_record))) as handle_write,
-            patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=MemoryOut(
-                id="mem-2",
-                domain="corporate",
-                entity_type="Decision",
-                content="after",
-                owner="owner-a",
-                status="active",
-                version=2,
-                sensitivity="internal",
-                superseded_by=None,
-                tags=["alpha"],
-                relations={},
-                obsidian_ref=None,
-                custom_fields={"policy_area": "security"},
-                content_hash="hash-after",
-                match_key="corp:decision:1",
-                previous_id="mem-1",
-                root_id="mem-1",
-                valid_from=None,
-                created_at=now,
-                updated_at=now,
-                created_by="tester",
-            ))),
+            patch.object(
+                memory_writes,
+                "handle_memory_write",
+                new=AsyncMock(
+                    return_value=MemoryWriteResponse(
+                        status="versioned", record=versioned_record
+                    )
+                ),
+            ) as handle_write,
+            patch.object(
+                memory_writes,
+                "get_memory",
+                new=AsyncMock(
+                    return_value=MemoryOut(
+                        id="mem-2",
+                        domain="corporate",
+                        entity_type="Decision",
+                        content="after",
+                        owner="owner-a",
+                        status="active",
+                        version=2,
+                        sensitivity="internal",
+                        superseded_by=None,
+                        tags=["alpha"],
+                        relations={},
+                        obsidian_ref=None,
+                        custom_fields={"policy_area": "security"},
+                        content_hash="hash-after",
+                        match_key="corp:decision:1",
+                        previous_id="mem-1",
+                        root_id="mem-1",
+                        valid_from=None,
+                        created_at=now,
+                        updated_at=now,
+                        created_by="tester",
+                    )
+                ),
+            ),
         ):
-            await crud.update_memory(session, "mem-1", MemoryUpdate(content="after"), actor="auth-sub")
+            await crud.update_memory(
+                session, "mem-1", MemoryUpdate(content="after"), actor="auth-sub"
+            )
 
         request = handle_write.await_args.args[1]
         self.assertEqual(request.write_mode.value, "append_version")
@@ -233,13 +277,23 @@ class UpdateMemoryTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: existing
+        )
 
         with (
-            patch.object(memory_writes, "handle_memory_write", new=AsyncMock(return_value=MemoryWriteResponse(status="updated", record=None))) as handle_write,
+            patch.object(
+                memory_writes,
+                "handle_memory_write",
+                new=AsyncMock(
+                    return_value=MemoryWriteResponse(status="updated", record=None)
+                ),
+            ) as handle_write,
             patch.object(memory_writes, "get_memory", new=AsyncMock(return_value=None)),
         ):
-            await crud.update_memory(session, "mem-1", MemoryUpdate(content="after"), actor="auth-sub")
+            await crud.update_memory(
+                session, "mem-1", MemoryUpdate(content="after"), actor="auth-sub"
+            )
 
         request = handle_write.await_args.args[1]
         self.assertEqual(request.write_mode.value, "upsert")

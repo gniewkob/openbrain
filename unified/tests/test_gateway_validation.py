@@ -46,7 +46,9 @@ class TestBrainSearchValidation(unittest.TestCase):
 
     def test_search_top_k_over_limit_raises(self):
         with self.assertRaisesRegex(ValueError, "top_k"):
-            _run(_gateway.brain_search(query="test", top_k=_gateway.MAX_SEARCH_TOP_K + 1))
+            _run(
+                _gateway.brain_search(query="test", top_k=_gateway.MAX_SEARCH_TOP_K + 1)
+            )
 
     def test_search_top_k_boundary_min_passes(self):
         try:

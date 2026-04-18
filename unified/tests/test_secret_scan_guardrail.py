@@ -10,7 +10,9 @@ import uuid
 def _load_secret_scan_module():
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "check_no_committed_secrets.py"
-    spec = importlib.util.spec_from_file_location("check_no_committed_secrets", script_path)
+    spec = importlib.util.spec_from_file_location(
+        "check_no_committed_secrets", script_path
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     sys.modules[spec.name] = module
@@ -27,7 +29,13 @@ def test_placeholder_values_are_ignored() -> None:
 
 
 def _create_repo_scoped_tmp_dir(module) -> Path:
-    tmp_dir = module.ROOT / "unified" / "tests" / ".tmp_secret_scan_guardrail" / str(uuid.uuid4())
+    tmp_dir = (
+        module.ROOT
+        / "unified"
+        / "tests"
+        / ".tmp_secret_scan_guardrail"
+        / str(uuid.uuid4())
+    )
     tmp_dir.mkdir(parents=True, exist_ok=True)
     return tmp_dir
 
@@ -37,7 +45,9 @@ def test_main_detects_real_secret_like_value(monkeypatch) -> None:
     tmp_dir = _create_repo_scoped_tmp_dir(module)
     try:
         suspect = tmp_dir / "settings.env"
-        suspect.write_text("INTERNAL_API_KEY=super-real-secret-value\n", encoding="utf-8")
+        suspect.write_text(
+            "INTERNAL_API_KEY=super-real-secret-value\n", encoding="utf-8"
+        )
         monkeypatch.setattr(module, "tracked_files", lambda: [suspect])
         assert module.main() == 1
     finally:

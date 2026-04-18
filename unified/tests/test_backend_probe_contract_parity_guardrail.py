@@ -36,7 +36,10 @@ async def _get_backend_status():
     return {"probe": "readyz", "reason": "/readyz probe failed; /healthz probe failed; /api/v1/health probe failed"}
 """
     errors = module._check_backend_probe_contract_parity(transport_src, gateway_src)
-    assert any("readyz_paths drift" in err or "backend probe contract drift" in err for err in errors)
+    assert any(
+        "readyz_paths drift" in err or "backend probe contract drift" in err
+        for err in errors
+    )
 
 
 def test_backend_probe_contract_loader_validates_required_keys(tmp_path: Path) -> None:
@@ -48,7 +51,9 @@ def test_backend_probe_contract_loader_validates_required_keys(tmp_path: Path) -
     try:
         try:
             module._load_contract()
-            assert False, "expected ValueError for invalid backend probe guardrail contract"
+            assert False, (
+                "expected ValueError for invalid backend probe guardrail contract"
+            )
         except ValueError as exc:
             assert "readyz_paths" in str(exc)
     finally:

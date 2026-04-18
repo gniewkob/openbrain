@@ -35,29 +35,47 @@ def _user(subject="alice", tenant_id=None, privileged=False, domain_scope=None):
 
 def _memory_out(**kwargs):
     defaults = dict(
-        id="m1", domain="build", entity_type="Note", content="c",
-        owner="alice", status="active", version=1, sensitivity="internal",
-        tags=[], created_at=_NOW, updated_at=_NOW, created_by="alice",
+        id="m1",
+        domain="build",
+        entity_type="Note",
+        content="c",
+        owner="alice",
+        status="active",
+        version=1,
+        sensitivity="internal",
+        tags=[],
+        created_at=_NOW,
+        updated_at=_NOW,
+        created_by="alice",
     )
     defaults.update(kwargs)
     return MemoryOut(**defaults)
 
 
-def _patch_auth(public=True, privileged=False, subject="alice", tenant_id=None, domain_scope=None, registry_scope=None):
+def _patch_auth(
+    public=True,
+    privileged=False,
+    subject="alice",
+    tenant_id=None,
+    domain_scope=None,
+    registry_scope=None,
+):
     """Patch PUBLIC_MODE and auth helpers used by policy.py.
 
     Note: PUBLIC_MODE is a module-level alias captured at import time, so we
     patch it directly rather than patching PUBLIC_EXPOSURE.
     """
     return [
-        patch("src.security.policy.PUBLIC_MODE", public),          # [0]
-        patch("src.security.policy.PUBLIC_EXPOSURE", public),       # [1]
+        patch("src.security.policy.PUBLIC_MODE", public),  # [0]
+        patch("src.security.policy.PUBLIC_EXPOSURE", public),  # [1]
         patch("src.security.policy.is_privileged_user", return_value=privileged),  # [2]
-        patch("src.security.policy.get_subject", return_value=subject),             # [3]
-        patch("src.security.policy.get_tenant_id", return_value=tenant_id),         # [4]
-        patch("src.security.policy.get_domain_scope", return_value=domain_scope),   # [5]
-        patch("src.security.policy.get_registry_domain_scope", return_value=registry_scope),  # [6]
-        patch("src.security.policy.incr_metric"),                   # [7]
+        patch("src.security.policy.get_subject", return_value=subject),  # [3]
+        patch("src.security.policy.get_tenant_id", return_value=tenant_id),  # [4]
+        patch("src.security.policy.get_domain_scope", return_value=domain_scope),  # [5]
+        patch(
+            "src.security.policy.get_registry_domain_scope", return_value=registry_scope
+        ),  # [6]
+        patch("src.security.policy.incr_metric"),  # [7]
     ]
 
 
@@ -122,7 +140,9 @@ def test_enforce_domain_access_domain_in_scope_passes():
 
 
 def test_enforce_domain_access_domain_not_in_scope_raises():
-    ps = _enforce_patches(privileged=False, domain_scope={"corporate"}, registry_scope=None)
+    ps = _enforce_patches(
+        privileged=False, domain_scope={"corporate"}, registry_scope=None
+    )
     with ps[0], ps[1], ps[2], ps[3], ps[4], ps[5], ps[6], ps[7], ps[8]:
         with pytest.raises(HTTPException) as exc:
             enforce_domain_access({}, "build", "read")
@@ -130,7 +150,9 @@ def test_enforce_domain_access_domain_not_in_scope_raises():
 
 
 def test_enforce_domain_access_intersection_of_scopes():
-    ps = _enforce_patches(privileged=False, domain_scope={"build", "corporate"}, registry_scope={"build"})
+    ps = _enforce_patches(
+        privileged=False, domain_scope={"build", "corporate"}, registry_scope={"build"}
+    )
     with ps[0], ps[1], ps[2], ps[3], ps[4], ps[5], ps[6], ps[7], ps[8]:
         enforce_domain_access({}, "build", "read")  # build in intersection → pass
 
@@ -155,21 +177,27 @@ def test_resolve_owner_not_scoped_returns_empty_when_none():
 
 
 def test_resolve_owner_scoped_with_tenant_passes_through():
-    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id="t1")
+    patches = _patch_auth(
+        public=True, privileged=False, subject="alice", tenant_id="t1"
+    )
     with patches[0], patches[1], patches[2], patches[3], patches[4]:
         result = resolve_owner_for_write({}, "someone")
     assert result == "someone"
 
 
 def test_resolve_owner_scoped_no_tenant_sets_subject():
-    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id=None)
+    patches = _patch_auth(
+        public=True, privileged=False, subject="alice", tenant_id=None
+    )
     with patches[0], patches[1], patches[2], patches[3], patches[4]:
         result = resolve_owner_for_write({}, None)
     assert result == "alice"
 
 
 def test_resolve_owner_scoped_different_owner_raises():
-    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id=None)
+    patches = _patch_auth(
+        public=True, privileged=False, subject="alice", tenant_id=None
+    )
     with patches[0], patches[1], patches[2], patches[3], patches[4], patches[7]:
         with pytest.raises(HTTPException) as exc:
             resolve_owner_for_write({}, "bob")
@@ -223,31 +251,95 @@ def test_apply_owner_scope_not_scoped_returns_unchanged():
 
 
 def test_apply_owner_scope_scoped_no_tenant_injects_owner():
-    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id=None, domain_scope=None, registry_scope=None)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    patches = _patch_auth(
+        public=True,
+        privileged=False,
+        subject="alice",
+        tenant_id=None,
+        domain_scope=None,
+        registry_scope=None,
+    )
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+    ):
         result = apply_owner_scope({}, {})
     assert result["owner"] == "alice"
 
 
 def test_apply_owner_scope_scoped_with_tenant_injects_tenant():
-    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id="t1", domain_scope=None, registry_scope=None)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    patches = _patch_auth(
+        public=True,
+        privileged=False,
+        subject="alice",
+        tenant_id="t1",
+        domain_scope=None,
+        registry_scope=None,
+    )
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+    ):
         result = apply_owner_scope({}, {})
     assert result["tenant_id"] == "t1"
     assert "owner" not in result
 
 
 def test_apply_owner_scope_domain_not_subset_raises():
-    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id=None, domain_scope={"corporate"}, registry_scope=None)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    patches = _patch_auth(
+        public=True,
+        privileged=False,
+        subject="alice",
+        tenant_id=None,
+        domain_scope={"corporate"},
+        registry_scope=None,
+    )
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+    ):
         with pytest.raises(HTTPException) as exc:
             apply_owner_scope({}, {"domain": "build"})
         assert exc.value.status_code == 403
 
 
 def test_apply_owner_scope_injects_allowed_domains_when_no_request():
-    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id=None, domain_scope={"build", "personal"}, registry_scope=None)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    patches = _patch_auth(
+        public=True,
+        privileged=False,
+        subject="alice",
+        tenant_id=None,
+        domain_scope={"build", "personal"},
+        registry_scope=None,
+    )
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+    ):
         result = apply_owner_scope({}, {})
     assert set(result["domain"]) == {"build", "personal"}
 
@@ -286,13 +378,17 @@ def test_enforce_memory_access_tenant_missing_raises_404():
 
 
 def test_enforce_memory_access_owner_matches_passes():
-    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id=None)
+    patches = _patch_auth(
+        public=True, privileged=False, subject="alice", tenant_id=None
+    )
     with patches[0], patches[1], patches[2], patches[3], patches[4]:
         enforce_memory_access({}, _memory_out(owner="alice"))  # No raise
 
 
 def test_enforce_memory_access_owner_mismatch_raises_404():
-    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id=None)
+    patches = _patch_auth(
+        public=True, privileged=False, subject="alice", tenant_id=None
+    )
     with patches[0], patches[1], patches[2], patches[3], patches[4], patches[7]:
         with pytest.raises(HTTPException) as exc:
             enforce_memory_access({}, _memory_out(owner="bob"))

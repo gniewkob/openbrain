@@ -16,6 +16,7 @@ def validate_fastapi_app() -> bool:
     print("Testing FastAPI app initialization...")
     try:
         from src.main import app
+
         print(f"  ✓ App loaded: {app.title} v{app.version}")
         return True
     except Exception as e:
@@ -28,39 +29,49 @@ def validate_routes() -> bool:
     print("\nTesting route registration...")
     try:
         from src.main import app
-        
-        routes = [r for r in app.routes if hasattr(r, 'path')]
+
+        routes = [r for r in app.routes if hasattr(r, "path")]
         paths = [r.path for r in routes]
-        
+
         # Expected routes
         expected = {
             # Health
-            '/healthz', '/readyz', '/health',
+            "/healthz",
+            "/readyz",
+            "/health",
             # Core API
-            '/api/v1/memory/write', '/api/v1/memory/write-many',
-            '/api/v1/memory/find', '/api/v1/memory/get-context',
-            '/api/v1/memory/{memory_id}',
+            "/api/v1/memory/write",
+            "/api/v1/memory/write-many",
+            "/api/v1/memory/find",
+            "/api/v1/memory/get-context",
+            "/api/v1/memory/{memory_id}",
             # Obsidian API
-            '/api/v1/obsidian/vaults', '/api/v1/obsidian/read-note',
-            '/api/v1/obsidian/write-note', '/api/v1/obsidian/update-note',
-            '/api/v1/obsidian/sync', '/api/v1/obsidian/export',
-            '/api/v1/obsidian/collection', '/api/v1/obsidian/bidirectional-sync',
-            '/api/v1/obsidian/sync-status',
+            "/api/v1/obsidian/vaults",
+            "/api/v1/obsidian/read-note",
+            "/api/v1/obsidian/write-note",
+            "/api/v1/obsidian/update-note",
+            "/api/v1/obsidian/sync",
+            "/api/v1/obsidian/export",
+            "/api/v1/obsidian/collection",
+            "/api/v1/obsidian/bidirectional-sync",
+            "/api/v1/obsidian/sync-status",
             # Auth
-            '/.well-known/oauth-protected-resource',
-            '/.well-known/oauth-authorization-server',
+            "/.well-known/oauth-protected-resource",
+            "/.well-known/oauth-authorization-server",
             # Legacy CRUD
-            '/memory', '/memory/{memory_id}',
-            '/search', '/export',
+            "/memory",
+            "/memory/{memory_id}",
+            "/search",
+            "/export",
         }
-        
+
         found = set(paths)
         missing = expected - found
-        
+
         if missing:
             print(f"  ✗ Missing routes: {missing}")
             return False
-        
+
         print(f"  ✓ All {len(expected)} expected routes registered")
         print(f"  ✓ Total routes: {len(paths)}")
         return True
@@ -78,6 +89,7 @@ def validate_repositories() -> bool:
             SQLAlchemyMemoryRepository,
             InMemoryMemoryRepository,
         )
+
         print("  ✓ MemoryRepository (ABC) imported")
         print("  ✓ SQLAlchemyMemoryRepository imported")
         print("  ✓ InMemoryMemoryRepository imported")
@@ -101,12 +113,12 @@ def validate_exceptions() -> bool:
             SyncConflictError,
             register_exception_handlers,
         )
-        
+
         # Test exception creation
         exc = ValidationError("Test error")
         assert exc.status_code == 422
         assert exc.error_code == "validation_error"
-        
+
         print("  ✓ All exception classes imported")
         print("  ✓ Exception attributes validated")
         return True
@@ -126,7 +138,7 @@ def validate_obsidian_sync() -> bool:
             ObsidianChangeTracker,
         )
         from src.common.obsidian_adapter import ObsidianCliAdapter
-        
+
         print("  ✓ BidirectionalSyncEngine imported")
         print("  ✓ SyncStrategy enum imported")
         print("  ✓ ChangeType enum imported")
@@ -143,6 +155,7 @@ def validate_embed_caching() -> bool:
     print("\nTesting Embedding Cache...")
     try:
         from src.embed import _EMBED_CACHE, _EMBED_CACHE_SIZE
+
         print(f"  ✓ Cache size limit: {_EMBED_CACHE_SIZE}")
         print("  ✓ Embedding cache initialized")
         return True
@@ -157,9 +170,9 @@ def validate_rate_limiting() -> bool:
     try:
         from src.app_factory import create_app
         from slowapi import Limiter
-        
+
         app = create_app(public_base_url="", lifespan=lambda x: None)
-        assert hasattr(app.state, 'limiter')
+        assert hasattr(app.state, "limiter")
         print("  ✓ Rate limiter configured")
         print("  ✓ Default limit: 100/minute")
         return True
@@ -173,7 +186,7 @@ def main() -> int:
     print("=" * 60)
     print("OpenBrain API Validation")
     print("=" * 60)
-    
+
     results = [
         validate_fastapi_app(),
         validate_routes(),
@@ -183,11 +196,11 @@ def main() -> int:
         validate_embed_caching(),
         validate_rate_limiting(),
     ]
-    
+
     print("\n" + "=" * 60)
     passed = sum(results)
     total = len(results)
-    
+
     if all(results):
         print(f"✓ ALL VALIDATIONS PASSED ({passed}/{total})")
         print("=" * 60)

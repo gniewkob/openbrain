@@ -45,7 +45,9 @@ def test_http_error_contract_semantics_detects_missing_session_hint_drift() -> N
     }
 
     errors = module._check_contract(bad, guardrail)
-    assert any("detail_hints.missing_session_id.contains drift" in err for err in errors)
+    assert any(
+        "detail_hints.missing_session_id.contains drift" in err for err in errors
+    )
     assert any("detail_hints.missing_session_id.message drift" in err for err in errors)
 
 

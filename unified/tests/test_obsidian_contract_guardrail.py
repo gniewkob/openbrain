@@ -8,7 +8,9 @@ import sys
 def _load_obsidian_contract_module():
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "check_obsidian_contract.py"
-    spec = importlib.util.spec_from_file_location("check_obsidian_contract", script_path)
+    spec = importlib.util.spec_from_file_location(
+        "check_obsidian_contract", script_path
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     sys.modules[spec.name] = module
@@ -32,7 +34,9 @@ async def brain_obsidian_sync():
     tree = module.ast.parse(src_with_call)
     fn = module._find_async_function(tree, "brain_obsidian_sync")
     assert fn is not None
-    assert module._function_calls_name(fn, "_require_obsidian_local_tools_enabled") is True
+    assert (
+        module._function_calls_name(fn, "_require_obsidian_local_tools_enabled") is True
+    )
 
     src_without_call = """
 async def brain_obsidian_sync():
@@ -41,7 +45,10 @@ async def brain_obsidian_sync():
     tree_no = module.ast.parse(src_without_call)
     fn_no = module._find_async_function(tree_no, "brain_obsidian_sync")
     assert fn_no is not None
-    assert module._function_calls_name(fn_no, "_require_obsidian_local_tools_enabled") is False
+    assert (
+        module._function_calls_name(fn_no, "_require_obsidian_local_tools_enabled")
+        is False
+    )
 
     transport_src_ok = """
 ENABLE_HTTP_OBSIDIAN_TOOLS = True
@@ -161,11 +168,17 @@ async def brain_capabilities():
         expected_secondary_key="obsidian_http",
     )
     assert any("obsidian.mode must be constant 'http'" in err for err in errors)
-    assert any("obsidian.status must reference obsidian_status" in err for err in errors)
-    assert any("obsidian_http.status must reference obsidian_status" in err for err in errors)
+    assert any(
+        "obsidian.status must reference obsidian_status" in err for err in errors
+    )
+    assert any(
+        "obsidian_http.status must reference obsidian_status" in err for err in errors
+    )
 
 
-def test_obsidian_contract_validates_disabled_reason_contract_shape(tmp_path: Path) -> None:
+def test_obsidian_contract_validates_disabled_reason_contract_shape(
+    tmp_path: Path,
+) -> None:
     module = _load_obsidian_contract_module()
     broken = tmp_path / "obsidian_disabled_reason_contract.json"
     broken.write_text("{}", encoding="utf-8")

@@ -28,7 +28,7 @@ def test_gateway_main_loads_capabilities_from_manifest() -> None:
     source = gateway_main.read_text(encoding="utf-8")
 
     assert "load_capabilities_manifest" in source
-    assert '_CAPS = load_capabilities_manifest()' in source
+    assert "_CAPS = load_capabilities_manifest()" in source
     assert 'CORE_TOOLS = _CAPS["core_tools"]' in source
     assert 'ADVANCED_TOOLS = _CAPS["advanced_tools"]' in source
     assert 'ADMIN_TOOLS = _CAPS["admin_tools"]' in source

@@ -176,9 +176,15 @@ def test_security_headers_middleware_adds_hsts_in_public_mode():
     async def call_next(req):
         return response_mock
 
-    scope = {"type": "http", "method": "GET", "path": "/test",
-             "headers": [], "query_string": b""}
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/test",
+        "headers": [],
+        "query_string": b"",
+    }
     from starlette.requests import Request
+
     request = Request(scope)
 
     with patch("src.app_factory.get_config") as mock_cfg:
@@ -214,6 +220,7 @@ def test_create_app_public_mode_no_custom_origins_uses_public_base_url():
         mock_cfg.return_value = cfg
 
         from src.app_factory import create_app
+
         app = create_app(public_base_url="https://example.com", lifespan=mock_lifespan)
 
     assert app is not None

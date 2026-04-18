@@ -475,7 +475,7 @@ class BidirectionalSyncEngine:
         )
         tracked_obsidian_hashes: dict[str, str] = {}
         for state, result in zip(existing_tracked, note_results):
-            if not isinstance(result, Exception):
+            if not isinstance(result, BaseException):
                 tracked_obsidian_hashes[state.obsidian_path] = (
                     self.compute_content_hash(result.content)
                 )
@@ -603,7 +603,7 @@ class BidirectionalSyncEngine:
             change.resolution = "manual_review_required"
             return "manual"
 
-        return "openbrain"  # Default fallback
+        return "openbrain"  # type: ignore[unreachable]  # Safety fallback if new strategy added
 
     async def _import_note_as_memory(
         self,

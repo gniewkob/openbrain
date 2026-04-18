@@ -124,7 +124,9 @@ def test_redis_backend_raises_on_missing_redis_import():
     try:
         sys.modules["redis"] = None  # type: ignore[assignment]
         with pytest.raises(RuntimeError, match="redis package"):
-            RedisCounterBackend(redis_url="redis://localhost:6379", known_counters=KNOWN)
+            RedisCounterBackend(
+                redis_url="redis://localhost:6379", known_counters=KNOWN
+            )
     finally:
         if original is not None:
             sys.modules["redis"] = original
@@ -151,7 +153,9 @@ def test_redis_backend_incr_calls_hincrby():
 
     client = _make_redis_client()
     with patch("redis.Redis.from_url", return_value=client):
-        backend = RedisCounterBackend(redis_url="redis://localhost:6379", known_counters=KNOWN)
+        backend = RedisCounterBackend(
+            redis_url="redis://localhost:6379", known_counters=KNOWN
+        )
         backend.incr("requests_total", 3)
 
     client.hincrby.assert_called_once_with(
@@ -162,9 +166,13 @@ def test_redis_backend_incr_calls_hincrby():
 def test_redis_backend_snapshot_parses_values():
     from src.telemetry_counters import RedisCounterBackend
 
-    client = _make_redis_client(hgetall_return={"requests_total": "5", "errors_total": "2"})
+    client = _make_redis_client(
+        hgetall_return={"requests_total": "5", "errors_total": "2"}
+    )
     with patch("redis.Redis.from_url", return_value=client):
-        backend = RedisCounterBackend(redis_url="redis://localhost:6379", known_counters=KNOWN)
+        backend = RedisCounterBackend(
+            redis_url="redis://localhost:6379", known_counters=KNOWN
+        )
         snap = backend.snapshot()
 
     assert snap["requests_total"] == 5
@@ -176,7 +184,9 @@ def test_redis_backend_snapshot_fills_missing_known_counters():
 
     client = _make_redis_client(hgetall_return={})
     with patch("redis.Redis.from_url", return_value=client):
-        backend = RedisCounterBackend(redis_url="redis://localhost:6379", known_counters=KNOWN)
+        backend = RedisCounterBackend(
+            redis_url="redis://localhost:6379", known_counters=KNOWN
+        )
         snap = backend.snapshot()
 
     for name in KNOWN:
@@ -189,7 +199,9 @@ def test_redis_backend_snapshot_skips_non_int_values():
 
     client = _make_redis_client(hgetall_return={"bad": "not_an_int"})
     with patch("redis.Redis.from_url", return_value=client):
-        backend = RedisCounterBackend(redis_url="redis://localhost:6379", known_counters=KNOWN)
+        backend = RedisCounterBackend(
+            redis_url="redis://localhost:6379", known_counters=KNOWN
+        )
         snap = backend.snapshot()
 
     assert "bad" not in snap
@@ -201,7 +213,9 @@ def test_redis_backend_bulk_load_writes_known():
     client = _make_redis_client()
     pipe = client.pipeline.return_value
     with patch("redis.Redis.from_url", return_value=client):
-        backend = RedisCounterBackend(redis_url="redis://localhost:6379", known_counters=KNOWN)
+        backend = RedisCounterBackend(
+            redis_url="redis://localhost:6379", known_counters=KNOWN
+        )
         backend.bulk_load({"requests_total": 10})
 
     pipe.hset.assert_called()
@@ -212,7 +226,9 @@ def test_redis_backend_bulk_load_empty_is_noop():
 
     client = _make_redis_client()
     with patch("redis.Redis.from_url", return_value=client):
-        backend = RedisCounterBackend(redis_url="redis://localhost:6379", known_counters=KNOWN)
+        backend = RedisCounterBackend(
+            redis_url="redis://localhost:6379", known_counters=KNOWN
+        )
         call_count_before = client.pipeline.call_count
         backend.bulk_load({})
 
@@ -225,7 +241,9 @@ def test_redis_backend_reset_deletes_hash():
 
     client = _make_redis_client()
     with patch("redis.Redis.from_url", return_value=client):
-        backend = RedisCounterBackend(redis_url="redis://localhost:6379", known_counters=KNOWN)
+        backend = RedisCounterBackend(
+            redis_url="redis://localhost:6379", known_counters=KNOWN
+        )
         backend.reset()
 
     client.delete.assert_called_once_with("openbrain:telemetry:counters")

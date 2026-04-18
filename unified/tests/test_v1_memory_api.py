@@ -15,11 +15,12 @@ from src.schemas import MemoryWriteResponse
 # ---------------------------------------------------------------------------
 
 _LOCAL_USER = {"sub": "local-dev"}
-_ADMIN_USER = {"sub": "local-dev"}   # local-dev is always privileged
+_ADMIN_USER = {"sub": "local-dev"}  # local-dev is always privileged
 
 
 def _get_app():
     from src.main import app
+
     return app
 
 
@@ -27,6 +28,7 @@ def _client(user=None):
     """TestClient with require_auth overridden to return *user* (defaults to local-dev)."""
     app = _get_app()
     from src.auth import require_auth
+
     actual_user = user or _LOCAL_USER
     app.dependency_overrides[require_auth] = lambda: actual_user
     c = TestClient(app, raise_server_exceptions=False)
@@ -60,7 +62,9 @@ def test_v1_write_status_branches(status):
     try:
         mock_result = MemoryWriteResponse(status=status, record=None)
 
-        with patch("src.api.v1.memory.handle_memory_write", AsyncMock(return_value=mock_result)):
+        with patch(
+            "src.api.v1.memory.handle_memory_write", AsyncMock(return_value=mock_result)
+        ):
             r = client.post("/api/v1/memory/write", json=_write_payload())
         assert r.status_code == 200
     finally:
@@ -80,7 +84,9 @@ def test_v1_write_no_match_key_counts_risk():
                 "owner": "alice",
             }
         }
-        with patch("src.api.v1.memory.handle_memory_write", AsyncMock(return_value=mock_result)):
+        with patch(
+            "src.api.v1.memory.handle_memory_write", AsyncMock(return_value=mock_result)
+        ):
             r = client.post("/api/v1/memory/write", json=payload)
         assert r.status_code == 200
     finally:
@@ -122,7 +128,10 @@ def test_v1_get_context_scoped_user_injects_owner():
             patch("src.api.v1.memory._effective_domain_scope", return_value={"build"}),
             patch("src.api.v1.memory.get_tenant_id", return_value=""),
             patch("src.api.v1.memory.get_subject", return_value="alice"),
-            patch("src.api.v1.memory.get_grounding_pack", AsyncMock(return_value=mock_response)),
+            patch(
+                "src.api.v1.memory.get_grounding_pack",
+                AsyncMock(return_value=mock_response),
+            ),
         ):
             r = client.post("/api/v1/memory/get-context", json={"query": "test"})
         # response validation may fail but handler ran the owner injection path
@@ -139,7 +148,10 @@ def test_v1_get_context_scoped_user_injects_owner():
 def test_v1_get_returns_404_when_not_found():
     client, app = _client()
     try:
-        with patch("src.api.v1.memory.get_memory_as_record", AsyncMock(return_value=(None, None))):
+        with patch(
+            "src.api.v1.memory.get_memory_as_record",
+            AsyncMock(return_value=(None, None)),
+        ):
             r = client.get("/api/v1/memory/nonexistent-id")
         assert r.status_code == 404
     finally:
@@ -155,7 +167,10 @@ def test_v1_get_calls_enforce_memory_access():
         mock_out.domain = "build"
 
         with (
-            patch("src.api.v1.memory.get_memory_as_record", AsyncMock(return_value=(mock_record, mock_out))),
+            patch(
+                "src.api.v1.memory.get_memory_as_record",
+                AsyncMock(return_value=(mock_record, mock_out)),
+            ),
             patch("src.api.v1.memory.enforce_domain_access"),
             patch("src.api.v1.memory.enforce_memory_access") as mock_enf,
         ):
@@ -178,7 +193,10 @@ def test_v1_update_returns_404_when_update_returns_none():
         mock_out.domain = "build"
 
         with (
-            patch("src.api.v1.memory.get_memory_as_record", AsyncMock(return_value=(mock_record, mock_out))),
+            patch(
+                "src.api.v1.memory.get_memory_as_record",
+                AsyncMock(return_value=(mock_record, mock_out)),
+            ),
             patch("src.api.v1.memory.enforce_domain_access"),
             patch("src.api.v1.memory.enforce_memory_access"),
             patch("src.api.v1.memory.update_memory", AsyncMock(return_value=None)),
@@ -209,7 +227,9 @@ def test_maintain_runs_and_returns_report():
             "errors": [],
         }
 
-        with patch("src.api.v1.memory.run_maintenance", AsyncMock(return_value=mock_report)):
+        with patch(
+            "src.api.v1.memory.run_maintenance", AsyncMock(return_value=mock_report)
+        ):
             r = client.post("/api/v1/memory/maintain", json={})
         assert r.status_code in [200, 422, 500]
     finally:
@@ -224,7 +244,9 @@ def test_maintain_runs_and_returns_report():
 def test_maintain_report_detail_returns_404_when_missing():
     client, app = _client()
     try:
-        with patch("src.api.v1.memory.get_maintenance_report", AsyncMock(return_value=None)):
+        with patch(
+            "src.api.v1.memory.get_maintenance_report", AsyncMock(return_value=None)
+        ):
             r = client.get("/api/v1/memory/maintain/reports/no-such-id")
         assert r.status_code == 404
     finally:
@@ -244,7 +266,9 @@ def test_v1_export_404_when_memory_missing():
     client, app = _client()
     try:
         with patch("src.api.v1.memory.get_memory", AsyncMock(return_value=None)):
-            r = client.post("/api/v1/memory/export", json=_export_payload(["missing-id"]))
+            r = client.post(
+                "/api/v1/memory/export", json=_export_payload(["missing-id"])
+            )
         assert r.status_code == 404
     finally:
         _restore(app)
@@ -260,9 +284,14 @@ def test_v1_export_json_format():
             patch("src.api.v1.memory.get_memory", AsyncMock(return_value=mock_mem)),
             patch("src.api.v1.memory.enforce_domain_access"),
             patch("src.api.v1.memory.enforce_memory_access"),
-            patch("src.api.v1.memory.export_memories", AsyncMock(return_value=[{"id": "m1"}])),
+            patch(
+                "src.api.v1.memory.export_memories",
+                AsyncMock(return_value=[{"id": "m1"}]),
+            ),
         ):
-            r = client.post("/api/v1/memory/export", json=_export_payload(["m1"], fmt="json"))
+            r = client.post(
+                "/api/v1/memory/export", json=_export_payload(["m1"], fmt="json")
+            )
         assert r.status_code == 200
         assert r.json() == [{"id": "m1"}]
     finally:
@@ -279,9 +308,14 @@ def test_v1_export_jsonl_format():
             patch("src.api.v1.memory.get_memory", AsyncMock(return_value=mock_mem)),
             patch("src.api.v1.memory.enforce_domain_access"),
             patch("src.api.v1.memory.enforce_memory_access"),
-            patch("src.api.v1.memory.export_memories", AsyncMock(return_value=[{"id": "m1"}])),
+            patch(
+                "src.api.v1.memory.export_memories",
+                AsyncMock(return_value=[{"id": "m1"}]),
+            ),
         ):
-            r = client.post("/api/v1/memory/export", json=_export_payload(["m1"], fmt="jsonl"))
+            r = client.post(
+                "/api/v1/memory/export", json=_export_payload(["m1"], fmt="jsonl")
+            )
         assert r.status_code == 200
         assert "application/x-ndjson" in r.headers["content-type"]
     finally:
@@ -298,8 +332,10 @@ def test_v1_export_access_denied_becomes_404():
 
         with (
             patch("src.api.v1.memory.get_memory", AsyncMock(return_value=mock_mem)),
-            patch("src.api.v1.memory.enforce_domain_access",
-                  side_effect=FHTTPException(status_code=403, detail="denied")),
+            patch(
+                "src.api.v1.memory.enforce_domain_access",
+                side_effect=FHTTPException(status_code=403, detail="denied"),
+            ),
         ):
             r = client.post("/api/v1/memory/export", json=_export_payload(["m1"]))
         assert r.status_code == 404
@@ -315,8 +351,10 @@ def test_v1_export_access_denied_becomes_404():
 def test_read_policy_registry_returns_registry():
     client, app = _client()
     try:
-        with patch("src.api.v1.memory.get_policy_registry",
-                   return_value={"tenants": {}, "subjects": {}}):
+        with patch(
+            "src.api.v1.memory.get_policy_registry",
+            return_value={"tenants": {}, "subjects": {}},
+        ):
             r = client.get("/api/v1/memory/security/policy-registry")
         assert r.status_code == 200
         data = r.json()
@@ -350,8 +388,10 @@ def test_v1_delete_returns_403_on_corporate():
             patch("src.api.v1.memory.get_memory", AsyncMock(return_value=mock_mem)),
             patch("src.api.v1.memory.enforce_domain_access"),
             patch("src.api.v1.memory.enforce_memory_access"),
-            patch("src.api.v1.memory.delete_memory",
-                  AsyncMock(side_effect=ValueError("Cannot hard-delete append-only"))),
+            patch(
+                "src.api.v1.memory.delete_memory",
+                AsyncMock(side_effect=ValueError("Cannot hard-delete append-only")),
+            ),
         ):
             r = client.delete("/api/v1/memory/corp-id")
         assert r.status_code == 403
@@ -422,8 +462,10 @@ def test_v1_sync_check_success():
 def test_v1_sync_check_raises_422_on_value_error():
     client, app = _client()
     try:
-        with patch("src.api.v1.memory.sync_check",
-                   AsyncMock(side_effect=ValueError("bad input"))):
+        with patch(
+            "src.api.v1.memory.sync_check",
+            AsyncMock(side_effect=ValueError("bad input")),
+        ):
             r = client.post("/api/v1/memory/sync-check", json={"memory_id": "m1"})
         assert r.status_code == 422
     finally:
@@ -440,14 +482,29 @@ def test_v1_bulk_upsert_success():
     try:
         mock_result = MagicMock()
         mock_result.model_dump.return_value = {
-            "created": 1, "updated": 0, "skipped": 0, "failed": 0, "errors": []
+            "created": 1,
+            "updated": 0,
+            "skipped": 0,
+            "failed": 0,
+            "errors": [],
         }
 
-        with patch("src.api.v1.memory.upsert_memories_bulk", AsyncMock(return_value=mock_result)):
-            r = client.post("/api/v1/memory/bulk-upsert", json=[
-                {"content": "x", "domain": "build", "entity_type": "Note",
-                 "owner": "alice", "match_key": "k1"}
-            ])
+        with patch(
+            "src.api.v1.memory.upsert_memories_bulk",
+            AsyncMock(return_value=mock_result),
+        ):
+            r = client.post(
+                "/api/v1/memory/bulk-upsert",
+                json=[
+                    {
+                        "content": "x",
+                        "domain": "build",
+                        "entity_type": "Note",
+                        "owner": "alice",
+                        "match_key": "k1",
+                    }
+                ],
+            )
         assert r.status_code in [200, 422]
     finally:
         _restore(app)
@@ -456,12 +513,22 @@ def test_v1_bulk_upsert_success():
 def test_v1_bulk_upsert_raises_422_on_value_error():
     client, app = _client()
     try:
-        with patch("src.api.v1.memory.upsert_memories_bulk",
-                   AsyncMock(side_effect=ValueError("missing match_key"))):
-            r = client.post("/api/v1/memory/bulk-upsert", json=[
-                {"content": "x", "domain": "build", "entity_type": "Note",
-                 "owner": "alice", "match_key": "k1"}
-            ])
+        with patch(
+            "src.api.v1.memory.upsert_memories_bulk",
+            AsyncMock(side_effect=ValueError("missing match_key")),
+        ):
+            r = client.post(
+                "/api/v1/memory/bulk-upsert",
+                json=[
+                    {
+                        "content": "x",
+                        "domain": "build",
+                        "entity_type": "Note",
+                        "owner": "alice",
+                        "match_key": "k1",
+                    }
+                ],
+            )
         assert r.status_code == 422
     finally:
         _restore(app)

@@ -26,7 +26,7 @@ def _make_memory(domain="build", memory_id="mem-1"):
     """Return a minimal Memory ORM stub with string domain (no .value)."""
     mem = MagicMock()
     mem.id = memory_id
-    mem.domain = domain          # plain string — avoids .value branch
+    mem.domain = domain  # plain string — avoids .value branch
     mem.status = "active"
     mem.owner = "test-owner"
     mem.tenant_id = None
@@ -60,15 +60,19 @@ async def test_create_logs_build_domain():
     session = _make_session()
 
     with (
-        patch("src.memory_writes._get_embedding_compat", AsyncMock(return_value=None)),
-        patch("src.memory_writes._audit_compat", new_callable=AsyncMock) as mock_audit,
+        patch("src.memory_writes.get_embedding", AsyncMock(return_value=None)),
+        patch("src.memory_writes._audit", new_callable=AsyncMock) as mock_audit,
         patch("src.memory_writes._session_add", return_value=None),
         patch("src.memory_writes._to_record", return_value=MagicMock()),
         patch("src.memory_writes.MemoryWriteResponse", return_value=MagicMock()),
     ):
         await _create_new_memory(
-            session, rec, actor="alice", content_hash="h",
-            append_only_policy=False, _commit=False
+            session,
+            rec,
+            actor="alice",
+            content_hash="h",
+            append_only_policy=False,
+            _commit=False,
         )
 
     mock_audit.assert_awaited_once()
@@ -88,15 +92,19 @@ async def test_create_logs_personal_domain():
     session = _make_session()
 
     with (
-        patch("src.memory_writes._get_embedding_compat", AsyncMock(return_value=None)),
-        patch("src.memory_writes._audit_compat", new_callable=AsyncMock) as mock_audit,
+        patch("src.memory_writes.get_embedding", AsyncMock(return_value=None)),
+        patch("src.memory_writes._audit", new_callable=AsyncMock) as mock_audit,
         patch("src.memory_writes._session_add", return_value=None),
         patch("src.memory_writes._to_record", return_value=MagicMock()),
         patch("src.memory_writes.MemoryWriteResponse", return_value=MagicMock()),
     ):
         await _create_new_memory(
-            session, rec, actor="alice", content_hash="h",
-            append_only_policy=False, _commit=False
+            session,
+            rec,
+            actor="alice",
+            content_hash="h",
+            append_only_policy=False,
+            _commit=False,
         )
 
     mock_audit.assert_awaited_once()
@@ -113,15 +121,19 @@ async def test_create_logs_corporate_domain():
     session = _make_session()
 
     with (
-        patch("src.memory_writes._get_embedding_compat", AsyncMock(return_value=None)),
-        patch("src.memory_writes._audit_compat", new_callable=AsyncMock) as mock_audit,
+        patch("src.memory_writes.get_embedding", AsyncMock(return_value=None)),
+        patch("src.memory_writes._audit", new_callable=AsyncMock) as mock_audit,
         patch("src.memory_writes._session_add", return_value=None),
         patch("src.memory_writes._to_record", return_value=MagicMock()),
         patch("src.memory_writes.MemoryWriteResponse", return_value=MagicMock()),
     ):
         await _create_new_memory(
-            session, rec, actor="alice", content_hash="h",
-            append_only_policy=True, _commit=False
+            session,
+            rec,
+            actor="alice",
+            content_hash="h",
+            append_only_policy=True,
+            _commit=False,
         )
 
     mock_audit.assert_awaited_once()
@@ -147,8 +159,8 @@ async def test_update_memory_emits_audit():
     session = _make_session()
 
     with (
-        patch("src.memory_writes._get_embedding_compat", AsyncMock(return_value=None)),
-        patch("src.memory_writes._audit_compat", new_callable=AsyncMock) as mock_audit,
+        patch("src.memory_writes.get_embedding", AsyncMock(return_value=None)),
+        patch("src.memory_writes._audit", new_callable=AsyncMock) as mock_audit,
         patch("src.memory_writes._to_record", return_value=MagicMock()),
         patch("src.memory_writes.MemoryWriteResponse", return_value=MagicMock()),
     ):
@@ -174,8 +186,8 @@ async def test_update_memory_audit_contains_domain():
     session = _make_session()
 
     with (
-        patch("src.memory_writes._get_embedding_compat", AsyncMock(return_value=None)),
-        patch("src.memory_writes._audit_compat", new_callable=AsyncMock) as mock_audit,
+        patch("src.memory_writes.get_embedding", AsyncMock(return_value=None)),
+        patch("src.memory_writes._audit", new_callable=AsyncMock) as mock_audit,
         patch("src.memory_writes._to_record", return_value=MagicMock()),
         patch("src.memory_writes.MemoryWriteResponse", return_value=MagicMock()),
     ):
@@ -205,8 +217,8 @@ async def test_version_memory_still_logged():
     session = _make_session()
 
     with (
-        patch("src.memory_writes._get_embedding_compat", AsyncMock(return_value=None)),
-        patch("src.memory_writes._audit_compat", new_callable=AsyncMock) as mock_audit,
+        patch("src.memory_writes.get_embedding", AsyncMock(return_value=None)),
+        patch("src.memory_writes._audit", new_callable=AsyncMock) as mock_audit,
         patch("src.memory_writes._session_add", return_value=None),
         patch("src.memory_writes._to_record", return_value=MagicMock()),
         patch("src.memory_writes.MemoryWriteResponse", return_value=MagicMock()),
@@ -217,7 +229,7 @@ async def test_version_memory_still_logged():
 
     mock_audit.assert_awaited_once()
     _, posargs, _ = mock_audit.mock_calls[0]
-    assert posargs[1] == "version"   # _version_memory logs operation "version"
+    assert posargs[1] == "version"  # _version_memory logs operation "version"
 
 
 @pytest.mark.asyncio
@@ -232,7 +244,7 @@ async def test_delete_memory_still_logged():
     execute_result.scalar_one_or_none = MagicMock(return_value=existing)
     session.execute = AsyncMock(return_value=execute_result)
 
-    with patch("src.memory_writes._audit_compat", new_callable=AsyncMock) as mock_audit:
+    with patch("src.memory_writes._audit", new_callable=AsyncMock) as mock_audit:
         await delete_memory(session, existing.id, actor="sys")
 
     mock_audit.assert_awaited_once()

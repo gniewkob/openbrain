@@ -14,10 +14,16 @@ def register_ops_routes(app: FastAPI, handlers) -> None:
     # Health endpoints moved to api.v1.health, registered here for backward
     # compatibility
     app.add_api_route("/healthz", healthz, methods=["GET"])
-    app.add_api_route("/readyz", readyz, methods=["GET"])
+    app.add_api_route("/readyz", readyz, methods=["GET"], response_model=None)
     # /health requires auth in PUBLIC_MODE
     health_deps = [Depends(require_auth)] if config.auth.public_mode else []
-    app.add_api_route("/health", health, methods=["GET"], dependencies=health_deps)
+    app.add_api_route(
+        "/health",
+        health,
+        methods=["GET"],
+        dependencies=health_deps,
+        response_model=None,
+    )
     app.add_api_route(
         "/api/diagnostics/metrics",
         handlers.diagnostics_metrics,

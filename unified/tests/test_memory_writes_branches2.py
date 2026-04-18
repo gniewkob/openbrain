@@ -52,7 +52,12 @@ def _make_memory_record():
 async def test_handle_memory_write_appends_truncation_warning_in_version_path():
     """_warn_if_truncated returns warning + version path taken → warning appended (line 446)."""
     from src.memory_writes import handle_memory_write
-    from src.schemas import MemoryWriteRecord, MemoryWriteRequest, WriteMode, MemoryWriteResponse
+    from src.schemas import (
+        MemoryWriteRecord,
+        MemoryWriteRequest,
+        WriteMode,
+        MemoryWriteResponse,
+    )
 
     session = _make_session()
     mock_existing = MagicMock()
@@ -77,11 +82,19 @@ async def test_handle_memory_write_appends_truncation_warning_in_version_path():
     )
 
     with (
-        patch("src.memory_writes._find_existing_memory", AsyncMock(return_value=mock_existing)),
+        patch(
+            "src.memory_writes._find_existing_memory",
+            AsyncMock(return_value=mock_existing),
+        ),
         patch("src.memory_writes._record_matches_existing", return_value=False),
-        patch("src.memory_writes._warn_if_truncated", return_value="content truncated warning"),
+        patch(
+            "src.memory_writes._warn_if_truncated",
+            return_value="content truncated warning",
+        ),
         patch("src.memory_writes._requires_append_only", return_value=False),
-        patch("src.memory_writes._version_memory", AsyncMock(return_value=version_result)),
+        patch(
+            "src.memory_writes._version_memory", AsyncMock(return_value=version_result)
+        ),
     ):
         result = await handle_memory_write(session, req)
 
@@ -98,7 +111,12 @@ async def test_handle_memory_write_appends_truncation_warning_in_version_path():
 async def test_handle_memory_write_appends_truncation_warning_in_update_path():
     """_warn_if_truncated returns warning + update path taken → warning appended (line 451)."""
     from src.memory_writes import handle_memory_write
-    from src.schemas import MemoryWriteRecord, MemoryWriteRequest, WriteMode, MemoryWriteResponse
+    from src.schemas import (
+        MemoryWriteRecord,
+        MemoryWriteRequest,
+        WriteMode,
+        MemoryWriteResponse,
+    )
 
     session = _make_session()
     mock_existing = MagicMock()
@@ -123,11 +141,19 @@ async def test_handle_memory_write_appends_truncation_warning_in_update_path():
     )
 
     with (
-        patch("src.memory_writes._find_existing_memory", AsyncMock(return_value=mock_existing)),
+        patch(
+            "src.memory_writes._find_existing_memory",
+            AsyncMock(return_value=mock_existing),
+        ),
         patch("src.memory_writes._record_matches_existing", return_value=False),
-        patch("src.memory_writes._warn_if_truncated", return_value="content truncated warning"),
+        patch(
+            "src.memory_writes._warn_if_truncated",
+            return_value="content truncated warning",
+        ),
         patch("src.memory_writes._requires_append_only", return_value=False),
-        patch("src.memory_writes._update_memory", AsyncMock(return_value=update_result)),
+        patch(
+            "src.memory_writes._update_memory", AsyncMock(return_value=update_result)
+        ),
     ):
         result = await handle_memory_write(session, req)
 
@@ -144,7 +170,12 @@ async def test_handle_memory_write_appends_truncation_warning_in_update_path():
 async def test_handle_memory_write_many_atomic_commits_on_success():
     """atomic=True + all succeed → session.commit() called (line 548)."""
     from src.memory_writes import handle_memory_write_many
-    from src.schemas import MemoryWriteRecord, MemoryWriteManyRequest, WriteMode, MemoryWriteResponse
+    from src.schemas import (
+        MemoryWriteRecord,
+        MemoryWriteManyRequest,
+        WriteMode,
+        MemoryWriteResponse,
+    )
 
     session = _make_session()
 
@@ -159,7 +190,9 @@ async def test_handle_memory_write_many_atomic_commits_on_success():
         entity_type="Note",
         match_key="key-atomic",
     )
-    req = MemoryWriteManyRequest(records=[rec], write_mode=WriteMode.upsert, atomic=True)
+    req = MemoryWriteManyRequest(
+        records=[rec], write_mode=WriteMode.upsert, atomic=True
+    )
 
     write_result = MemoryWriteResponse(
         status="created",
@@ -167,7 +200,9 @@ async def test_handle_memory_write_many_atomic_commits_on_success():
         warnings=[],
     )
 
-    with patch("src.memory_writes.handle_memory_write", AsyncMock(return_value=write_result)):
+    with patch(
+        "src.memory_writes.handle_memory_write", AsyncMock(return_value=write_result)
+    ):
         response = await handle_memory_write_many(session, req)
 
     # session.commit() was called (line 548)
@@ -200,7 +235,9 @@ async def test_store_memory_raises_on_failed_write():
         errors=["write validation failed"],
     )
 
-    with patch("src.memory_writes.handle_memory_write", AsyncMock(return_value=failed_result)):
+    with patch(
+        "src.memory_writes.handle_memory_write", AsyncMock(return_value=failed_result)
+    ):
         with pytest.raises(ValueError, match="Write failed"):
             await store_memory(session, item)
 
@@ -241,7 +278,10 @@ async def test_store_memories_bulk_returns_empty_when_no_ids():
         ],
     )
 
-    with patch("src.memory_writes.handle_memory_write_many", AsyncMock(return_value=no_id_result)):
+    with patch(
+        "src.memory_writes.handle_memory_write_many",
+        AsyncMock(return_value=no_id_result),
+    ):
         result = await store_memories_bulk(session, items)
 
     assert result == []

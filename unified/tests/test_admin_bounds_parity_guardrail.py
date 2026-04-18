@@ -38,7 +38,9 @@ async def brain_cleanup_build_test_data(dry_run: bool = True, limit: int = 100):
         raise ValueError("limit must be 1–600")
     return {}
 """
-    errors = module._check_admin_bounds_parity(transport_src, gateway_src, checked_bounds)
+    errors = module._check_admin_bounds_parity(
+        transport_src, gateway_src, checked_bounds
+    )
     assert any("brain_cleanup_build_test_data.limit drift" in err for err in errors)
 
 

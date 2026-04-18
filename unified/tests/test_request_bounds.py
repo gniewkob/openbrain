@@ -4,7 +4,13 @@ import unittest
 
 from pydantic import ValidationError
 
-from src.schemas import ExportRequest, MemoryCreate, MemoryGetContextRequest, ObsidianSyncRequest, SearchRequest
+from src.schemas import (
+    ExportRequest,
+    MemoryCreate,
+    MemoryGetContextRequest,
+    ObsidianSyncRequest,
+    SearchRequest,
+)
 
 
 class RequestBoundsTests(unittest.TestCase):

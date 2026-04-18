@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Awaitable
+
 from fastapi import FastAPI, Request, Response
+from starlette.types import Lifespan
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -24,7 +27,9 @@ _EXPOSE_HEADERS = ["X-Request-ID"]
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to every response."""
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """Add security headers to the response."""
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -42,7 +47,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def create_app(*, public_base_url: str = "", lifespan) -> FastAPI:
+def create_app(*, public_base_url: str = "", lifespan: Lifespan[FastAPI]) -> FastAPI:
     """
     Create and configure the FastAPI application.
 
@@ -83,7 +88,7 @@ def create_app(*, public_base_url: str = "", lifespan) -> FastAPI:
 
     # Add rate limiting
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # Configure CORS — explicit allowed headers, never wildcard
     allowed_origins: list[str] = []

@@ -16,11 +16,13 @@ from fastapi.testclient import TestClient
 
 def _get_app():
     from src.main import app
+
     return app
 
 
 def _client():
     from src.auth import require_auth
+
     app = _get_app()
     app.dependency_overrides[require_auth] = lambda: {"sub": "local-dev"}
     return TestClient(app, raise_server_exceptions=False), app
@@ -62,7 +64,10 @@ def test_metrics_endpoint_handles_gauge_error():
     client, app = _client()
     try:
         with (
-            patch("src.main.refresh_memory_gauges", AsyncMock(side_effect=RuntimeError("db down"))),
+            patch(
+                "src.main.refresh_memory_gauges",
+                AsyncMock(side_effect=RuntimeError("db down")),
+            ),
             patch("src.main.AsyncSessionLocal") as mock_ctx,
             patch("src.main.render_prometheus_metrics", return_value="# ok\n"),
         ):
@@ -85,7 +90,9 @@ def test_load_contract_falls_back_when_file_missing():
     """_load_contract except branch (lines 27-28)."""
     from src.http_error_adapter import _load_contract
 
-    with patch("src.http_error_adapter.Path.read_text", side_effect=FileNotFoundError()):
+    with patch(
+        "src.http_error_adapter.Path.read_text", side_effect=FileNotFoundError()
+    ):
         contract = _load_contract()
 
     assert "status_labels" in contract
@@ -113,7 +120,11 @@ def test_backend_error_hint_skips_empty_needle():
     original_hints = _CONTRACT.get("detail_hints", {})
     try:
         _CONTRACT["detail_hints"] = {
-            "empty": {"status_code": 404, "contains": "  ", "message": "should not appear"}
+            "empty": {
+                "status_code": 404,
+                "contains": "  ",
+                "message": "should not appear",
+            }
         }
         msg = backend_error_message(404, "some detail")
     finally:

@@ -17,7 +17,7 @@ class DatabaseSecurityTests(unittest.TestCase):
 
     def test_public_mode_rejects_dev_default_database_credentials(self) -> None:
         dev_url = "postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified"
-        
+
         with patch.dict(
             os.environ,
             {

@@ -46,4 +46,7 @@ async def brain_capabilities():
         gateway_src,
         {"stable", "active", "guarded"},
     )
-    assert any("tier status values must be in" in err or "tier status drift" in err for err in errors)
+    assert any(
+        "tier status values must be in" in err or "tier status drift" in err
+        for err in errors
+    )

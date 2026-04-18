@@ -98,7 +98,9 @@ async def test_app_public_exposure_unauthorized_returns_401():
     ):
         await combined_mod.app(scope, fake_receive, fake_send)
 
-    statuses = [r.get("status") for r in responses if r.get("type") == "http.response.start"]
+    statuses = [
+        r.get("status") for r in responses if r.get("type") == "http.response.start"
+    ]
     assert 401 in statuses
 
 
@@ -226,7 +228,12 @@ def test_check_internal_key_rate_limit_falls_back_on_redis_exception():
 
 def test_determine_change_conflict_both_changed():
     """Both memory_changed and obsidian_changed → conflict (line 533)."""
-    from src.obsidian_sync import BidirectionalSyncEngine, SyncState, ChangeType, SyncStrategy
+    from src.obsidian_sync import (
+        BidirectionalSyncEngine,
+        SyncState,
+        ChangeType,
+        SyncStrategy,
+    )
     from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc)
@@ -263,7 +270,12 @@ def test_determine_change_conflict_both_changed():
 
 def test_determine_change_only_obsidian_changed():
     """Only obsidian_changed → returns UPDATED from obsidian (line 541)."""
-    from src.obsidian_sync import BidirectionalSyncEngine, SyncState, ChangeType, SyncStrategy
+    from src.obsidian_sync import (
+        BidirectionalSyncEngine,
+        SyncState,
+        ChangeType,
+        SyncStrategy,
+    )
     from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc)
@@ -299,7 +311,12 @@ def test_determine_change_only_obsidian_changed():
 
 def test_resolve_conflict_returns_openbrain_for_unknown_strategy():
     """Unknown/unhandled strategy falls through to default → 'openbrain' (line 588)."""
-    from src.obsidian_sync import BidirectionalSyncEngine, SyncStrategy, SyncChange, ChangeType
+    from src.obsidian_sync import (
+        BidirectionalSyncEngine,
+        SyncStrategy,
+        SyncChange,
+        ChangeType,
+    )
 
     engine = BidirectionalSyncEngine(strategy=SyncStrategy.DOMAIN_BASED)
 
@@ -328,7 +345,12 @@ def test_resolve_conflict_returns_openbrain_for_unknown_strategy():
 @pytest.mark.asyncio
 async def test_apply_sync_import_exception_raises_obsidian_error():
     """adapter.read_note raises during import → wrapped in ObsidianCliError (lines 650-657)."""
-    from src.obsidian_sync import BidirectionalSyncEngine, SyncStrategy, SyncChange, ChangeType
+    from src.obsidian_sync import (
+        BidirectionalSyncEngine,
+        SyncStrategy,
+        SyncChange,
+        ChangeType,
+    )
     from src.exceptions import ObsidianCliError
 
     engine = BidirectionalSyncEngine(strategy=SyncStrategy.DOMAIN_BASED)
@@ -358,7 +380,12 @@ async def test_apply_sync_import_exception_raises_obsidian_error():
 @pytest.mark.asyncio
 async def test_apply_sync_update_obsidian_wins_exception():
     """obsidian wins + adapter.read_note raises → wrapped in ObsidianCliError (lines 678-693)."""
-    from src.obsidian_sync import BidirectionalSyncEngine, SyncStrategy, SyncChange, ChangeType
+    from src.obsidian_sync import (
+        BidirectionalSyncEngine,
+        SyncStrategy,
+        SyncChange,
+        ChangeType,
+    )
     from src.exceptions import ObsidianCliError
 
     engine = BidirectionalSyncEngine(strategy=SyncStrategy.DOMAIN_BASED)
@@ -379,7 +406,9 @@ async def test_apply_sync_update_obsidian_wins_exception():
     # resolve_conflict returns "obsidian" → takes the obsidian-wins path
     with patch("src.obsidian_sync.log"):
         with patch.object(engine, "resolve_conflict", return_value="obsidian"):
-            with pytest.raises(ObsidianCliError, match="Failed to update from Obsidian"):
+            with pytest.raises(
+                ObsidianCliError, match="Failed to update from Obsidian"
+            ):
                 await engine.apply_sync(mock_session, mock_adapter, change)
 
 

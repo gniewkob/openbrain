@@ -85,7 +85,9 @@ def test_tool_inventory_parity_validates_manifest_shape(tmp_path: Path) -> None:
     assert any("http_obsidian_tools must be non-empty list" in err for err in errors)
 
 
-def test_tool_inventory_guardrail_contract_loader_validates_shape(tmp_path: Path) -> None:
+def test_tool_inventory_guardrail_contract_loader_validates_shape(
+    tmp_path: Path,
+) -> None:
     module = _load_tool_inventory_parity_module()
     broken = tmp_path / "tool_inventory_guardrail_contract.json"
     broken.write_text("{}", encoding="utf-8")
@@ -95,7 +97,9 @@ def test_tool_inventory_guardrail_contract_loader_validates_shape(tmp_path: Path
     try:
         try:
             module._load_contract()
-            assert False, "expected ValueError for invalid tool inventory guardrail contract"
+            assert False, (
+                "expected ValueError for invalid tool inventory guardrail contract"
+            )
         except ValueError as exc:
             assert "manifest_obsidian_tools_key" in str(exc)
     finally:

@@ -133,7 +133,7 @@ class TestErrorResponseCreation(unittest.TestCase):
         """Test response for OpenBrainError."""
         exc = ValidationError("Invalid field", details={"field": "name"})
         response = create_error_response(exc)
-        
+
         self.assertEqual(response["error"]["code"], "validation_error")
         self.assertIn("message", response["error"])
 
@@ -142,7 +142,7 @@ class TestErrorResponseCreation(unittest.TestCase):
         with patch.dict(os.environ, {"PUBLIC_MODE": ""}):
             exc = ValueError("Something went wrong")
             response = create_error_response(exc)
-            
+
             self.assertEqual(response["error"]["code"], "internal_error")
             self.assertEqual(response["error"]["message"], "Something went wrong")
             self.assertEqual(response["error"]["type"], "ValueError")
@@ -152,7 +152,7 @@ class TestErrorResponseCreation(unittest.TestCase):
         with patch.dict(os.environ, {"PUBLIC_MODE": "true"}):
             exc = ValueError("Something went wrong")
             response = create_error_response(exc)
-            
+
             self.assertEqual(response["error"]["code"], "internal_error")
             self.assertEqual(response["error"]["message"], "An internal error occurred")
             self.assertNotIn("type", response["error"])
@@ -165,7 +165,7 @@ class TestErrorResponseCreation(unittest.TestCase):
             note_path="vault/note.md",
         )
         response = create_error_response(exc)
-        
+
         self.assertEqual(response["error"]["conflict"]["memory_id"], "mem_123")
         self.assertEqual(response["error"]["conflict"]["note_path"], "vault/note.md")
 
@@ -202,7 +202,7 @@ class TestErrorContext(unittest.TestCase):
         with self.assertRaises(DatabaseError) as ctx:
             with ErrorContext("database query", DatabaseError):
                 raise ValueError("Connection refused")
-        
+
         self.assertIn("database query failed", str(ctx.exception))
         self.assertIsInstance(ctx.exception.__cause__, ValueError)
 
@@ -220,9 +220,9 @@ class TestExceptionHandlers(unittest.IsolatedAsyncioTestCase):
         """Test handler returns JSONResponse."""
         mock_request = MagicMock()
         exc = ValidationError("Invalid input")
-        
+
         response = await openbrain_exception_handler(mock_request, exc)
-        
+
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_CONTENT)
         self.assertIn("error", response.body.decode())
 
@@ -230,27 +230,27 @@ class TestExceptionHandlers(unittest.IsolatedAsyncioTestCase):
         """Test generic handler with OpenBrainError."""
         mock_request = MagicMock()
         exc = NotFoundError("Not found")
-        
+
         response = await generic_exception_handler(mock_request, exc)
-        
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     async def test_generic_exception_handler_http_exception(self) -> None:
         """Test generic handler with HTTPException."""
         mock_request = MagicMock()
         exc = HTTPException(status_code=418, detail="I'm a teapot")
-        
+
         response = await generic_exception_handler(mock_request, exc)
-        
+
         self.assertEqual(response.status_code, 418)
 
     async def test_generic_exception_handler_generic(self) -> None:
         """Test generic handler with generic exception."""
         mock_request = MagicMock()
         exc = RuntimeError("Unexpected")
-        
+
         response = await generic_exception_handler(mock_request, exc)
-        
+
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -263,6 +263,7 @@ class TestHttpExceptionHandlerBranches(unittest.IsolatedAsyncioTestCase):
         exc = HTTPException(status_code=400, detail="bad request string")
         response = await http_exception_handler(mock_request, exc)
         import json
+
         body = json.loads(response.body)
         assert body["error"]["message"] == "bad request string"
 
@@ -272,6 +273,7 @@ class TestHttpExceptionHandlerBranches(unittest.IsolatedAsyncioTestCase):
         exc = HTTPException(status_code=404, detail=["list", "detail"])
         response = await http_exception_handler(mock_request, exc)
         import json
+
         body = json.loads(response.body)
         assert body["error"]["message"] == "404"
 
@@ -291,6 +293,7 @@ class TestValueErrorHandler(unittest.IsolatedAsyncioTestCase):
         with patch("src.exceptions.is_production", return_value=True):
             response = await value_error_handler(mock_request, exc)
         import json
+
         body = json.loads(response.body)
         assert body["error"]["message"] == "Invalid request"
 

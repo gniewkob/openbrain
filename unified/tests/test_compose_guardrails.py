@@ -8,7 +8,9 @@ import sys
 def _load_compose_guardrails_module():
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "check_compose_guardrails.py"
-    spec = importlib.util.spec_from_file_location("check_compose_guardrails", script_path)
+    spec = importlib.util.spec_from_file_location(
+        "check_compose_guardrails", script_path
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     sys.modules[spec.name] = module
@@ -25,9 +27,11 @@ def test_find_missing_required_snippets_detects_missing_values() -> None:
     module = _load_compose_guardrails_module()
     contract = module.load_contract()
     content = "POSTGRES_USER: ${POSTGRES_USER}\n"
-    missing = module.find_missing_required_snippets(content, contract["required_snippets"])
-    assert 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}' in missing
-    assert 'POSTGRES_DB: ${POSTGRES_DB}' in missing
+    missing = module.find_missing_required_snippets(
+        content, contract["required_snippets"]
+    )
+    assert "POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}" in missing
+    assert "POSTGRES_DB: ${POSTGRES_DB}" in missing
 
 
 def test_find_forbidden_snippets_detects_hardcoded_defaults() -> None:
@@ -55,7 +59,9 @@ command:
     assert "--url=${NGROK_DOMAIN}" in missing
 
 
-def test_compose_guardrails_contract_loader_validates_required_keys(tmp_path: Path) -> None:
+def test_compose_guardrails_contract_loader_validates_required_keys(
+    tmp_path: Path,
+) -> None:
     module = _load_compose_guardrails_module()
     broken = tmp_path / "compose_guardrails_contract.json"
     broken.write_text("{}", encoding="utf-8")

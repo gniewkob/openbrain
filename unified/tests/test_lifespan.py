@@ -11,6 +11,7 @@ import pytest
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 @asynccontextmanager
 async def _null_session():
     """Minimal no-op DB session for lifespan tests."""
@@ -41,7 +42,9 @@ def _lifespan_patches(
     return {
         "src.lifespan.AsyncSessionLocal": _NullSessionMaker(),
         "src.lifespan.get_telemetry_counters": AsyncMock(return_value=counters or []),
-        "src.lifespan.get_telemetry_histograms": AsyncMock(return_value=histograms or []),
+        "src.lifespan.get_telemetry_histograms": AsyncMock(
+            return_value=histograms or []
+        ),
         "src.lifespan.bulk_load_metrics": MagicMock(),
         "src.lifespan.bulk_load_histograms": MagicMock(),
         "src.lifespan.refresh_memory_gauges": AsyncMock(return_value=gauges or {}),
@@ -66,16 +69,41 @@ async def test_startup_loads_persisted_telemetry():
     """On startup, persisted counters and histograms are loaded into memory."""
     patches = _lifespan_patches(counters={"c": 1}, histograms={"h": []})
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]) as mock_blm,
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]) as mock_blh,
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ) as mock_blm,
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ) as mock_blh,
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -91,16 +119,41 @@ async def test_startup_skips_bulk_load_when_no_persisted_data():
     """bulk_load_* NOT called when persisted counters and histograms are empty."""
     patches = _lifespan_patches(counters=[], histograms=[])
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]) as mock_blm,
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]) as mock_blh,
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ) as mock_blm,
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ) as mock_blh,
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -119,16 +172,41 @@ async def test_startup_telemetry_exception_does_not_crash():
         side_effect=Exception("DB unavailable")
     )
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -147,16 +225,41 @@ async def test_startup_refreshes_gauges():
     """On startup, refresh_memory_gauges is called."""
     patches = _lifespan_patches()
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]) as mock_rg,
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ) as mock_rg,
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -174,16 +277,41 @@ async def test_startup_gauge_exception_does_not_crash():
         side_effect=Exception("gauge error")
     )
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -201,16 +329,41 @@ async def test_startup_raises_when_public_mode_and_memory_redis():
     """PUBLIC_MODE=true + REDIS_URL=memory:// must raise RuntimeError at startup."""
     patches = _lifespan_patches(public_mode=True, redis_url="memory://")
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -224,16 +377,41 @@ async def test_startup_ok_when_public_mode_and_real_redis():
     """PUBLIC_MODE=true with a real Redis URL passes the guard."""
     patches = _lifespan_patches(public_mode=True, redis_url="redis://localhost:6379/0")
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -260,16 +438,41 @@ async def test_shutdown_cancels_sync_task():
         return t
 
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
         patch("asyncio.create_task", side_effect=_capture_task),
     ):
         from src.lifespan import lifespan
@@ -286,16 +489,41 @@ async def test_shutdown_calls_final_flush():
     """upsert_telemetry_metrics is called on shutdown for final flush."""
     patches = _lifespan_patches()
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]) as mock_upsert,
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ) as mock_upsert,
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -314,16 +542,41 @@ async def test_shutdown_final_flush_exception_does_not_reraise():
         side_effect=Exception("flush failed")
     )
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -336,16 +589,41 @@ async def test_shutdown_closes_embedding_client():
     """close_embedding_client is called on shutdown."""
     patches = _lifespan_patches()
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]) as mock_close,
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ) as mock_close,
     ):
         from src.lifespan import lifespan
 
@@ -363,16 +641,41 @@ async def test_shutdown_embedding_exception_does_not_reraise():
         side_effect=Exception("close failed")
     )
     with (
-        patch("src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]),
-        patch("src.lifespan.get_telemetry_counters", patches["src.lifespan.get_telemetry_counters"]),
-        patch("src.lifespan.get_telemetry_histograms", patches["src.lifespan.get_telemetry_histograms"]),
-        patch("src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]),
-        patch("src.lifespan.bulk_load_histograms", patches["src.lifespan.bulk_load_histograms"]),
-        patch("src.lifespan.refresh_memory_gauges", patches["src.lifespan.refresh_memory_gauges"]),
-        patch("src.lifespan.upsert_telemetry_metrics", patches["src.lifespan.upsert_telemetry_metrics"]),
-        patch("src.lifespan.get_metrics_snapshot", patches["src.lifespan.get_metrics_snapshot"]),
+        patch(
+            "src.lifespan.AsyncSessionLocal", patches["src.lifespan.AsyncSessionLocal"]
+        ),
+        patch(
+            "src.lifespan.get_telemetry_counters",
+            patches["src.lifespan.get_telemetry_counters"],
+        ),
+        patch(
+            "src.lifespan.get_telemetry_histograms",
+            patches["src.lifespan.get_telemetry_histograms"],
+        ),
+        patch(
+            "src.lifespan.bulk_load_metrics", patches["src.lifespan.bulk_load_metrics"]
+        ),
+        patch(
+            "src.lifespan.bulk_load_histograms",
+            patches["src.lifespan.bulk_load_histograms"],
+        ),
+        patch(
+            "src.lifespan.refresh_memory_gauges",
+            patches["src.lifespan.refresh_memory_gauges"],
+        ),
+        patch(
+            "src.lifespan.upsert_telemetry_metrics",
+            patches["src.lifespan.upsert_telemetry_metrics"],
+        ),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            patches["src.lifespan.get_metrics_snapshot"],
+        ),
         patch("src.lifespan.get_config", patches["src.lifespan.get_config"]),
-        patch("src.lifespan.close_embedding_client", patches["src.lifespan.close_embedding_client"]),
+        patch(
+            "src.lifespan.close_embedding_client",
+            patches["src.lifespan.close_embedding_client"],
+        ),
     ):
         from src.lifespan import lifespan
 
@@ -429,7 +732,10 @@ async def test_periodic_sync_exception_continues_loop():
 
     with (
         patch("src.lifespan.asyncio.sleep", side_effect=_fast_sleep),
-        patch("src.lifespan.get_metrics_snapshot", MagicMock(return_value={"counters": {}, "histograms": {}})),
+        patch(
+            "src.lifespan.get_metrics_snapshot",
+            MagicMock(return_value={"counters": {}, "histograms": {}}),
+        ),
         patch("src.lifespan.upsert_telemetry_metrics", side_effect=_failing_upsert),
         patch("src.lifespan.refresh_memory_gauges", AsyncMock(return_value={})),
         patch("src.lifespan.AsyncSessionLocal", _NullSessionMaker()),

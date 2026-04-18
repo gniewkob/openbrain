@@ -249,10 +249,10 @@ def render_prometheus_metrics() -> str:
         lines.append(f"{metric_name} {value}")
 
     # Gauges
-    for name, value in registry.gauges_snapshot().items():
+    for name, gvalue in registry.gauges_snapshot().items():
         metric_name = _sanitize_metric_name(name)
         lines.append(f"# TYPE {metric_name} gauge")
-        lines.append(f"{metric_name} {value}")
+        lines.append(f"{metric_name} {gvalue}")
 
     # Histograms
     for name, hist in registry.histograms_snapshot().items():

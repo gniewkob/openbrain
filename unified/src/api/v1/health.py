@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -39,13 +41,13 @@ async def _check_vector_store() -> str:
 
 
 @router.get("/healthz")
-async def healthz() -> dict:
+async def healthz() -> dict[str, Any]:
     """Basic health check - always returns OK."""
     return {"status": "ok", "service": "openbrain-unified"}
 
 
-@router.get("/readyz")
-async def readyz() -> dict:
+@router.get("/readyz", response_model=None)
+async def readyz() -> JSONResponse | dict[str, Any]:
     """Readiness check - verifies database and vector store connectivity."""
     db_status = "ok"
     try:
@@ -58,7 +60,7 @@ async def readyz() -> dict:
     vector_store_status = await _check_vector_store()
 
     overall = "ok" if db_status == "ok" else "degraded"
-    payload = {
+    payload: dict[str, Any] = {
         "status": overall,
         "service": "openbrain-unified",
         "db": db_status,
@@ -69,9 +71,9 @@ async def readyz() -> dict:
     return payload
 
 
-@router.get("/health")
+@router.get("/health", response_model=None)
 async def health(
-    _user: dict = Depends(require_auth),
-) -> dict:
+    _user: dict[str, Any] = Depends(require_auth),
+) -> JSONResponse | dict[str, Any]:
     """Detailed health check (requires authentication)."""
     return await readyz()

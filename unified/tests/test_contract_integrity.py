@@ -155,9 +155,13 @@ def test_runtime_limits_validation_rejects_non_positive_values() -> None:
 
 
 def test_memory_paths_contract_is_loaded() -> None:
-    raw = json.loads((_contracts_dir() / "memory_paths.json").read_text(encoding="utf-8"))
-    assert memory_absolute_path("find") == f'{raw["memory_base"]}{raw["paths"]["find"]}'
-    assert memory_absolute_path("write") == f'{raw["memory_base"]}{raw["paths"]["write"]}'
+    raw = json.loads(
+        (_contracts_dir() / "memory_paths.json").read_text(encoding="utf-8")
+    )
+    assert memory_absolute_path("find") == f"{raw['memory_base']}{raw['paths']['find']}"
+    assert (
+        memory_absolute_path("write") == f"{raw['memory_base']}{raw['paths']['write']}"
+    )
 
 
 def test_mcp_transport_import_scope_contract_shape() -> None:
@@ -167,12 +171,14 @@ def test_mcp_transport_import_scope_contract_shape() -> None:
         )
     )
     assert isinstance(raw["scan_dirs"], list) and raw["scan_dirs"]
-    assert isinstance(raw["required_runtime_importers"], list) and raw[
-        "required_runtime_importers"
-    ]
-    assert isinstance(raw["allowed_runtime_importers"], list) and raw[
-        "allowed_runtime_importers"
-    ]
+    assert (
+        isinstance(raw["required_runtime_importers"], list)
+        and raw["required_runtime_importers"]
+    )
+    assert (
+        isinstance(raw["allowed_runtime_importers"], list)
+        and raw["allowed_runtime_importers"]
+    )
     assert isinstance(raw["allowed_test_importer_prefix"], str)
     assert raw["allowed_test_importer_prefix"]
 
@@ -197,22 +203,29 @@ def test_obsidian_guardrail_contract_shape() -> None:
     )
     gateway = raw["gateway"]
     http = raw["http"]
-    assert isinstance(gateway["required_env_constant_snippet"], str) and gateway[
-        "required_env_constant_snippet"
-    ]
-    assert isinstance(gateway["required_guard_function"], str) and gateway[
-        "required_guard_function"
-    ]
-    assert isinstance(gateway["required_capability_snippets"], list) and gateway[
-        "required_capability_snippets"
-    ]
-    assert all(
-        isinstance(item, str) and item for item in gateway["required_capability_snippets"]
+    assert (
+        isinstance(gateway["required_env_constant_snippet"], str)
+        and gateway["required_env_constant_snippet"]
     )
-    assert isinstance(http["required_gate_snippet"], str) and http["required_gate_snippet"]
-    assert isinstance(http["required_capability_snippets"], list) and http[
-        "required_capability_snippets"
-    ]
+    assert (
+        isinstance(gateway["required_guard_function"], str)
+        and gateway["required_guard_function"]
+    )
+    assert (
+        isinstance(gateway["required_capability_snippets"], list)
+        and gateway["required_capability_snippets"]
+    )
+    assert all(
+        isinstance(item, str) and item
+        for item in gateway["required_capability_snippets"]
+    )
+    assert (
+        isinstance(http["required_gate_snippet"], str) and http["required_gate_snippet"]
+    )
+    assert (
+        isinstance(http["required_capability_snippets"], list)
+        and http["required_capability_snippets"]
+    )
     assert all(
         isinstance(item, str) and item for item in http["required_capability_snippets"]
     )
@@ -226,9 +239,10 @@ def test_compose_guardrails_contract_shape() -> None:
     )
     assert isinstance(raw["required_snippets"], list) and raw["required_snippets"]
     assert isinstance(raw["forbidden_snippets"], list) and raw["forbidden_snippets"]
-    assert isinstance(raw["required_public_transport_snippets"], list) and raw[
-        "required_public_transport_snippets"
-    ]
+    assert (
+        isinstance(raw["required_public_transport_snippets"], list)
+        and raw["required_public_transport_snippets"]
+    )
     assert all(isinstance(item, str) and item for item in raw["required_snippets"])
     assert all(isinstance(item, str) and item for item in raw["forbidden_snippets"])
     assert all(
@@ -244,18 +258,22 @@ def test_shared_http_client_reuse_contract_shape() -> None:
         )
     )
     assert isinstance(raw["required_globals"], list) and raw["required_globals"]
-    assert isinstance(raw["required_refresh_snippets"], list) and raw[
-        "required_refresh_snippets"
-    ]
-    assert isinstance(raw["required_client_factory_name"], str) and raw[
-        "required_client_factory_name"
-    ]
-    assert isinstance(raw["required_client_factory_return_call"], str) and raw[
-        "required_client_factory_return_call"
-    ]
-    assert isinstance(raw["required_shared_client_class_name"], str) and raw[
-        "required_shared_client_class_name"
-    ]
+    assert (
+        isinstance(raw["required_refresh_snippets"], list)
+        and raw["required_refresh_snippets"]
+    )
+    assert (
+        isinstance(raw["required_client_factory_name"], str)
+        and raw["required_client_factory_name"]
+    )
+    assert (
+        isinstance(raw["required_client_factory_return_call"], str)
+        and raw["required_client_factory_return_call"]
+    )
+    assert (
+        isinstance(raw["required_shared_client_class_name"], str)
+        and raw["required_shared_client_class_name"]
+    )
     assert all(isinstance(item, str) and item for item in raw["required_globals"])
     assert all(
         isinstance(item, str) and item for item in raw["required_refresh_snippets"]
@@ -284,7 +302,10 @@ def test_http_error_adapter_guardrail_contract_shape() -> None:
             encoding="utf-8"
         )
     )
-    assert isinstance(raw["required_defaults_keys"], list) and raw["required_defaults_keys"]
+    assert (
+        isinstance(raw["required_defaults_keys"], list)
+        and raw["required_defaults_keys"]
+    )
     assert all(isinstance(item, str) and item for item in raw["required_defaults_keys"])
 
 
@@ -328,8 +349,13 @@ def test_capabilities_health_guardrail_contract_shape() -> None:
             encoding="utf-8"
         )
     )
-    assert isinstance(raw["required_function_names"], list) and raw["required_function_names"]
-    assert all(isinstance(item, str) and item for item in raw["required_function_names"])
+    assert (
+        isinstance(raw["required_function_names"], list)
+        and raw["required_function_names"]
+    )
+    assert all(
+        isinstance(item, str) and item for item in raw["required_function_names"]
+    )
 
 
 def test_admin_bounds_guardrail_contract_shape() -> None:
@@ -416,18 +442,20 @@ def test_export_guardrail_contract_shape() -> None:
 
 def test_http_error_contract_guardrail_contract_shape() -> None:
     raw = json.loads(
-        (
-            _contracts_dir() / "http_error_contract_guardrail_contract.json"
-        ).read_text(encoding="utf-8")
+        (_contracts_dir() / "http_error_contract_guardrail_contract.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert isinstance(raw["required_root_keys"], list) and raw["required_root_keys"]
-    assert isinstance(raw["required_status_label_keys"], list) and raw[
-        "required_status_label_keys"
-    ]
+    assert (
+        isinstance(raw["required_status_label_keys"], list)
+        and raw["required_status_label_keys"]
+    )
     assert isinstance(raw["required_fallbacks"], dict) and raw["required_fallbacks"]
-    assert isinstance(raw["required_missing_session_hint"], dict) and raw[
-        "required_missing_session_hint"
-    ]
+    assert (
+        isinstance(raw["required_missing_session_hint"], dict)
+        and raw["required_missing_session_hint"]
+    )
     assert all(isinstance(item, str) and item for item in raw["required_root_keys"])
     assert all(
         isinstance(item, str) and item for item in raw["required_status_label_keys"]
@@ -470,16 +498,21 @@ def test_mcp_transport_mount_contract_shape() -> None:
     )
     assert isinstance(raw["required_import_name"], str) and raw["required_import_name"]
     assert isinstance(raw["required_import_level"], int)
-    assert isinstance(raw["required_mount_target"], str) and raw["required_mount_target"]
-    assert isinstance(raw["required_mount_attr_chain"], list) and raw[
-        "required_mount_attr_chain"
-    ]
-    assert isinstance(raw["required_redirect_target"], str) and raw[
-        "required_redirect_target"
-    ]
-    assert isinstance(raw["required_redirect_attr_chain"], list) and raw[
-        "required_redirect_attr_chain"
-    ]
+    assert (
+        isinstance(raw["required_mount_target"], str) and raw["required_mount_target"]
+    )
+    assert (
+        isinstance(raw["required_mount_attr_chain"], list)
+        and raw["required_mount_attr_chain"]
+    )
+    assert (
+        isinstance(raw["required_redirect_target"], str)
+        and raw["required_redirect_target"]
+    )
+    assert (
+        isinstance(raw["required_redirect_attr_chain"], list)
+        and raw["required_redirect_attr_chain"]
+    )
 
 
 def test_mcp_http_session_contract_shape() -> None:
@@ -489,13 +522,15 @@ def test_mcp_http_session_contract_shape() -> None:
         )
     )
     assert isinstance(raw["required_run_kwargs"], dict) and raw["required_run_kwargs"]
-    assert isinstance(raw["required_custom_routes"], list) and raw[
-        "required_custom_routes"
-    ]
+    assert (
+        isinstance(raw["required_custom_routes"], list)
+        and raw["required_custom_routes"]
+    )
     assert isinstance(raw["require_main_entrypoint_call"], bool)
-    assert isinstance(raw["runbook_required_snippets"], list) and raw[
-        "runbook_required_snippets"
-    ]
+    assert (
+        isinstance(raw["runbook_required_snippets"], list)
+        and raw["runbook_required_snippets"]
+    )
 
 
 def test_local_guardrails_runner_contract_shape() -> None:
@@ -532,7 +567,11 @@ def test_pr_readiness_runner_contract_shape() -> None:
     assert all(isinstance(item, str) and item for item in guardrail_tests)
     assert all(isinstance(item, str) and item for item in contract_smoke_tests)
     assert isinstance(timeouts, dict) and timeouts
-    for label in ("local guardrails", "guardrail runner tests", "contract integrity smoke"):
+    for label in (
+        "local guardrails",
+        "guardrail runner tests",
+        "contract integrity smoke",
+    ):
         assert label in timeouts
         assert isinstance(timeouts[label], int) and timeouts[label] > 0
     assert isinstance(step_contract_sources, dict) and step_contract_sources

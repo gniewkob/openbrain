@@ -44,7 +44,9 @@ def _load_request_contracts():
     path = Path(__file__).resolve() / "contracts" / "request_contracts.json"
 """
     errors = module._check_request_contract_parity(http_src, gateway_src)
-    assert any("_validate_request_contracts logic must stay identical" in err for err in errors)
+    assert any(
+        "_validate_request_contracts logic must stay identical" in err for err in errors
+    )
 
 
 def test_request_runtime_parity_guardrail_detects_runtime_defaults_drift() -> None:

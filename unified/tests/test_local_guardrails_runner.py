@@ -58,7 +58,10 @@ def test_local_guardrails_run_step_returns_124_on_timeout(monkeypatch) -> None:
 
 def test_local_guardrails_includes_monitoring_contract_step() -> None:
     module = _load_local_guardrails_module()
-    assert ("monitoring contract", "scripts/validate_monitoring_contract.py") in module.GUARDRAIL_STEPS
+    assert (
+        "monitoring contract",
+        "scripts/validate_monitoring_contract.py",
+    ) in module.GUARDRAIL_STEPS
 
 
 def test_local_guardrails_includes_telemetry_contract_parity_step() -> None:
@@ -87,7 +90,10 @@ def test_local_guardrails_includes_hidden_test_data_alert_parity_step() -> None:
 
 def test_local_guardrails_includes_export_contract_step() -> None:
     module = _load_local_guardrails_module()
-    assert ("export contract", "scripts/check_export_contract.py") in module.GUARDRAIL_STEPS
+    assert (
+        "export contract",
+        "scripts/check_export_contract.py",
+    ) in module.GUARDRAIL_STEPS
 
 
 def test_local_guardrails_includes_capabilities_manifest_parity_step() -> None:

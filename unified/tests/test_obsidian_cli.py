@@ -46,7 +46,9 @@ class ObsidianCliHelperTests(unittest.TestCase):
         self.assertEqual(frontmatter["tags"], ["openbrain", "obsidian"])
         self.assertEqual(body, "# Architecture Audit\nBody")
 
-    def test_note_to_memory_write_record_uses_frontmatter_defaults_and_match_key(self) -> None:
+    def test_note_to_memory_write_record_uses_frontmatter_defaults_and_match_key(
+        self,
+    ) -> None:
         fake_schemas = types.ModuleType("src.schemas")
 
         class FakeSourceMetadata:
@@ -65,7 +67,11 @@ class ObsidianCliHelperTests(unittest.TestCase):
                 vault="Documents",
                 path="Architecture/OpenBrain.md",
                 content="---\ndomain: build\nentity_type: Architecture\ntags: [openbrain, obsidian]\n---\nBody",
-                frontmatter={"domain": "build", "entity_type": "Architecture", "tags": ["openbrain", "obsidian"]},
+                frontmatter={
+                    "domain": "build",
+                    "entity_type": "Architecture",
+                    "tags": ["openbrain", "obsidian"],
+                },
                 tags=["openbrain", "obsidian"],
                 title="OpenBrain",
                 file_hash="hash",
@@ -79,7 +85,9 @@ class ObsidianCliHelperTests(unittest.TestCase):
                 default_tags=["sync"],
             )
 
-            self.assertEqual(record.match_key, "obsidian:Documents:Architecture/OpenBrain.md")
+            self.assertEqual(
+                record.match_key, "obsidian:Documents:Architecture/OpenBrain.md"
+            )
             self.assertEqual(record.domain, "build")
             self.assertEqual(record.entity_type, "Architecture")
             self.assertEqual(record.owner, "gniewkob")
@@ -97,9 +105,7 @@ class ObsidianVaultDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parsed, {"Memory": "/vault/memory", "Work": "/vault/work"})
 
     def test_parse_vault_paths_mapping_supports_braced_legacy_format(self) -> None:
-        parsed = _parse_vault_paths_mapping(
-            "{Memory:/vault/memory,Work:/vault/work}"
-        )
+        parsed = _parse_vault_paths_mapping("{Memory:/vault/memory,Work:/vault/work}")
         self.assertEqual(parsed, {"Memory": "/vault/memory", "Work": "/vault/work"})
 
     def test_configured_vaults_from_json_and_named_env(self) -> None:
@@ -116,14 +122,17 @@ class ObsidianVaultDiscoveryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_list_vaults_falls_back_to_env_when_cli_unavailable(self) -> None:
         adapter = ObsidianCliAdapter(command="obsidian")
-        with patch.object(
-            adapter,
-            "_run",
-            new=AsyncMock(side_effect=ObsidianCliError("cli unavailable")),
-        ), patch.dict(
-            os.environ,
-            {"OBSIDIAN_VAULT_PATHS": '{"Controlled":"/tmp/controlled"}'},
-            clear=False,
+        with (
+            patch.object(
+                adapter,
+                "_run",
+                new=AsyncMock(side_effect=ObsidianCliError("cli unavailable")),
+            ),
+            patch.dict(
+                os.environ,
+                {"OBSIDIAN_VAULT_PATHS": '{"Controlled":"/tmp/controlled"}'},
+                clear=False,
+            ),
         ):
             vaults = await adapter.list_vaults()
 
@@ -131,12 +140,13 @@ class ObsidianVaultDiscoveryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_list_vaults_raises_when_cli_unavailable_and_no_env(self) -> None:
         adapter = ObsidianCliAdapter(command="obsidian")
-        with patch.object(
-            adapter,
-            "_run",
-            new=AsyncMock(side_effect=ObsidianCliError("cli unavailable")),
-        ), patch.dict(
-            os.environ, {}, clear=True
+        with (
+            patch.object(
+                adapter,
+                "_run",
+                new=AsyncMock(side_effect=ObsidianCliError("cli unavailable")),
+            ),
+            patch.dict(os.environ, {}, clear=True),
         ):
             with self.assertRaises(ObsidianCliError):
                 await adapter.list_vaults()

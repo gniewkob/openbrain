@@ -12,9 +12,13 @@ from src.schemas import MemoryCreate, MemoryWriteRecord, MemoryWriteRequest, Wri
 
 
 class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
-    async def test_handle_memory_write_create_persists_custom_fields_tenant_and_root_id(self) -> None:
+    async def test_handle_memory_write_create_persists_custom_fields_tenant_and_root_id(
+        self,
+    ) -> None:
         session = AsyncMock()
-        session.execute.return_value = type("Result", (), {"scalar_one_or_none": lambda self: None})()
+        session.execute.return_value = type(
+            "Result", (), {"scalar_one_or_none": lambda self: None}
+        )()
         session.commit = AsyncMock()
         session.refresh = AsyncMock()
         added: list[object] = []
@@ -32,7 +36,9 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
 
         session.flush = AsyncMock(side_effect=_flush)
 
-        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.1, 0.2])):
+        with patch.object(
+            memory_writes, "get_embedding", new=AsyncMock(return_value=[0.1, 0.2])
+        ):
             result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
@@ -54,11 +60,15 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.record.owner, "owner-a")
         self.assertEqual(result.record.tenant_id, "tenant-a")
         self.assertEqual(result.record.tags, ["alpha"])
-        self.assertEqual(result.record.custom_fields, {"priority": "high", "token": "abc"})
+        self.assertEqual(
+            result.record.custom_fields, {"priority": "high", "token": "abc"}
+        )
         self.assertIsNone(result.record.previous_id)
         self.assertEqual(result.record.root_id, result.record.id)
 
-    async def test_handle_memory_write_append_version_sets_previous_and_root_lineage(self) -> None:
+    async def test_handle_memory_write_append_version_sets_previous_and_root_lineage(
+        self,
+    ) -> None:
         now = datetime.now(timezone.utc)
         existing = Memory(
             id="mem-1",
@@ -74,7 +84,12 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
             superseded_by=None,
             tags=["alpha"],
             relations={},
-            metadata_={"title": "Decision", "tenant_id": "tenant-a", "custom_fields": {"priority": "high"}, "root_id": "mem-1"},
+            metadata_={
+                "title": "Decision",
+                "tenant_id": "tenant-a",
+                "custom_fields": {"priority": "high"},
+                "root_id": "mem-1",
+            },
             obsidian_ref=None,
             content_hash="hash-before",
             match_key="corp:decision:1",
@@ -83,7 +98,9 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
             updated_at=now,
         )
         session = AsyncMock()
-        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: existing)
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: existing
+        )
         session.commit = AsyncMock()
         session.refresh = AsyncMock()
         added: list[object] = []
@@ -101,7 +118,9 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
 
         session.flush = AsyncMock(side_effect=_flush)
 
-        with patch.object(memory_writes, "_get_embedding_compat", new=AsyncMock(return_value=[0.3, 0.4])):
+        with patch.object(
+            memory_writes, "get_embedding", new=AsyncMock(return_value=[0.3, 0.4])
+        ):
             result = await memory_writes.handle_memory_write(
                 session,
                 MemoryWriteRequest(
@@ -140,7 +159,11 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
             superseded_by=None,
             tags=["alpha"],
             relations={},
-            metadata_={"tenant_id": "tenant-a", "custom_fields": {"priority": "high"}, "root_id": "mem-1"},
+            metadata_={
+                "tenant_id": "tenant-a",
+                "custom_fields": {"priority": "high"},
+                "root_id": "mem-1",
+            },
             obsidian_ref=None,
             content_hash="hash-1",
             match_key="mk-1",
@@ -149,10 +172,16 @@ class MetadataLineageTests(unittest.IsolatedAsyncioTestCase):
             updated_at=datetime.now(timezone.utc),
         )
         with (
-            patch.object(memory_writes, "handle_memory_write", new=AsyncMock()) as handle_write,
-            patch.object(memory_writes, "get_memory_raw", new=AsyncMock(return_value=created)),
+            patch.object(
+                memory_writes, "handle_memory_write", new=AsyncMock()
+            ) as handle_write,
+            patch.object(
+                memory_writes, "get_memory_raw", new=AsyncMock(return_value=created)
+            ),
         ):
-            handle_write.return_value = SimpleNamespace(status="created", errors=[], record=SimpleNamespace(id="mem-1"))
+            handle_write.return_value = SimpleNamespace(
+                status="created", errors=[], record=SimpleNamespace(id="mem-1")
+            )
             result = await memory_writes.store_memory(
                 AsyncMock(),
                 MemoryCreate(
