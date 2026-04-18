@@ -663,6 +663,15 @@ class MemoryOut(BaseModel):
         """Delegate to shared custom_fields validator."""
         return _validate_custom_fields(v) if v is not None else {}
 
+    @property
+    def title(self) -> Optional[str]:
+        """Return title from custom_fields, if present and non-empty."""
+        v = self.custom_fields.get("title")
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s if s else None
+
 
 class SearchResult(BaseModel):
     """A single search result pairing a memory record with its relevance score."""
