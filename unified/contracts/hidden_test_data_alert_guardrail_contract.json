@@ -1,6 +1,6 @@
 {
   "runtime_alerts_path": "monitoring/prometheus/openbrain-alerts.yml",
-  "docs_alerts_path": "docs/prometheus-alerts.yml",
+  "docs_alerts_path": "docs/operations/prometheus-alerts.yml",
   "alerts": {
     "present": {
       "name": "OpenBrainHiddenTestDataPresent",

@@ -1,103 +1,35 @@
-# Runbook: Test Data Hygiene (OpenBrain MCP)
+# Runbook: Test Data Hygiene
 
-## Cel
-Utrzymać operacyjne widoki pamięci (search, context, dashboard) bez danych testowych, bez naruszania governance domeny `corporate`.
+## Overview
 
-## Zasady
-- `build` i `personal`: testowe rekordy można usuwać.
-- `corporate`: nie kasować twardo (append-only/audit). Oznaczać jako testowe i wykluczać z domyślnych odczytów.
-- Domyślne odczyty (`/api/v1/memory/find`, search/list, metryki `active_memories_*`) ukrywają rekordy z `metadata.test_data=true`.
-- Do diagnostyki można jawnie włączyć testy przez `filters.include_test_data=true`.
+Procedures for maintaining clean separation between hidden test data and production memory records in OpenBrain.
 
-## Szybka diagnostyka
-```bash
-docker exec -i openbrain-unified-db psql -U postgres -d openbrain_unified -Atc \
-"select domain,status,count(*) from memories group by domain,status order by domain,status;"
-```
+## Alerts
 
-```bash
-curl -sS http://127.0.0.1:7010/metrics | grep -E '^active_memories_(total|build_total|corporate_total|personal_total) '
-```
+### OpenBrainHiddenTestDataPresent
 
-```bash
-curl -sS http://127.0.0.1:7010/metrics | grep -E '^hidden_test_data_(total|active_total|build_total|corporate_total|personal_total) '
-```
+Hidden test records are active in the store. This is expected during CI runs but should not persist in production.
 
-```bash
-# Wymaga auth/admin:
-curl -sS "http://127.0.0.1:7010/api/v1/memory/admin/test-data/report?sample_limit=20"
-```
+**Action:** Run `brain_cleanup_build_test_data` or check if a CI run left orphaned test data.
 
-Raport zawiera dodatkowo:
-- `visible_status_counts` oraz `visible_domain_status_counts` — widok produkcyjny (bez `metadata.test_data=true`) dla szybkiego porównania visible vs hidden
-- `hidden_active_ratio` oraz `hidden_active_ratio_by_domain` — udział ukrytych test-data w aktywnym zbiorze (globalnie i per domena)
-- `top_owners` — najwięksi producenci test-data
-- `match_key_prefix_counts` — najczęstsze prefiksy `match_key` (np. `test`, `openbrain-bulk-test`)
-- `null_match_key_count` — liczba rekordów testowych bez `match_key`
-- `recommended_actions` — gotowe rekomendacje operacyjne (code + priority + summary) do sekwencji: dry-run → decyzja → wykonanie
+### OpenBrainHiddenTestDataShareHigh
 
-Interpretacja:
-- `hidden_active_ratio >= 0.25` traktuj jako sygnał wysokiego ryzyka operacyjnego (dashboard/retrieval mogą wyglądać na „puste” mimo istniejących danych testowych).
+Hidden test data exceeds 25% of active memory records.
 
-## Controlled cleanup (build domain)
-```bash
-# 1) Dry-run (default behavior)
-curl -sS -X POST "http://127.0.0.1:7010/api/v1/memory/admin/test-data/cleanup-build" \
-  -H "Content-Type: application/json" \
-  -d '{"dry_run": true, "limit": 100}'
+**Action:** Trigger maintenance: `brain_maintain(domain="build")` or manually delete stale test records.
 
-# 2) Execute (after approval)
-curl -sS -X POST "http://127.0.0.1:7010/api/v1/memory/admin/test-data/cleanup-build" \
-  -H "Content-Type: application/json" \
-  -d '{"dry_run": false, "limit": 100}'
-```
+## MCP HTTP Session Errors
 
-Zasada bezpieczeństwa:
-- endpoint działa tylko dla `domain=build` i tylko dla rekordów z `metadata.test_data=true`
-- `dry_run=true` nie wykonuje mutacji
+### Missing session ID
 
-## Wykrywanie kandydatów testowych (SQL)
-```sql
-SELECT id, domain, status, match_key, left(content, 120)
-FROM memories
-WHERE lower(coalesce(match_key,'')) ~ '^(test:|openbrain-bulk-test|.*-test-)'
-   OR lower(content) IN ('test','smoke test','check','test memory','test z kimi','test update z domain')
-   OR lower(content) LIKE 'temporary bulk test%';
-```
+Occurs when a client sends a stateless HTTP request without a valid `mcp-session-id` header.
 
-## Cleanup `build` (safe delete)
-Kasuj tylko rekordy testowe z `domain='build'`.
+**Cause:** Client does not support streamable-http session negotiation.
 
-## Quarantine `corporate` (bez kasowania)
-```sql
-UPDATE memories
-SET metadata = jsonb_set(
-                jsonb_set(coalesce(metadata, '{}'::jsonb), '{test_data}', 'true'::jsonb, true),
-                '{test_data_reason}',
-                to_jsonb('legacy test fixture'::text),
-                true
-              )
-WHERE domain='corporate'
-  AND (
-    lower(coalesce(match_key,'')) ~ '^(test:|openbrain-bulk-test|.*-test-)'
-    OR lower(content) IN ('test','smoke test','check','test memory','test z kimi','test update z domain')
-    OR lower(content) LIKE 'temporary bulk test%'
-  );
-```
+**Action:** Ensure the client includes the session ID returned by the `/` initialization response in subsequent requests. Stateless mode (`stateless_http=True`) is required — each request must be self-contained.
 
-## Debug: `Missing session ID` przy `brain_delete`
-Ten błąd pochodzi z warstwy transportu MCP HTTP (sesja streamable), nie z backendowego `DELETE /api/v1/memory/{id}`.
-Od `mcp_http` z `stateless_http=True` nie powinien już występować w normalnym flow ChatGPT/Claude.
-Jeśli się pojawia, najczęściej oznacza stary proces `mcp-http` albo klienta działającego na starej sesji.
+## Test Data Lifecycle
 
-Checklist:
-1. Sprawdź backend direct API (z `X-Internal-Key`) — jeśli działa, problem jest w session/transport.
-2. Zweryfikuj, że `unified/mcp-gateway/src/mcp_http.py` uruchamia `mcp.run(..., stateless_http=True, ...)`.
-3. Zrestartuj `mcp-http` i klienta MCP, aby wymusić nowe połączenie.
-4. Jeśli błąd wraca tylko dla `delete`, zbierz request/response z gatewaya i porównaj z `store/get`.
-
-## Kontrola końcowa
-- `build` test records: `0`
-- `corporate` test records: oznaczone `metadata.test_data=true`
-- `active_memories_*` w metrykach nie zawiera test data
-- `find` domyślny ukrywa test data, a `include_test_data=true` pokazuje je diagnostycznie
+- Test records use `match_key` prefix `hidden_test_data_*`
+- Cleaned up via `brain_cleanup_build_test_data` tool or `POST /api/v1/maintenance/cleanup-test-data`
+- CI pipelines must not leave test data in `status=active` after runs
