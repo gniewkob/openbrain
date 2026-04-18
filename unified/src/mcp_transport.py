@@ -223,7 +223,7 @@ def _redact_logged_payload(payload: Any) -> Any:
     return redact_logged_payload(payload, _SENSITIVE_LOG_FIELDS)
 
 
-async def _safe_req(method: str, path: str, **kwargs) -> dict[str, Any]:
+async def _safe_req(method: str, path: str, **kwargs) -> Any:
     async with _client() as c:
         full_path = f"/api/v1/memory{path}" if not path.startswith("/api") else path
         if "json" in kwargs:
