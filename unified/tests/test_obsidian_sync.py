@@ -251,6 +251,10 @@ class TestDetectChangesWithTrackedState:
         """Create mock adapter."""
         adapter = MagicMock()
         adapter.list_files = AsyncMock(return_value=["tracked.md"])
+        # detect_changes now reads tracked notes to compare hashes
+        unchanged_note = MagicMock()
+        unchanged_note.content = "Original content"
+        adapter.read_note = AsyncMock(return_value=unchanged_note)
         return adapter
 
     @pytest.fixture
@@ -303,25 +307,30 @@ class TestDetectChangesWithTrackedState:
 
     @pytest.mark.asyncio
     async def test_detect_obsidian_change(self, engine, mock_session, mock_adapter):
-        """Test detecting change in Obsidian - currently simplified."""
-        # Mock memory with same content (no OpenBrain change)
+        """Test detecting change in Obsidian via content hash comparison."""
+        # Mock memory with same content as stored hash (no OpenBrain change)
         mock_memory = MagicMock()
         mock_memory.id = "mem-1"
         mock_memory.obsidian_ref = "tracked.md"
         mock_memory.content = "Original content"
         mock_memory.updated_at = datetime.min.replace(tzinfo=timezone.utc)
-        
-        # File exists in Obsidian, but current simplified implementation
-        # doesn't detect Obsidian changes without mtime comparison
+
+        # Obsidian note now has different content than the stored hash
+        changed_note = MagicMock()
+        changed_note.content = "Changed in Obsidian"
+        mock_adapter.read_note = AsyncMock(return_value=changed_note)
+
         with patch(
             "src.obsidian_sync.list_memories", new=AsyncMock(return_value=[mock_memory])
         ):
             changes = await engine.detect_changes(
                 mock_session, mock_adapter, "Documents"
             )
-        
-        # No changes detected - Obsidian change detection is simplified
-        assert changes == []
+
+        # Obsidian change is now detected via hash comparison
+        assert len(changes) == 1
+        assert changes[0].change_type == ChangeType.UPDATED
+        assert changes[0].source == "obsidian"
 
     @pytest.mark.asyncio
     async def test_detect_both_deleted(self, engine, mock_session, mock_adapter):
@@ -577,8 +586,9 @@ class TestApplySync:
         session = AsyncMock()
         adapter = MagicMock()
         change = self._change(source="openbrain")
-        # openbrain source created = pass (stub)
-        result = await engine.apply_sync(session, adapter, change)
+        # _export_memory_to_obsidian is now implemented — patch it to isolate apply_sync
+        with patch.object(engine, "_export_memory_to_obsidian", AsyncMock()):
+            result = await engine.apply_sync(session, adapter, change)
         assert result is True
 
     @pytest.mark.asyncio
@@ -622,7 +632,9 @@ class TestApplySync:
         session = AsyncMock()
         adapter = MagicMock()
         change = self._change(change_type=ChangeType.UPDATED, source="openbrain")
-        result = await engine.apply_sync(session, adapter, change)
+        # _push_memory_to_obsidian is now implemented — patch it to isolate apply_sync
+        with patch.object(engine, "_push_memory_to_obsidian", AsyncMock()):
+            result = await engine.apply_sync(session, adapter, change)
         assert result is True
 
     @pytest.mark.asyncio
@@ -630,8 +642,11 @@ class TestApplySync:
         engine = self._engine(tmp_path)
         session = AsyncMock()
         adapter = MagicMock()
+        adapter.delete_note = AsyncMock()
         change = self._change(change_type=ChangeType.DELETED)
-        result = await engine.apply_sync(session, adapter, change)
+        # _handle_deleted is now implemented — patch delete_memory to isolate apply_sync
+        with patch("src.memory_writes.delete_memory", AsyncMock(return_value=True)):
+            result = await engine.apply_sync(session, adapter, change)
         assert result is True
 
 

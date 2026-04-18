@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import functools
-from typing import Any
+import logging
+from collections.abc import Callable
+from typing import Any, TypeVar
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 def http_obsidian_disabled_reason() -> str:
@@ -14,25 +18,28 @@ def http_obsidian_disabled_reason() -> str:
     )
 
 
-def make_tool_guard(logger):
+def make_tool_guard(logger: logging.Logger) -> Callable[[F], F]:
     """Wrap MCP tool functions with consistent error framing."""
 
-    def _decorator(func):
+    def _decorator(func: F) -> F:
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return await func(*args, **kwargs)
             except Exception as exc:
-                logger.error("mcp_tool_error", tool=func.__name__, error=str(exc))
+                logger.error(  # type: ignore[call-arg]
+                    "mcp_tool_error", tool=func.__name__, error=str(exc)
+                )
                 raise ValueError(f"Tool execution failed: {str(exc)}") from exc
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return _decorator
 
 
 def extract_record_from_write_response(
-    payload: dict[str, Any], to_legacy_record
+    payload: dict[str, Any],
+    to_legacy_record: Callable[[dict[str, Any]], dict[str, Any]],
 ) -> dict[str, Any]:
     """Extract and normalize write response payload shape."""
     record = payload.get("record")
