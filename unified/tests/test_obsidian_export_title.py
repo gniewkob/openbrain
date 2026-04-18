@@ -53,3 +53,11 @@ def test_memory_out_title_empty_string_treated_as_none():
     """MemoryOut.title must return None for empty string titles."""
     mem = _make_memory_out(custom_fields={"title": ""})
     assert mem.title is None
+
+
+def test_memory_out_title_included_in_model_dump():
+    """MemoryOut.title must appear in model_dump() output (computed_field, not bare @property)."""
+    mem = _make_memory_out(custom_fields={"title": "My Title"})
+    dumped = mem.model_dump()
+    assert "title" in dumped
+    assert dumped["title"] == "My Title"

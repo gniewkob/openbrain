@@ -41,13 +41,38 @@ async def test_update_memory_from_obsidian_calls_update_memory():
     change = _make_change(memory_id="mem-123")
 
     with patch("src.memory_writes.update_memory") as mock_update:
-        mock_update.return_value = MagicMock()
+        mock_updated = MagicMock()
+        mock_updated.id = "mem-123"
+        mock_update.return_value = mock_updated
         await engine._update_memory_from_obsidian(mock_session, mock_adapter, change)
 
     mock_update.assert_called_once()
     # First positional arg is session, second is memory_id
     call_args = mock_update.call_args
     assert call_args[0][1] == "mem-123"
+
+
+@pytest.mark.asyncio
+async def test_update_memory_from_obsidian_updates_tracker_state():
+    """_update_memory_from_obsidian must call tracker.update_state() to prevent sync loops."""
+    from src.obsidian_sync import BidirectionalSyncEngine
+
+    engine = BidirectionalSyncEngine()
+    mock_session = AsyncMock()
+    mock_adapter = AsyncMock()
+    mock_adapter.read_note = AsyncMock(return_value=_make_note())
+    change = _make_change(memory_id="mem-123")
+
+    with patch("src.memory_writes.update_memory") as mock_update:
+        mock_updated = MagicMock()
+        mock_updated.id = "mem-123"
+        mock_update.return_value = mock_updated
+        with patch.object(engine.tracker, "update_state") as mock_update_state:
+            await engine._update_memory_from_obsidian(
+                mock_session, mock_adapter, change
+            )
+
+    mock_update_state.assert_called_once()
 
 
 @pytest.mark.asyncio

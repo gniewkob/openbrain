@@ -677,6 +677,16 @@ class BidirectionalSyncEngine:
                     change.vault,
                     change.obsidian_path,
                 )
+                self.tracker.update_state(
+                    SyncState(
+                        memory_id=updated.id,
+                        obsidian_path=note.path,
+                        vault=change.vault,
+                        content_hash=self.compute_content_hash(note.content),
+                        memory_updated_at=datetime.now(timezone.utc),
+                        obsidian_modified_at=datetime.now(timezone.utc),
+                    )
+                )
         except ObsidianCliError:
             raise
         except Exception as e:

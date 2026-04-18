@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 from src.runtime_limits import load_runtime_limits
 
 MAX_ENTITY_TYPE_LEN = 64
@@ -663,6 +663,7 @@ class MemoryOut(BaseModel):
         """Delegate to shared custom_fields validator."""
         return _validate_custom_fields(v) if v is not None else {}
 
+    @computed_field
     @property
     def title(self) -> Optional[str]:
         """Return title from custom_fields, if present and non-empty."""
