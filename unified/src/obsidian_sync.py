@@ -466,7 +466,9 @@ class BidirectionalSyncEngine:
         # Batch-read Obsidian content for all tracked paths that still exist.
         # This is the only correct way to detect Obsidian-side changes without
         # file mtime support in the adapter.
-        existing_tracked = [s for s in tracked_states if s.obsidian_path in obsidian_files]
+        existing_tracked = [
+            s for s in tracked_states if s.obsidian_path in obsidian_files
+        ]
         note_results = await asyncio.gather(
             *(adapter.read_note(s.vault, s.obsidian_path) for s in existing_tracked),
             return_exceptions=True,
@@ -474,19 +476,23 @@ class BidirectionalSyncEngine:
         tracked_obsidian_hashes: dict[str, str] = {}
         for state, result in zip(existing_tracked, note_results):
             if not isinstance(result, Exception):
-                tracked_obsidian_hashes[state.obsidian_path] = self.compute_content_hash(
-                    result.content
+                tracked_obsidian_hashes[state.obsidian_path] = (
+                    self.compute_content_hash(result.content)
                 )
 
         # Process tracked items
         for state in tracked_states:
             memory = memory_map.get(state.obsidian_path)
             obsidian_exists = state.obsidian_path in obsidian_files
-            memory_changed = _check_memory_changed(state, memory, self.compute_content_hash)
+            memory_changed = _check_memory_changed(
+                state, memory, self.compute_content_hash
+            )
 
             # Obsidian change detection via content hash comparison
             current_hash = tracked_obsidian_hashes.get(state.obsidian_path)
-            obsidian_changed = current_hash is not None and current_hash != state.content_hash
+            obsidian_changed = (
+                current_hash is not None and current_hash != state.content_hash
+            )
 
             # Determine change type and create change record
             change = self._determine_change(
@@ -847,7 +853,9 @@ class BidirectionalSyncEngine:
             # Note removed from Obsidian → delete corresponding memory (non-corporate only)
             if change.memory_id:
                 try:
-                    await delete_memory(session, change.memory_id, actor="obsidian-sync")
+                    await delete_memory(
+                        session, change.memory_id, actor="obsidian-sync"
+                    )
                     log.info(
                         "deleted_memory_from_obsidian_signal: memory_id=%s vault=%s path=%s",
                         change.memory_id,

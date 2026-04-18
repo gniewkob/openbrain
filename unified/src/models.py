@@ -95,7 +95,9 @@ class Memory(Base):
 
     # --- Tagging & relations ---
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
-    relations: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    relations: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
     metadata_: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, default=dict
     )

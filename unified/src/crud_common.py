@@ -269,7 +269,9 @@ def _tenant_filter_expr(tenant_ids: list[str]) -> ColumnElement[bool]:
     )
 
 
-def _match_metadata_fields(existing: Memory, rec: Any, metadata: dict[str, Any]) -> bool:
+def _match_metadata_fields(
+    existing: Memory, rec: Any, metadata: dict[str, Any]
+) -> bool:
     """Check that metadata-sourced fields match the record."""
     return bool(
         metadata.get("title") == rec.title
