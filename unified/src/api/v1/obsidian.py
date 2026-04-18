@@ -410,7 +410,7 @@ async def v1_obsidian_sync_status(
     tracker = await _get_sync_tracker()
     stats = tracker.get_stats()
 
-    return ObsidianSyncStatus(**stats).model_dump()
+    return ObsidianSyncStatus(**stats)
 
 
 @router.post("/update-note")

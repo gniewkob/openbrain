@@ -626,10 +626,10 @@ class BidirectionalSyncEngine:
                 )
         except Exception as e:
             log.error(
-                "import_from_obsidian_failed",
-                error=str(e),
-                vault=change.vault,
-                path=change.obsidian_path,
+                "import_from_obsidian_failed: vault=%s path=%s error=%s",
+                change.vault,
+                change.obsidian_path,
+                str(e),
             )
             raise ObsidianCliError(
                 f"Failed to import from Obsidian: {e}",

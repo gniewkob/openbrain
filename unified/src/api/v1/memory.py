@@ -183,7 +183,7 @@ async def v1_get(
 ) -> MemoryRecord:
     """Retrieve a single memory by ID."""
     record, memory_out = await get_memory_as_record(session, memory_id)
-    if record is None:
+    if record is None or memory_out is None:
         raise HTTPException(status_code=404, detail="Memory not found")
     enforce_domain_access(_user, memory_out.domain, "read")
     enforce_memory_access(_user, memory_out)
@@ -199,7 +199,7 @@ async def v1_update(
 ) -> MemoryRecord:
     """Update an existing memory by ID (in-place for build/personal, new version for corporate)."""
     record, memory_out = await get_memory_as_record(session, memory_id)
-    if record is None:
+    if record is None or memory_out is None:
         raise HTTPException(status_code=404, detail="Memory not found")
     enforce_domain_access(_user, memory_out.domain, "write")
     enforce_memory_access(_user, memory_out)
@@ -211,6 +211,10 @@ async def v1_update(
     if updated is None:
         raise HTTPException(status_code=404, detail="Memory not found")
     updated_record, _ = await get_memory_as_record(session, updated.id)
+    if updated_record is None:
+        raise HTTPException(
+            status_code=500, detail="Internal error: updated record not found"
+        )
     return updated_record
 
 
@@ -371,7 +375,7 @@ async def v1_sync_check(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return SyncCheckResponse(**result)
+    return SyncCheckResponse.model_validate(result)
 
 
 @router.post("/bulk-upsert", response_model=BulkUpsertResult)
