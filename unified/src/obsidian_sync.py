@@ -714,6 +714,126 @@ class BidirectionalSyncEngine:
                 details={"vault": change.vault, "path": change.obsidian_path},
             ) from e
 
+    async def _export_memory_to_obsidian(
+        self,
+        session: "AsyncSession",
+        adapter: "ObsidianCliAdapter",
+        change: SyncChange,
+    ) -> None:
+        """Export a new OpenBrain memory to an Obsidian note (creates, does not overwrite)."""
+        from .memory_reads import get_memory
+        from .services.converter import memory_to_frontmatter, memory_to_note_content
+
+        memory = await get_memory(session, change.memory_id)
+        if memory is None:
+            log.warning(
+                "export_to_obsidian_memory_not_found: memory_id=%s vault=%s path=%s",
+                change.memory_id,
+                change.vault,
+                change.obsidian_path,
+            )
+            return
+
+        content = memory_to_note_content(memory)
+        frontmatter = memory_to_frontmatter(memory)
+
+        try:
+            note = await adapter.write_note(
+                vault=change.vault,
+                path=change.obsidian_path,
+                content=content,
+                frontmatter=frontmatter,
+                overwrite=False,
+            )
+            self.tracker.update_state(
+                SyncState(
+                    memory_id=change.memory_id,
+                    obsidian_path=note.path,
+                    vault=change.vault,
+                    content_hash=self.compute_content_hash(note.content),
+                    memory_updated_at=datetime.now(timezone.utc),
+                    obsidian_modified_at=datetime.now(timezone.utc),
+                )
+            )
+            log.info(
+                "export_to_obsidian_success: memory_id=%s vault=%s path=%s",
+                change.memory_id,
+                change.vault,
+                note.path,
+            )
+        except Exception as e:
+            log.error(
+                "export_to_obsidian_failed: memory_id=%s error=%s vault=%s path=%s",
+                change.memory_id,
+                str(e),
+                change.vault,
+                change.obsidian_path,
+            )
+            raise ObsidianCliError(
+                f"Failed to export memory to Obsidian: {e}",
+                details={"vault": change.vault, "path": change.obsidian_path},
+            ) from e
+
+    async def _push_memory_to_obsidian(
+        self,
+        session: "AsyncSession",
+        adapter: "ObsidianCliAdapter",
+        change: SyncChange,
+    ) -> None:
+        """Overwrite an Obsidian note with authoritative OpenBrain content (openbrain wins)."""
+        from .memory_reads import get_memory
+        from .services.converter import memory_to_frontmatter, memory_to_note_content
+
+        memory = await get_memory(session, change.memory_id)
+        if memory is None:
+            log.warning(
+                "push_to_obsidian_memory_not_found: memory_id=%s vault=%s path=%s",
+                change.memory_id,
+                change.vault,
+                change.obsidian_path,
+            )
+            return
+
+        content = memory_to_note_content(memory)
+        frontmatter = memory_to_frontmatter(memory)
+
+        try:
+            note = await adapter.write_note(
+                vault=change.vault,
+                path=change.obsidian_path,
+                content=content,
+                frontmatter=frontmatter,
+                overwrite=True,
+            )
+            self.tracker.update_state(
+                SyncState(
+                    memory_id=change.memory_id,
+                    obsidian_path=note.path,
+                    vault=change.vault,
+                    content_hash=self.compute_content_hash(note.content),
+                    memory_updated_at=datetime.now(timezone.utc),
+                    obsidian_modified_at=datetime.now(timezone.utc),
+                )
+            )
+            log.info(
+                "push_to_obsidian_success: memory_id=%s vault=%s path=%s",
+                change.memory_id,
+                change.vault,
+                note.path,
+            )
+        except Exception as e:
+            log.error(
+                "push_to_obsidian_failed: memory_id=%s error=%s vault=%s path=%s",
+                change.memory_id,
+                str(e),
+                change.vault,
+                change.obsidian_path,
+            )
+            raise ObsidianCliError(
+                f"Failed to push memory update to Obsidian: {e}",
+                details={"vault": change.vault, "path": change.obsidian_path},
+            ) from e
+
     async def apply_sync(
         self,
         session: "AsyncSession",
@@ -725,17 +845,19 @@ class BidirectionalSyncEngine:
             if change.change_type == ChangeType.CREATED:
                 if change.source == "obsidian":
                     await self._import_note_as_memory(session, adapter, change)
-                # change.source == "openbrain": export to Obsidian (not yet implemented)
+                elif change.source == "openbrain":
+                    await self._export_memory_to_obsidian(session, adapter, change)
 
             elif change.change_type == ChangeType.UPDATED:
                 resolution = self.resolve_conflict(change)
                 if resolution == "manual":
                     return False
-                if resolution != "openbrain":  # obsidian wins
+                if resolution == "obsidian":
                     await self._update_memory_from_obsidian(session, adapter, change)
-                # resolution == "openbrain": push to Obsidian (not yet implemented)
+                else:  # openbrain wins
+                    await self._push_memory_to_obsidian(session, adapter, change)
 
-            # ChangeType.DELETED: not yet implemented
+            # ChangeType.DELETED: handled in Task A4
 
             return True
 
