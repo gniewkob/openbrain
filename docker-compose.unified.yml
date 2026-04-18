@@ -76,6 +76,12 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   # Ollama działa lokalnie na macOS - używamy host.docker.internal
   # Aby uruchomić lokalną Ollamę: ollama serve
