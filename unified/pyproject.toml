@@ -33,9 +33,35 @@ dev = [
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
     "fastmcp>=2.0",
+    "mypy>=1.10",
 ]
 
 [tool.pytest.ini_options]
 markers = [
     "integration: integration tests that require explicit environment opt-in",
 ]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+    "src.obsidian_sync",
+    "src.app_factory",
+    "src.api.v1.obsidian",
+    "src.api.v1.health",
+    "src.common.obsidian_adapter",
+    "src.crud_common",
+    "src.exceptions",
+    "src.memory_writes",
+    "src.repositories.memory_repository",
+    "src.telemetry_counters",
+    "src.telemetry",
+]
+ignore_errors = true
