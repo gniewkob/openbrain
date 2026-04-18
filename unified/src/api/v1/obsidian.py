@@ -21,6 +21,7 @@ from ...obsidian_sync import (
 from ...use_cases.memory import store_memories_many as handle_memory_write_many
 from ...schemas import (
     MemoryWriteManyRequest,
+    WriteMode,
     ObsidianBidirectionalSyncRequest,
     ObsidianBidirectionalSyncResponse,
     ObsidianCollectionRequest,
@@ -151,7 +152,7 @@ async def v1_obsidian_sync(
     ]
     result = await handle_memory_write_many(
         session,
-        MemoryWriteManyRequest(records=records, write_mode="upsert"),
+        MemoryWriteManyRequest(records=records, write_mode=WriteMode.upsert),
         actor=_user.get("sub", "obsidian-sync"),
     )
     return ObsidianSyncResponse(
