@@ -663,7 +663,7 @@ class MemoryOut(BaseModel):
         """Delegate to shared custom_fields validator."""
         return _validate_custom_fields(v) if v is not None else {}
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def title(self) -> Optional[str]:
         """Return title from custom_fields, if present and non-empty."""
