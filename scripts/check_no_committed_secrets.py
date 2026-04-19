@@ -36,6 +36,8 @@ IGNORED_PATHS = {
     "docs/architecture/superpowers/specs/2026-04-05-track-a-p0-hardening-design.md",
     "docs/architecture/superpowers/specs/2026-04-05-track-b-p1-fixes-design.md",
     "docs/getting-started/configuration.md",
+    # .env.example intentionally contains placeholder credentials as documentation
+    "unified/.env.example",
 }
 
 IGNORED_SUFFIXES = {
