@@ -7,9 +7,11 @@ import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...auth import require_auth
+from ...models import Memory
 from ...common.obsidian_adapter import ObsidianCliAdapter, ObsidianCliError
 from ...db import get_session
 from ...memory_reads import get_memory, search_memories
@@ -27,6 +29,8 @@ from ...schemas import (
     ObsidianBidirectionalSyncResponse,
     ObsidianCollectionRequest,
     ObsidianCollectionResponse,
+    ObsidianConflict,
+    ObsidianConflictsResponse,
     MemoryOut,
     ObsidianExportItem,
     ObsidianExportRequest,
@@ -412,6 +416,65 @@ async def v1_obsidian_sync_status(
     stats = tracker.get_stats()
 
     return ObsidianSyncStatus(**stats)
+
+
+@router.get("/conflicts", response_model=ObsidianConflictsResponse)
+async def v1_obsidian_conflicts(
+    vault: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    _user: dict[str, Any] = Depends(require_auth),
+) -> ObsidianConflictsResponse:
+    """List all memories with unresolved Obsidian bidirectional sync conflicts."""
+    require_admin(_user)
+
+    stmt = (
+        select(Memory)
+        .where(Memory.metadata_["obsidian_conflict_pending"] != None)  # noqa: E711
+        .where(Memory.status == "active")
+        .order_by(Memory.updated_at.desc())
+    )
+    result = await session.execute(stmt)
+    memories = result.scalars().all()
+
+    conflicts = []
+    for mem in memories:
+        cf = mem.metadata_.get("obsidian_conflict_pending", {})
+        if vault and cf.get("vault") != vault:
+            continue
+        conflicts.append(
+            ObsidianConflict(
+                memory_id=mem.id,
+                obsidian_path=cf.get("obsidian_path", ""),
+                vault=cf.get("vault", ""),
+                detected_at=cf.get("detected_at", ""),
+                content_preview=mem.content[:200],
+            )
+        )
+
+    return ObsidianConflictsResponse(conflicts=conflicts, total=len(conflicts))
+
+
+@router.delete("/conflicts/{memory_id}", status_code=204)
+async def v1_obsidian_resolve_conflict(
+    memory_id: str,
+    session: AsyncSession = Depends(get_session),
+    _user: dict[str, Any] = Depends(require_auth),
+) -> None:
+    """Mark an Obsidian sync conflict as manually resolved (clears the pending flag)."""
+    require_admin(_user)
+
+    result = await session.execute(select(Memory).where(Memory.id == memory_id))
+    mem = result.scalar_one_or_none()
+    if mem is None:
+        raise HTTPException(status_code=404, detail="Memory not found")
+
+    new_meta = {
+        k: v for k, v in mem.metadata_.items() if k != "obsidian_conflict_pending"
+    }
+    await session.execute(
+        update(Memory).where(Memory.id == memory_id).values(metadata_=new_meta)
+    )
+    await session.commit()
 
 
 @router.post("/update-note")

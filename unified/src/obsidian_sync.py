@@ -30,6 +30,37 @@ from .memory_reads import list_memories
 log = logging.getLogger(__name__)
 
 
+async def _mark_conflict_pending(
+    session: "AsyncSession",
+    memory_id: str,
+    vault: str,
+    obsidian_path: str,
+) -> None:
+    """Write obsidian_conflict_pending flag into Memory.metadata_ for manual review."""
+    from datetime import datetime, timezone
+    from sqlalchemy import update, cast, literal
+    from sqlalchemy.dialects.postgresql import JSONB
+    from .models import Memory
+
+    detected_at = datetime.now(timezone.utc).isoformat()
+    conflict_data = {
+        "obsidian_conflict_pending": {
+            "vault": vault,
+            "obsidian_path": obsidian_path,
+            "detected_at": detected_at,
+        }
+    }
+    await session.execute(
+        update(Memory)
+        .where(Memory.id == memory_id)
+        .values(
+            metadata_=Memory.metadata_.op("||")(
+                cast(literal(conflict_data, JSONB), JSONB)
+            )
+        )
+    )
+
+
 class SyncStrategy(str, Enum):
     """Conflict resolution strategies."""
 
@@ -966,6 +997,10 @@ class BidirectionalSyncEngine:
                 log.warning(
                     "Skipping conflict (manual review): %s", change.obsidian_path
                 )
+                if change.memory_id:
+                    await _mark_conflict_pending(
+                        session, change.memory_id, change.vault, change.obsidian_path
+                    )
                 continue
 
             success = await self.apply_sync(session, adapter, change)

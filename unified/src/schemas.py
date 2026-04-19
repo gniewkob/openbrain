@@ -441,6 +441,23 @@ class ObsidianSyncStatus(BaseModel):
     storage_path: str
 
 
+class ObsidianConflict(BaseModel):
+    """A memory with an unresolved Obsidian bidirectional sync conflict."""
+
+    memory_id: str
+    obsidian_path: str
+    vault: str
+    detected_at: str  # ISO8601
+    content_preview: str
+
+
+class ObsidianConflictsResponse(BaseModel):
+    """List of pending Obsidian sync conflicts requiring manual resolution."""
+
+    conflicts: list[ObsidianConflict]
+    total: int
+
+
 class SyncCheckRequest(BaseModel):
     """Request to check sync status between OpenBrain and Obsidian for a single record."""
 
