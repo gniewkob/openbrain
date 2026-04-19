@@ -193,7 +193,7 @@ async def _create_new_memory(
     """Create a new memory record."""
     embedding = await get_embedding(rec.content)
 
-    memory = Memory(  # type: ignore[call-arg]
+    memory = Memory(
         domain=rec.domain,
         entity_type=rec.entity_type,
         content=rec.content,
@@ -256,7 +256,7 @@ async def _version_memory(
     existing.status = "superseded"
     await session.flush()
 
-    new_memory = Memory(  # type: ignore[call-arg]
+    new_memory = Memory(
         domain=existing.domain,
         entity_type=rec.entity_type,
         content=rec.content,
@@ -1002,7 +1002,7 @@ async def _run_maintenance_inner(
         await session.commit()
         return report
 
-    audit_entry = AuditLog(  # type: ignore[call-arg]
+    audit_entry = AuditLog(
         operation="maintain",
         tool_name="memory.maintain",
         memory_id=None,

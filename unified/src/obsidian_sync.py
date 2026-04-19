@@ -603,7 +603,7 @@ class BidirectionalSyncEngine:
             change.resolution = "manual_review_required"
             return "manual"
 
-        return "openbrain"  # type: ignore[unreachable]  # Safety fallback if new strategy added
+        return "openbrain"  # Safety fallback if new strategy added
 
     async def _import_note_as_memory(
         self,
