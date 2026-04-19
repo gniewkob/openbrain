@@ -4,8 +4,6 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-_SAFE_CF_KEY = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +32,8 @@ from .schemas import (
     TestDataHygieneReport,
     TestDataSampleEntry,
 )
+
+_SAFE_CF_KEY = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
 
 
 async def _get_embedding_compat(text: str):

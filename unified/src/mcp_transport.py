@@ -430,7 +430,9 @@ async def brain_search(
         owner=owner,
         include_test_data=include_test_data,
     )
-    payload = build_find_search_payload(query=query, limit=top_k, filters=filters, offset=offset)
+    payload = build_find_search_payload(
+        query=query, limit=top_k, filters=filters, offset=offset
+    )
     return normalize_find_hits_to_scored_memories(
         await _safe_req("POST", memory_path("find"), json=payload)
     )
