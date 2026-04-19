@@ -250,6 +250,7 @@ class MemoryFindRequest(BaseModel):
     query: Optional[QueryStr] = None
     filters: dict[str, Any] = Field(default_factory=dict)
     limit: int = Field(default=10, ge=1, le=MAX_FILTER_LIMIT)
+    offset: int = Field(default=0, ge=0, le=10_000)
     sort: Literal["relevance", "updated_at_desc"] = "relevance"
 
 

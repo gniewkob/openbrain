@@ -733,7 +733,7 @@ async def find_memories_v1(
     else:
         stmt = stmt.order_by(Memory.updated_at.desc())
 
-    stmt = stmt.limit(req.limit)
+    stmt = stmt.limit(req.limit).offset(req.offset)
     result = await session.execute(stmt)
     if embedding:
         return [
