@@ -198,7 +198,19 @@ def _apply_filters_to_stmt(
                 raise ValueError(
                     f"custom_fields key '{key[:32]}' must match ^[A-Za-z0-9_.\\-]{{1,64}}$"
                 )
-            stmt = stmt.where(Memory.metadata_["custom_fields"][key].astext == str(val))
+            if isinstance(val, bool):
+                coerced = "true" if val else "false"
+                stmt = stmt.where(
+                    Memory.metadata_["custom_fields"][key].astext == coerced
+                )
+            elif val is None:
+                stmt = stmt.where(
+                    Memory.metadata_["custom_fields"][key].astext.is_(None)
+                )
+            else:
+                stmt = stmt.where(
+                    Memory.metadata_["custom_fields"][key].astext == str(val)
+                )
 
     return stmt
 

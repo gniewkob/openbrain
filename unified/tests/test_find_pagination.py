@@ -8,22 +8,26 @@ from unittest.mock import AsyncMock, MagicMock
 class TestFindPagination:
     def test_find_request_default_offset_is_zero(self):
         from src.schemas import MemoryFindRequest
+
         req = MemoryFindRequest(query="test")
         assert req.offset == 0
 
     def test_find_request_accepts_positive_offset(self):
         from src.schemas import MemoryFindRequest
+
         req = MemoryFindRequest(query="test", offset=20)
         assert req.offset == 20
 
     def test_find_request_rejects_negative_offset(self):
         from pydantic import ValidationError
         from src.schemas import MemoryFindRequest
+
         with pytest.raises(ValidationError):
             MemoryFindRequest(query="test", offset=-1)
 
     def test_find_request_offset_is_in_schema(self):
         from src.schemas import MemoryFindRequest
+
         fields = MemoryFindRequest.model_fields
         assert "offset" in fields
 
@@ -48,7 +52,10 @@ async def test_find_memories_v1_passes_offset_to_sql():
     async def capturing_execute(stmt, *args, **kwargs):
         try:
             from sqlalchemy.dialects import postgresql
-            compiled = stmt.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})
+
+            compiled = stmt.compile(
+                dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+            )
             captured_stmts.append(str(compiled))
         except Exception:
             captured_stmts.append(repr(stmt))
@@ -61,9 +68,6 @@ async def test_find_memories_v1_passes_offset_to_sql():
     assert captured_stmts, "session.execute was never called"
     sql = captured_stmts[0].upper()
     assert "OFFSET" in sql, f"Expected OFFSET in SQL but got:\n{captured_stmts[0]}"
-
-
-import re as _re
 
 
 @pytest.mark.asyncio
@@ -89,6 +93,7 @@ async def test_find_memories_custom_fields_filter_applied():
     async def capturing_execute(stmt, *args, **kwargs):
         try:
             from sqlalchemy.dialects import postgresql
+
             compiled = stmt.compile(
                 dialect=postgresql.dialect(),
                 compile_kwargs={"literal_binds": True},
@@ -152,3 +157,46 @@ def test_apply_filters_custom_fields_valid_key_accepted():
         default_status_filter=False,
     )
     assert result is not None
+
+
+def test_apply_filters_custom_fields_bool_true_uses_lowercase():
+    """bool True must produce 'true' (not 'True') for JSONB compatibility."""
+    from src.memory_reads import _apply_filters_to_stmt
+    from src.models import Memory
+    from sqlalchemy import select
+    from sqlalchemy.dialects import postgresql
+
+    stmt = select(Memory)
+    result = _apply_filters_to_stmt(
+        stmt,
+        {"custom_fields": {"active": True}},
+        default_status_filter=False,
+    )
+    compiled = str(
+        result.compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    assert "'true'" in compiled, f"Expected 'true' in compiled SQL, got:\n{compiled}"
+    assert "'True'" not in compiled, f"Got Python-cased 'True' instead of JSON 'true'"
+
+
+def test_apply_filters_custom_fields_bool_false_uses_lowercase():
+    """bool False must produce 'false' (not 'False') for JSONB compatibility."""
+    from src.memory_reads import _apply_filters_to_stmt
+    from src.models import Memory
+    from sqlalchemy import select
+    from sqlalchemy.dialects import postgresql
+
+    stmt = select(Memory)
+    result = _apply_filters_to_stmt(
+        stmt,
+        {"custom_fields": {"active": False}},
+        default_status_filter=False,
+    )
+    compiled = str(
+        result.compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    assert "'false'" in compiled, f"Expected 'false' in compiled SQL, got:\n{compiled}"
