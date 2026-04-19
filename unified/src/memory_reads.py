@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
+
+_SAFE_CF_KEY = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -185,6 +188,17 @@ def _apply_filters_to_stmt(
             stmt = stmt.where(_tenant_filter_expr([tenant_ids]))
     if "tags_any" in filters:
         stmt = stmt.where(Memory.tags.overlap(filters["tags_any"]))
+
+    if "custom_fields" in filters:
+        cf_filters = filters["custom_fields"]
+        if not isinstance(cf_filters, dict):
+            raise ValueError("custom_fields filter must be a dict")
+        for key, val in cf_filters.items():
+            if not _SAFE_CF_KEY.match(key):
+                raise ValueError(
+                    f"custom_fields key '{key[:32]}' must match ^[A-Za-z0-9_.\\-]{{1,64}}$"
+                )
+            stmt = stmt.where(Memory.metadata_["custom_fields"][key].astext == str(val))
 
     return stmt
 
