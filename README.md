@@ -1,6 +1,6 @@
 # OpenBrain Unified
 
-![Tests](https://img.shields.io/badge/tests-1403%20passed-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen) ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+[![CI](https://github.com/gniewkob/openbrain/actions/workflows/ci.yml/badge.svg)](https://github.com/gniewkob/openbrain/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 
 OpenBrain is an intelligent, unified memory platform that serves as a semantic bridge between your personal knowledge (e.g., Obsidian) and Large Language Models (ChatGPT, Claude, Gemini).
 
@@ -44,8 +44,8 @@ By default the local stack binds service ports to `127.0.0.1`, not all interface
    ```
 2. Configure your environment:
    ```bash
-   cp .env.example .env
-   # Edit .env with your NGROK_AUTHTOKEN and other settings
+   cp unified/.env.example unified/.env
+   # Required: set INTERNAL_API_KEY to a random secret
    ```
    In `PUBLIC_MODE=true`, OpenBrain now fails closed:
    - `OIDC_ISSUER_URL` must be set
@@ -84,13 +84,12 @@ make pr-readiness
 
 ## Documentation
 
-- [Current Status (2026-04-14)](docs/STATUS_2026-04-14.md)
 - [Installation & Configuration](INSTALLATION.md)
-- [Operating Manual](docs/operating-manual.md)
-- [Governance Layer](docs/governance-layer.md)
-- [API Architecture](docs/README.md)
-- [Architecture Decisions](docs/adr/)
-- [Improvement Roadmap Q2 2026](docs/IMPROVEMENT_ROADMAP_2026-Q2.md)
+- [Architecture Overview](docs/architecture/overview.md)
+- [Governance Layer](docs/architecture/governance.md)
+- [Obsidian Integration](docs/guides/obsidian-sync.md)
+- [Architecture Decisions](docs/architecture/adr/)
+- [Roadmap](docs/architecture/roadmap.md)
 
 ## License
 
