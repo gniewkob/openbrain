@@ -406,12 +406,14 @@ async def brain_search(
     owner: str | None = None,
     sensitivity: str | None = None,
     include_test_data: bool = False,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     """Primary tool for semantic retrieval. Finds information by topic or phrase.
 
     Optionally filter by domain (corporate|build|personal), entity_type, owner,
     sensitivity.
     include_test_data: include records marked with metadata.test_data=true
+    offset: number of results to skip for pagination
     """
     if not isinstance(include_test_data, bool):
         raise ValueError(
@@ -419,6 +421,8 @@ async def brain_search(
         )
     if not 1 <= top_k <= MAX_SEARCH_TOP_K:
         raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
+    if not 0 <= offset <= 10_000:
+        raise ValueError(f"offset must be 0–10000, got {offset}")
     filters = build_list_filters(
         domain=domain,
         entity_type=entity_type,
@@ -426,7 +430,7 @@ async def brain_search(
         owner=owner,
         include_test_data=include_test_data,
     )
-    payload = build_find_search_payload(query=query, limit=top_k, filters=filters)
+    payload = build_find_search_payload(query=query, limit=top_k, filters=filters, offset=offset)
     return normalize_find_hits_to_scored_memories(
         await _safe_req("POST", memory_path("find"), json=payload)
     )
@@ -538,12 +542,14 @@ async def brain_list(
     tenant_id: str | None = None,
     include_test_data: bool = False,
     limit: int = 20,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     """Browse memories with metadata filters.
 
     status options: active | superseded (default: active only)
     domain options: corporate | build | personal
     include_test_data: include records marked with metadata.test_data=true
+    offset: number of results to skip for pagination
     """
     if not isinstance(include_test_data, bool):
         raise ValueError(
@@ -551,6 +557,8 @@ async def brain_list(
         )
     if not 1 <= limit <= MAX_LIST_LIMIT:
         raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
+    if not 0 <= offset <= 10_000:
+        raise ValueError(f"offset must be 0–10000, got {offset}")
     filters = build_list_filters(
         domain=domain,
         entity_type=entity_type,
@@ -560,7 +568,7 @@ async def brain_list(
         tenant_id=tenant_id,
         include_test_data=include_test_data,
     )
-    payload = build_find_list_payload(limit=limit, filters=filters)
+    payload = build_find_list_payload(limit=limit, filters=filters, offset=offset)
     hits = await _safe_req("POST", memory_path("find"), json=payload)
     return normalize_find_hits_to_records(hits)
 

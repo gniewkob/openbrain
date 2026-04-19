@@ -565,6 +565,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
                         "query": "x",
                         "filters": {"include_test_data": True},
                         "limit": 2,
+                        "offset": 0,
                     }
                 },
             ),
@@ -732,6 +733,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
                         "query": None,
                         "filters": {"domain": "build"},
                         "limit": 5,
+                        "offset": 0,
                         "sort": "updated_at_desc",
                     }
                 },
@@ -753,6 +755,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
                         "query": None,
                         "filters": {"include_test_data": True},
                         "limit": 3,
+                        "offset": 0,
                         "sort": "updated_at_desc",
                     }
                 },
