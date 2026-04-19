@@ -4,6 +4,7 @@ from typing import Any
 
 from .contract_loader import load_contract
 
+
 def _validate_request_contracts(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("request_contracts must be a JSON object")
@@ -63,11 +64,14 @@ def build_list_filters(
     return filters
 
 
-def build_find_list_payload(*, limit: int, filters: dict[str, Any]) -> dict[str, Any]:
+def build_find_list_payload(
+    *, limit: int, filters: dict[str, Any], offset: int = 0
+) -> dict[str, Any]:
     return {
         "query": _CONTRACTS["find_list_query"],
         "filters": filters,
         "limit": limit,
+        "offset": offset,
         "sort": _CONTRACTS["find_list_sort"],
     }
 
@@ -77,11 +81,13 @@ def build_find_search_payload(
     query: str,
     limit: int,
     filters: dict[str, Any],
+    offset: int = 0,
 ) -> dict[str, Any]:
     return {
         "query": query,
         "filters": filters,
         "limit": limit,
+        "offset": offset,
     }
 
 

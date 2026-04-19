@@ -38,6 +38,7 @@ def test_build_find_list_payload_has_contract_defaults() -> None:
         "query": None,
         "filters": {"domain": "build"},
         "limit": 5,
+        "offset": 0,
         "sort": "updated_at_desc",
     }
 
@@ -58,7 +59,7 @@ def test_build_find_search_payload() -> None:
         limit=7,
         filters={"domain": "build"},
     )
-    assert payload == {"query": "auth", "filters": {"domain": "build"}, "limit": 7}
+    assert payload == {"query": "auth", "filters": {"domain": "build"}, "limit": 7, "offset": 0}
 
 
 def test_build_sync_check_payload() -> None:

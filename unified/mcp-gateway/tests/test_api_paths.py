@@ -171,7 +171,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
 
         client.post.assert_awaited_once_with(
             "/api/v1/memory/find",
-            json={"query": None, "limit": 1, "filters": {}, "sort": "updated_at_desc"},
+            json={"query": None, "limit": 1, "offset": 0, "filters": {}, "sort": "updated_at_desc"},
         )
 
     async def test_brain_list_can_include_test_data_filter(self) -> None:
@@ -194,6 +194,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
             json={
                 "query": None,
                 "limit": 1,
+                "offset": 0,
                 "filters": {"include_test_data": True},
                 "sort": "updated_at_desc",
             },
@@ -216,7 +217,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
 
         client.post.assert_awaited_once_with(
             "/api/v1/memory/find",
-            json={"query": "test", "limit": 1, "filters": {}},
+            json={"query": "test", "limit": 1, "offset": 0, "filters": {}},
         )
 
     async def test_brain_search_can_include_test_data_filter(self) -> None:
@@ -240,7 +241,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
 
         client.post.assert_awaited_once_with(
             "/api/v1/memory/find",
-            json={"query": "test", "limit": 1, "filters": {"include_test_data": True}},
+            json={"query": "test", "limit": 1, "offset": 0, "filters": {"include_test_data": True}},
         )
 
     async def test_brain_search_can_include_owner_filter(self) -> None:
@@ -260,7 +261,7 @@ class GatewayApiPathTests(unittest.IsolatedAsyncioTestCase):
 
         client.post.assert_awaited_once_with(
             "/api/v1/memory/find",
-            json={"query": "test", "limit": 1, "filters": {"owner": "alice"}},
+            json={"query": "test", "limit": 1, "offset": 0, "filters": {"owner": "alice"}},
         )
 
     async def test_brain_sync_check_calls_api_sync_check_path_with_json_body(

@@ -66,12 +66,15 @@ def build_list_filters(
     return filters
 
 
-def build_find_list_payload(*, limit: int, filters: dict[str, Any]) -> dict[str, Any]:
+def build_find_list_payload(
+    *, limit: int, filters: dict[str, Any], offset: int = 0
+) -> dict[str, Any]:
     """Build the POST /find/list request body using contract-defined sort and query."""
     return {
         "query": _CONTRACTS["find_list_query"],
         "filters": filters,
         "limit": limit,
+        "offset": offset,
         "sort": _CONTRACTS["find_list_sort"],
     }
 
@@ -81,12 +84,14 @@ def build_find_search_payload(
     query: str,
     limit: int,
     filters: dict[str, Any],
+    offset: int = 0,
 ) -> dict[str, Any]:
     """Build the POST /find/search request body for semantic search."""
     return {
         "query": query,
         "filters": filters,
         "limit": limit,
+        "offset": offset,
     }
 
 

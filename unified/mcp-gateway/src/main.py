@@ -237,7 +237,9 @@ class _SharedClient:
             try:
                 await _http_client.aclose()
             except Exception as exc:  # pragma: no cover - defensive logging path
-                _gateway_logger.warning("mcp_client_close_failed", extra={"error": str(exc)})
+                _gateway_logger.warning(
+                    "mcp_client_close_failed", extra={"error": str(exc)}
+                )
             _gateway_logger.info(
                 "mcp_client_refreshed_due_to_config_drift",
                 extra={
@@ -316,7 +318,9 @@ def _obsidian_local_tools_enabled() -> bool:
 
 
 def _local_obsidian_tools_registered() -> bool:
-    return all(callable(globals().get(f"brain_{tool}")) for tool in OBSIDIAN_LOCAL_TOOLS)
+    return all(
+        callable(globals().get(f"brain_{tool}")) for tool in OBSIDIAN_LOCAL_TOOLS
+    )
 
 
 def _obsidian_local_tools_disabled_reason() -> str:
@@ -422,12 +426,16 @@ async def _get_backend_status() -> dict:
 @mcp.tool()
 async def brain_capabilities() -> dict:
     """Check the operational status of the Memory Platform V1."""
-    obsidian_enabled = _obsidian_local_tools_enabled() and _local_obsidian_tools_registered()
+    obsidian_enabled = (
+        _obsidian_local_tools_enabled() and _local_obsidian_tools_registered()
+    )
     backend = await _get_backend_status()
     tier_2_tools = [*ADVANCED_TOOLS]
     obsidian_tools = [*OBSIDIAN_LOCAL_TOOLS] if obsidian_enabled else []
     obsidian_status = "enabled" if obsidian_enabled else "disabled"
-    obsidian_reason = None if obsidian_enabled else _obsidian_local_tools_disabled_reason()
+    obsidian_reason = (
+        None if obsidian_enabled else _obsidian_local_tools_disabled_reason()
+    )
     if obsidian_tools:
         tier_2_tools.extend(obsidian_tools)
     health = build_capabilities_health(backend, obsidian_status)
@@ -553,6 +561,7 @@ async def brain_list(
     tenant_id: str | None = None,
     include_test_data: bool = False,
     limit: int = 20,
+    offset: int = 0,
 ) -> list[dict]:
     """
     Browse memories with metadata filters.
@@ -560,6 +569,7 @@ async def brain_list(
     status options: active | superseded (default: active only)
     domain options: corporate | build | personal
     include_test_data: include records marked with metadata.test_data=true
+    offset: Number of results to skip for pagination
     """
     if not isinstance(include_test_data, bool):
         raise ValueError(
@@ -567,6 +577,8 @@ async def brain_list(
         )
     if not 1 <= limit <= MAX_LIST_LIMIT:
         raise ValueError(f"limit must be 1–{MAX_LIST_LIMIT}, got {limit}")
+    if not 0 <= offset <= 10_000:
+        raise ValueError(f"offset must be 0–10000, got {offset}")
     filters = build_list_filters(
         domain=domain,
         entity_type=entity_type,
@@ -576,7 +588,7 @@ async def brain_list(
         tenant_id=tenant_id,
         include_test_data=include_test_data,
     )
-    payload = build_find_list_payload(limit=limit, filters=filters)
+    payload = build_find_list_payload(limit=limit, filters=filters, offset=offset)
 
     async with _client() as c:
         r = await _request_or_raise(
@@ -610,12 +622,14 @@ async def brain_search(
     owner: str | None = None,
     sensitivity: str | None = None,
     include_test_data: bool = False,
+    offset: int = 0,
 ) -> list[dict]:
     """
     Semantic search across the unified knowledge base.
     Returns top-k memories most relevant to the query.
     Optionally filter by domain (corporate|build|personal), entity_type, owner, sensitivity.
     include_test_data: include records marked with metadata.test_data=true
+    offset: Number of results to skip for pagination
     """
     if not isinstance(include_test_data, bool):
         raise ValueError(
@@ -623,6 +637,8 @@ async def brain_search(
         )
     if not 1 <= top_k <= MAX_SEARCH_TOP_K:
         raise ValueError(f"top_k must be 1–{MAX_SEARCH_TOP_K}, got {top_k}")
+    if not 0 <= offset <= 10_000:
+        raise ValueError(f"offset must be 0–10000, got {offset}")
     filters = build_list_filters(
         domain=domain,
         entity_type=entity_type,
@@ -630,7 +646,9 @@ async def brain_search(
         sensitivity=sensitivity,
         include_test_data=include_test_data,
     )
-    payload = build_find_search_payload(query=query, limit=top_k, filters=filters)
+    payload = build_find_search_payload(
+        query=query, limit=top_k, filters=filters, offset=offset
+    )
 
     async with _client() as c:
         r = await _request_or_raise(
