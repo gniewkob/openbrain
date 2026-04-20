@@ -10,7 +10,7 @@ def _normalize_actor(value: Any, fallback: str) -> str:
 
 
 def to_legacy_memory_shape(record: dict[str, Any]) -> dict[str, Any]:
-    """Extract and normalize the canonical set of memory fields from a raw record dict."""
+    """Extract and normalize legacy memory fields from a raw record dict."""
     keys = (
         "id",
         "tenant_id",
