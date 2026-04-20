@@ -35,22 +35,22 @@ OpenBrain supports several explicit write modes to prevent accidental data loss:
 
 ## Architecture Decisions
 
-- [ADR-0001: Architecture Baseline and Module Ownership](./adr/ADR-0001-architecture-baseline.md)
-- [ADR-0002: Canonical MCP Transport and Compatibility Posture](./adr/ADR-0002-canonical-mcp-transport.md)
+- [ADR-0001: Architecture Baseline and Module Ownership](./architecture/adr/ADR-0001-architecture-baseline.md)
+- [ADR-0002: Canonical MCP Transport and Compatibility Posture](./architecture/adr/ADR-0002-canonical-mcp-transport.md)
 
 ## Current Status
 
-- [Status 2026-04-14](./STATUS_2026-04-14.md) — **100% test coverage, 1403 tests, ngrok active**
-- [Improvement Roadmap Q2 2026](./IMPROVEMENT_ROADMAP_2026-Q2.md)
+- [Status 2026-04-14](./reports/status/STATUS_2026-04-14.md) — **100% test coverage, 1403 tests, ngrok active**
+- [Improvement Roadmap Q2 2026](./architecture/roadmap.md)
 
 ## Iteration Tracking (2026-04-08)
 
-- [Iteration Synthesis](./ITERATION_SYNTHESIS_2026-04-08.md)
-- [Iteration Reports Index](./ITERATION_REPORTS_INDEX_2026-04-08.md)
-- [Cleanup Register](./CLEANUP_REGISTER_2026-04-08.md)
-- [Merge Readiness Snapshot](./MERGE_READINESS_2026-04-08.md)
+- [Iteration Synthesis](./reports/iterations/ITERATION_SYNTHESIS_2026-04-08.md)
+- [Iteration Reports Index](./reports/iterations/ITERATION_REPORTS_INDEX_2026-04-08.md)
+- [Cleanup Register](./reports/iterations/CLEANUP_REGISTER_2026-04-08.md)
+- [Merge Readiness Snapshot](./reports/iterations/MERGE_READINESS_2026-04-08.md)
 
 ## Archive
 
-- [Iteration Archive](./archive/iterations/2026-04-08/)
-- [Legacy Docs Archive](./archive/legacy/2026-04-07/README.md)
+- [Iteration Archive](./reports/archive/iterations/2026-04-08/)
+- [Legacy Docs Archive](./reports/archive/legacy/2026-04-07/README.md)

@@ -190,7 +190,7 @@ make test
 
 ## 7. Governance
 
-Before using Tier 3 tools in production, read the operating policy in [docs/governance-layer.md](docs/governance-layer.md).
+Before using Tier 3 tools in production, read the operating policy in [architecture/governance.md](../architecture/governance.md).
 
 Minimum rules:
 - `corporate` records are versioned, not overwritten.

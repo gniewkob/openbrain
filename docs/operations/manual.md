@@ -275,7 +275,7 @@ Backup branch inventory note (2026-04-08):
 - use `/healthz` and `/readyz` for probes; `/health` and `/metrics` require authentication in public mode
 - example Prometheus rules are provided in [prometheus-alerts.yml](prometheus-alerts.yml)
 
-For the full production operating model, see [Governance Layer](governance-layer.md).
+For the full production operating model, see [Governance Layer](../architecture/governance.md).
 
 ## Troubleshooting
 - **404 Not Found in ChatGPT**: Ensure you are using the base ngrok URL without any suffix. The server handles all routing.

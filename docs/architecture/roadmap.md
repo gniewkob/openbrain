@@ -1,20 +1,20 @@
 # PLAN POPRAWY TECHNICAL DEBT - Q2 2026
 
 **Data**: 2026-04-04  
-**Aktualizacja**: 2026-04-14  
+**Aktualizacja**: 2026-04-20  
 **Czas realizacji**: 6-8 tygodni  
 **Status**: W toku
 
-## Postęp (stan 2026-04-14)
+## Postęp (stan 2026-04-20)
 
 | # | Zadanie | Status |
 |---|---|---|
 | — | 100% pokrycie testów (1403 testów) | ✅ DONE |
 | — | `aiofiles` jako oficjalna zależność projektu | ✅ DONE |
-| — | Refaktoryzacja `detect_changes()` | ⏳ TODO |
-| — | Refaktoryzacja `run_maintenance()` | ⏳ TODO |
+| — | Refaktoryzacja `detect_changes()` | 🔄 PARTIAL (C901 clean, dalsza dekompozycja opcjonalna) |
+| — | Refaktoryzacja `run_maintenance()` | ✅ DONE |
 | 1.1 | Naprawa E501 long lines | ⏳ TODO |
-| 1.2 | Black/Ruff format enforcement | ⏳ TODO |
+| 1.2 | Ruff format enforcement w CI | ✅ DONE |
 
 ---
 
@@ -45,62 +45,37 @@ ruff check src/ --select=E501 --fix
 
 ---
 
-#### 1.2 Auto-formatowanie z Black
-**Krok opcjonalny** (alternatywa do Ruff):
+#### 1.2 Format enforcement (Ruff)
+**Status**: ✅ DONE
 
-```bash
-pip install black
-black src/ --line-length 88
-```
+`ruff format --check` jest już uruchamiany w CI (`ci.yml`, `ci-enhanced.yml`).
 
-**Uwaga**: Wymaga dyskusji zespołowej - czy wdrożyć Black do CI?
+Black pozostaje opcjonalny i nie jest wymagany do jakości gate.
 
 ---
 
 ### FAZA 2: Funkcje o wysokiej złożoności (Tydzień 3-4)
 
-#### 2.1 `detect_changes()` - 132 linie, złożoność 21
+#### 2.1 `detect_changes()` — status po refaktorze częściowym
 **Plik**: `src/obsidian_sync.py`
 
-**Plan refaktoryzacji**:
-```python
-# OBECNIE:
-async def detect_changes(...) -> SyncResult:
-    # 132 linie kodu z 21 rozgałęzieniami
-
-# PO REFAKTORYZACJI:
-async def detect_changes(...) -> SyncResult:
-    changes = await _detect_vault_changes(vault)
-    conflicts = await _identify_conflicts(changes)
-    return await _build_sync_result(changes, conflicts)
-
-async def _detect_vault_changes(vault: str) -> list[Change]:
-    # ~40 linii
-
-async def _identify_conflicts(changes: list[Change]) -> list[Conflict]:
-    # ~40 linii
-
-async def _build_sync_result(...) -> SyncResult:
-    # ~30 linii
-```
-
-**Szacunkowy czas**: 12h (wymaga testów integracyjnych)
+**Status**: 🔄 PARTIAL  
+- Quality gate złożoności (`ruff --select C901`) przechodzi.
+- Funkcja została odchudzona przez ekstrakcję części logiki do helperów.
+- Dalsza dekompozycja jest możliwa, ale nie jest blockerem release.
 
 ---
 
-#### 2.2 `run_maintenance()` - 113 linie, złożoność 20
+#### 2.2 `run_maintenance()` — rozbicie wykonane
 **Plik**: `src/memory_writes.py`
 
-**Plan refaktoryzacji**:
-```python
-# Rozbić na mniejsze funkcje:
-- _collect_maintenance_candidates()
-- _process_duplicates()
-- _process_policy_skips()
-- _build_maintenance_report()
-```
-
-**Szacunkowy czas**: 10h
+**Status**: ✅ DONE  
+Implementacja jest rozbita na mniejsze kroki:
+- `run_maintenance()`
+- `_run_maintenance_inner()`
+- `_process_duplicates()`
+- `_normalize_owners()`
+- `_fix_superseded_links()`
 
 ---
 
