@@ -50,6 +50,7 @@ def _load_schema_types():
 
         return MemoryWriteRecord, SourceMetadata
 
+
 # Vault path configuration from environment
 # Format: OBSIDIAN_VAULT_{VAULT_NAME}_PATH or OBSIDIAN_VAULT_PATHS as JSON
 _VAULT_PATHS_CACHE: dict[str, str] = {}
