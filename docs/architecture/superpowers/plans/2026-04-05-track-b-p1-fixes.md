@@ -153,7 +153,7 @@ if __name__ == "__main__":
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_gateway_validation.py -v 2>&1 | head -40
 ```
 
@@ -199,7 +199,7 @@ In `brain_obsidian_collection` (first line of function body after `_require_obsi
 - [ ] **Step 4: Run tests to verify they pass**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_gateway_validation.py -v
 ```
 
@@ -208,7 +208,7 @@ Expected: All 12 tests PASS.
 - [ ] **Step 5: Run full test suite to check for regressions**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/ -v --tb=short 2>&1 | tail -20
 ```
 
@@ -217,7 +217,7 @@ Expected: All previously passing tests still pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 git add mcp-gateway/src/main.py tests/test_gateway_validation.py
 git commit -m "feat: PERF-007 — add parameter bounds validation to gateway tools
 
@@ -242,7 +242,7 @@ The four passing tests (`test_public_mode_rejects_dev_default_internal_key`, `te
 - [ ] **Step 1: Run the test file to confirm exactly 2 failures**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_auth_security.py -v 2>&1
 ```
 
@@ -281,7 +281,7 @@ Also remove unused imports `asyncio`, `importlib`, `os`, `sys`, `types` only if 
 - [ ] **Step 3: Run all 6 tests to verify all pass**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_auth_security.py -v
 ```
 
@@ -290,7 +290,7 @@ Expected: All 6 PASS. Zero `sys.modules` manipulation in the two fixed tests (th
 - [ ] **Step 4: Run full test suite to check for regressions**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/ -v --tb=short 2>&1 | tail -20
 ```
 
@@ -299,7 +299,7 @@ Expected: All previously passing tests still pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 git add tests/test_auth_security.py
 git commit -m "fix: TEST-002 — fix 2 failing auth security tests
 
@@ -494,7 +494,7 @@ if __name__ == "__main__":
 - [ ] **Step 2: Run tests to confirm failures**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_boundary_values.py -v 2>&1 | head -50
 ```
 
@@ -506,19 +506,19 @@ If schema boundary tests fail, check `src/schemas.py` for exact field validators
 
 ```bash
 grep -n "MAX_CONTENT\|MAX_ENTITY\|MAX_TAGS\|MAX_BULK\|MAX_TAGS" \
-  /Users/gniewkob/Repos/openbrain/unified/src/schemas.py | head -20
+  /Users/<user>/Repos/openbrain/unified/src/schemas.py | head -20
 ```
 
 If `SyncCheckRequest` doesn't exist or has different field names:
 ```bash
 grep -n "SyncCheck\|sync_check\|memory_id\|match_key\|obsidian_ref\|content_hash" \
-  /Users/gniewkob/Repos/openbrain/unified/src/schemas.py | head -20
+  /Users/<user>/Repos/openbrain/unified/src/schemas.py | head -20
 ```
 
 If `MemoryWriteManyRequest` uses a different field name:
 ```bash
 grep -n "WriteManyRequest\|WriteMany\|records" \
-  /Users/gniewkob/Repos/openbrain/unified/src/schemas.py | head -20
+  /Users/<user>/Repos/openbrain/unified/src/schemas.py | head -20
 ```
 
 Adjust imports and field names in the test to match actual schema.
@@ -526,7 +526,7 @@ Adjust imports and field names in the test to match actual schema.
 - [ ] **Step 4: Run all boundary value tests to verify they pass**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_boundary_values.py -v
 ```
 
@@ -535,7 +535,7 @@ Expected: All tests PASS in < 500ms.
 - [ ] **Step 5: Run full test suite**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/ -v --tb=short 2>&1 | tail -20
 ```
 
@@ -544,7 +544,7 @@ Expected: All previously passing tests still pass. New tests added.
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 git add tests/test_boundary_values.py
 git commit -m "test: TEST-004 — add schema and gateway boundary value tests
 

@@ -24,7 +24,7 @@ The bridge follows the same pattern as the `mailai` exporter on port 9177.
 
 ## Secret location
 
-`INTERNAL_API_KEY` is stored in `/Users/gniewkob/Repos/openbrain/.env`
+`INTERNAL_API_KEY` is stored in `/Users/<user>/Repos/openbrain/.env`
 (gitignored — never committed).
 
 The bridge reads it automatically at startup. To rotate:
@@ -52,8 +52,8 @@ launchctl kickstart -k gui/$(id -u)/com.openbrain.metrics.bridge
 launchctl list | grep openbrain
 
 # Logs
-tail -f /Users/gniewkob/Repos/openbrain/monitoring/bridge-stdout.log
-tail -f /Users/gniewkob/Repos/openbrain/monitoring/bridge-stderr.log
+tail -f /Users/<user>/Repos/openbrain/monitoring/bridge-stdout.log
+tail -f /Users/<user>/Repos/openbrain/monitoring/bridge-stderr.log
 ```
 
 The plist has `RunAtLoad=true` and `KeepAlive=true` — the bridge starts automatically at login and restarts on crash.

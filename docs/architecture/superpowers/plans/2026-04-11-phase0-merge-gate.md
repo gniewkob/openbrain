@@ -104,7 +104,7 @@ Expected: merge commit is HEAD on master.
 - [ ] **Step 3.1: Run smoke tests**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_startup_smoke.py \
   unified/tests/test_contract_parity.py \
   unified/tests/test_secret_scan.py \

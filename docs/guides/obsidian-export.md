@@ -19,8 +19,8 @@ Musisz wskazać OpenBrain ścieżki do swoich vaultów Obsidian:
 
 ```bash
 # Opcja 1: Pojedyncza zmienna dla każdego vaultu
-export OBSIDIAN_VAULT_DOCUMENTS_PATH="/Users/gniewkob/Documents/Obsidian/Documents"
-export OBSIDIAN_VAULT_WORK_PATH="/Users/gniewkob/Documents/Obsidian/Work"
+export OBSIDIAN_VAULT_DOCUMENTS_PATH="/Users/<user>/Documents/Obsidian/Documents"
+export OBSIDIAN_VAULT_WORK_PATH="/Users/<user>/Documents/Obsidian/Work"
 
 # Opcja 2: JSON z wieloma vaultami
 export OBSIDIAN_VAULT_PATHS='{"Documents": "/path/to/Documents", "Work": "/path/to/Work"}'
@@ -63,7 +63,7 @@ OpenBrain uses a unified memory architecture...
     frontmatter={
         "domain": "build",
         "entity_type": "Architecture",
-        "owner": "@gniewkob",
+        "owner": "<owner>",
         "priority": "high",
     },
     overwrite=True,  # Nadpisz jeśli istnieje
@@ -199,7 +199,7 @@ title: Memory Title
 openbrain_id: mem_abc123
 domain: corporate
 entity_type: Decision
-owner: @gniewkob
+owner: <owner>
 version: 3
 status: active
 created_at: 2026-03-27T10:00:00
@@ -214,7 +214,7 @@ source: openbrain-export
 
 **Domain:** corporate
 **Type:** Decision
-**Owner:** @gniewkob
+**Owner:** <owner>
 **Created:** 2026-03-27T10:00:00
 
 ## Content

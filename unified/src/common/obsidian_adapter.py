@@ -18,6 +18,38 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ..schemas import MemoryWriteRecord
 
+
+def _load_config_getter():
+    """
+    Import get_config in both package layouts:
+    - unified package context: from ..config import get_config
+    - gateway fallback context: from config import get_config
+    """
+    try:
+        from ..config import get_config  # type: ignore[import-not-found]
+
+        return get_config
+    except ImportError:
+        from config import get_config  # type: ignore[import-not-found]
+
+        return get_config
+
+
+def _load_schema_types():
+    """
+    Import schema types in both package layouts:
+    - unified package context: from ..schemas import ...
+    - gateway fallback context: from schemas import ...
+    """
+    try:
+        from ..schemas import MemoryWriteRecord, SourceMetadata  # type: ignore[import-not-found]
+
+        return MemoryWriteRecord, SourceMetadata
+    except ImportError:
+        from schemas import MemoryWriteRecord, SourceMetadata  # type: ignore[import-not-found]
+
+        return MemoryWriteRecord, SourceMetadata
+
 # Vault path configuration from environment
 # Format: OBSIDIAN_VAULT_{VAULT_NAME}_PATH or OBSIDIAN_VAULT_PATHS as JSON
 _VAULT_PATHS_CACHE: dict[str, str] = {}
@@ -258,7 +290,7 @@ def note_to_memory_write_record(
     default_tags: list[str] | None = None,
 ) -> "MemoryWriteRecord":
     """Convert ObsidianNote to MemoryWriteRecord for direct use."""
-    from ..schemas import MemoryWriteRecord, SourceMetadata
+    MemoryWriteRecord, SourceMetadata = _load_schema_types()
 
     frontmatter = note.frontmatter
     domain = str(frontmatter.get("domain") or default_domain)
@@ -295,8 +327,7 @@ class ObsidianCliAdapter:
         if command:
             self.command = command
         else:
-            from ..config import get_config
-
+            get_config = _load_config_getter()
             config = get_config()
             self.command = config.obsidian.cli_command
         self.timeout_s = timeout_s

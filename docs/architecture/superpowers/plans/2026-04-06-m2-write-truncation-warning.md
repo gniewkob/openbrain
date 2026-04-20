@@ -102,7 +102,7 @@ class TestWriteTruncationWarning(unittest.TestCase):
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_memory_writes.py::TestWriteTruncationWarning -v 2>&1 | tail -20
 ```
 
@@ -273,7 +273,7 @@ async def handle_memory_write(
 - [ ] **Step 5: Run tests to verify they pass**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_memory_writes.py -v 2>&1 | tail -30
 ```
 
@@ -282,7 +282,7 @@ Expected: All tests PASS including the 3 new `TestWriteTruncationWarning` tests.
 - [ ] **Step 6: Run full test suite to check for regressions**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m unittest discover -s tests -v 2>&1 | tail -30
 ```
 
@@ -291,7 +291,7 @@ Expected: All previously passing tests still PASS. No new failures.
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/src/memory_writes.py unified/tests/test_memory_writes.py
 git commit -m "fix(M2): warn at write-time when content exceeds embedding limit
 

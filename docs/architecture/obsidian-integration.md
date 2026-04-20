@@ -671,7 +671,7 @@ OpenBrain uses a unified memory architecture with three domains:
     frontmatter={
         "domain": "build",
         "entity_type": "Architecture",
-        "owner": "@gniewkob",
+        "owner": "<owner>",
     },
 )
 ```
@@ -722,8 +722,8 @@ result = await brain_obsidian_collection(
 
 ```bash
 # Nowe zmienne środowiskowe
-OBSIDIAN_VAULT_DOCUMENTS_PATH=/Users/gniewkob/Documents/Obsidian/Documents
-OBSIDIAN_VAULT_WORK_PATH=/Users/gniewkob/Documents/Obsidian/Work
+OBSIDIAN_VAULT_DOCUMENTS_PATH=/Users/<user>/Documents/Obsidian/Documents
+OBSIDIAN_VAULT_WORK_PATH=/Users/<user>/Documents/Obsidian/Work
 # Format: OBSIDIAN_VAULT_{VAULT_NAME}_PATH
 
 # Lub jedna zmienna z JSON map

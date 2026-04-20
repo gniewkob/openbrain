@@ -125,7 +125,7 @@ The idempotency check now includes metadata state as well, so metadata-only upda
 ## CI Release Gate (Branch Protection)
 
 Baseline branch in this repository is `master` (`gh repo view`).
-As of 2026-04-08 the branch is protected (verified via `gh api repos/gniewkob/openbrain/branches/master/protection`).
+As of 2026-04-08 the branch is protected (verified via `gh api repos/<owner>/openbrain/branches/master/protection`).
 
 Recommended required checks:
 - `lint`

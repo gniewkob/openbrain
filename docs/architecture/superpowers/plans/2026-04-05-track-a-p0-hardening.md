@@ -254,7 +254,7 @@ class TestSecretScanMiddlewareIntegration:
 - [ ] **Step 1.2: Run the tests — verify they all FAIL with ImportError**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_secret_scan.py -v 2>&1 | head -30
 ```
 
@@ -263,7 +263,7 @@ Expected: `ImportError: cannot import name '_scan_for_secrets' from 'src.middlew
 - [ ] **Step 1.3: Commit failing tests**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/tests/test_secret_scan.py
 git commit -m "test(security): add failing secret scan tests"
 ```
@@ -483,7 +483,7 @@ class SecretScanMiddleware(BaseHTTPMiddleware):
 - [ ] **Step 2.2: Run the unit tests — they should now pass**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_secret_scan.py::TestScanForSecrets -v
 ```
 
@@ -492,7 +492,7 @@ Expected: all `TestScanForSecrets` tests PASS.
 - [ ] **Step 2.3: Run the integration tests**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_secret_scan.py::TestSecretScanMiddlewareIntegration -v
 ```
 
@@ -501,7 +501,7 @@ Expected: all integration tests PASS.
 - [ ] **Step 2.4: Commit implementation**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/src/middleware.py
 git commit -m "feat(security): implement SecretScanMiddleware with pattern-based detection"
 ```
@@ -546,7 +546,7 @@ The final middleware block in `create_app()` should look like:
 - [ ] **Step 3.2: Run full existing test suite to verify nothing is broken**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/ -v --ignore=tests/test_api_endpoints_live.py --ignore=tests/validate_openbrain_api.py -x 2>&1 | tail -30
 ```
 
@@ -555,7 +555,7 @@ Expected: all existing tests PASS (secret scan tests added in Task 1 also pass).
 - [ ] **Step 3.3: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/src/app_factory.py
 git commit -m "feat(security): register SecretScanMiddleware in production app"
 ```
@@ -780,7 +780,7 @@ class TestBrainSyncCheckContract:
 - [ ] **Step 4.2: Run — all contract tests should PASS immediately**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_contract_parity.py -v
 ```
 
@@ -789,7 +789,7 @@ Expected: all PASS (contracts already aligned). If any FAIL, there is actual sch
 - [ ] **Step 4.3: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/tests/test_contract_parity.py
 git commit -m "test(contracts): add gateway↔backend schema parity tests"
 ```
@@ -1390,7 +1390,7 @@ if __name__ == "__main__":
 - [ ] **Step 5.2: Run the tests — all should PASS**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_update_e2e.py -v
 ```
 
@@ -1399,7 +1399,7 @@ Expected: all PASS. If any fail, there is a real regression in the update logic 
 - [ ] **Step 5.3: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/tests/test_update_e2e.py
 git commit -m "test(update): add brain_update invariant E2E tests and regressions"
 ```
@@ -1488,7 +1488,7 @@ class TestReadyzVectorStoreField:
 - [ ] **Step 6.2: Run to confirm tests FAIL**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_health_endpoint.py -v
 ```
 
@@ -1584,7 +1584,7 @@ async def health(
 - [ ] **Step 6.4: Run health tests — should now PASS**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_health_endpoint.py -v
 ```
 
@@ -1593,7 +1593,7 @@ Expected: all PASS.
 - [ ] **Step 6.5: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/src/api/v1/health.py unified/tests/test_health_endpoint.py
 git commit -m "feat(health): add vector_store status to /readyz endpoint"
 ```
@@ -1688,7 +1688,7 @@ async def brain_capabilities() -> dict:
 - [ ] **Step 7.2: Verify gateway imports without error**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified/mcp-gateway
+cd /Users/<user>/Repos/openbrain/unified/mcp-gateway
 python -c "from src.main import mcp; print('gateway imports OK')"
 ```
 
@@ -1697,7 +1697,7 @@ Expected: `gateway imports OK`
 - [ ] **Step 7.3: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/mcp-gateway/src/main.py
 git commit -m "feat(gateway): brain_capabilities queries /readyz for real backend status"
 ```
@@ -1853,7 +1853,7 @@ class TestErrorDetailSchema:
 - [ ] **Step 8.2: Run — confirm tests FAIL**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_error_normalization.py -v 2>&1 | head -40
 ```
 
@@ -1997,7 +1997,7 @@ async def openbrain_exception_handler(
 - [ ] **Step 8.5: Run error normalization tests — should now PASS**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/test_error_normalization.py -v
 ```
 
@@ -2006,7 +2006,7 @@ Expected: all PASS.
 - [ ] **Step 8.6: Run full test suite to verify no regressions**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/ -v --ignore=tests/test_api_endpoints_live.py --ignore=tests/validate_openbrain_api.py 2>&1 | tail -40
 ```
 
@@ -2015,7 +2015,7 @@ Expected: all tests PASS. Fix any failures before committing.
 - [ ] **Step 8.7: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/src/schemas.py unified/src/exceptions.py unified/tests/test_error_normalization.py
 git commit -m "feat(errors): normalize HTTPException to ErrorDetail envelope with retryable field"
 ```
@@ -2027,7 +2027,7 @@ git commit -m "feat(errors): normalize HTTPException to ErrorDetail envelope wit
 - [ ] **Run complete test suite one last time**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified
+cd /Users/<user>/Repos/openbrain/unified
 python -m pytest tests/ -v \
   --ignore=tests/test_api_endpoints_live.py \
   --ignore=tests/validate_openbrain_api.py \
@@ -2042,14 +2042,14 @@ Expected output ends with something like:
 - [ ] **Verify gateway imports cleanly**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain/unified/mcp-gateway
+cd /Users/<user>/Repos/openbrain/unified/mcp-gateway
 python -c "from src.main import mcp; print('OK')"
 ```
 
 - [ ] **Tag completion**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git tag track-a-p0-complete
 ```
 

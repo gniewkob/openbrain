@@ -7,7 +7,7 @@ Observability i health truthfulness (governance execution)
 Repo miał zdefiniowaną docelową politykę release gate, ale branch `master` nie był faktycznie chroniony.
 
 ## Evidence
-- Wcześniej `gh api repos/gniewkob/openbrain/branches/master/protection` zwracał `404`.
+- Wcześniej `gh api repos/<owner>/openbrain/branches/master/protection` zwracał `404`.
 - `python scripts/check_release_gate.py` raportował brak protection i brakujące required checks.
 
 ## Decision
@@ -21,7 +21,7 @@ Repo miał zdefiniowaną docelową politykę release gate, ale branch `master` n
   - force-push/delete disabled.
 
 ## Validation
-- `gh api repos/gniewkob/openbrain/branches/master/protection` -> zwraca aktywną konfigurację ochrony.
+- `gh api repos/<owner>/openbrain/branches/master/protection` -> zwraca aktywną konfigurację ochrony.
 - `python scripts/check_release_gate.py` -> `[OK] Branch protection enabled with 9 checks.`
 - `RELEASE_GATE_ENFORCE=1 python scripts/check_release_gate.py` -> `EXIT:0`.
 

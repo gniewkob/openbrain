@@ -30,7 +30,7 @@
 - [ ] **Step 1.1: Install radon if missing**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pip install radon -q
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pip install radon -q
 ```
 
 Expected: installs or already satisfied.
@@ -38,7 +38,7 @@ Expected: installs or already satisfied.
 - [ ] **Step 1.2: Measure complexity of both files**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/radon cc \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/radon cc \
   unified/src/obsidian_sync.py \
   unified/src/memory_writes.py \
   -s --min B
@@ -123,7 +123,7 @@ class TestDetectChangesContracts:
 - [ ] **Step 2.2: Run tests to confirm they fail correctly**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_obsidian_sync_refactor.py -v --tb=short
 ```
 
@@ -141,7 +141,7 @@ Add both as private methods on `SyncEngine` class. Keep `_determine_change()` as
 - [ ] **Step 2.4: Run tests to confirm they pass**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_obsidian_sync_refactor.py -v --tb=short
 ```
 
@@ -150,7 +150,7 @@ Expected: all pass.
 - [ ] **Step 2.5: Verify complexity is now ≤ 15**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/radon cc \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/radon cc \
   unified/src/obsidian_sync.py -s --min B
 ```
 
@@ -159,7 +159,7 @@ Expected: no function above grade B (complexity > 10). Max allowed: 15.
 - [ ] **Step 2.6: Run full test suite to check for regressions**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_obsidian_sync.py \
   unified/tests/test_obsidian_sync_refactor.py \
   -v --tb=short
@@ -262,7 +262,7 @@ class TestMaintenanceHelpers:
 - [ ] **Step 3.2: Run tests to confirm they fail**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_maintenance_refactor.py -v --tb=short
 ```
 
@@ -504,7 +504,7 @@ async def _run_maintenance_inner(
 - [ ] **Step 3.7: Run tests to confirm they pass**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_maintenance_refactor.py \
   unified/tests/test_maintenance_timeout.py \
   unified/tests/test_memory_writes.py \
@@ -516,7 +516,7 @@ Expected: all pass.
 - [ ] **Step 3.8: Verify complexity is now ≤ 15**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/radon cc \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/radon cc \
   unified/src/memory_writes.py -s --min B
 ```
 
@@ -536,7 +536,7 @@ git commit -m "refactor(memory_writes): extract _run_maintenance_inner into focu
 - [ ] **Step 4.1: Run full complexity report**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/radon cc \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/radon cc \
   unified/src/ -s -a --min B
 ```
 
@@ -547,7 +547,7 @@ Expected:
 - [ ] **Step 4.2: Run full test suite**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/ --ignore=unified/tests/integration \
   --tb=short -q
 ```

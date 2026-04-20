@@ -89,6 +89,12 @@ class TestRun:
         mock_proc.kill = MagicMock()
         mock_proc.communicate = AsyncMock(return_value=(b"", b""))
 
+        async def _timeout_wait_for(awaitable, timeout):
+            # Simulate timeout while ensuring the passed coroutine is not leaked.
+            if hasattr(awaitable, "close"):
+                awaitable.close()
+            raise asyncio.TimeoutError()
+
         adapter = _make_adapter()
         adapter.timeout_s = 1.0
         with _with_real_run(adapter):
@@ -98,7 +104,7 @@ class TestRun:
             ):
                 with patch(
                     "src.common.obsidian_adapter.asyncio.wait_for",
-                    new=AsyncMock(side_effect=asyncio.TimeoutError()),
+                    new=_timeout_wait_for,
                 ):
                     with pytest.raises(ObsidianCliError, match="timed out"):
                         await adapter._run("vaults")
@@ -110,6 +116,7 @@ class TestRun:
         ObsidianCliError = _adapter_mod.ObsidianCliError
         mock_proc = MagicMock()
         mock_proc.returncode = 1
+        mock_proc.communicate = AsyncMock(return_value=(b"", b"some error"))
 
         adapter = _make_adapter()
         with _with_real_run(adapter):
@@ -117,18 +124,15 @@ class TestRun:
                 "src.common.obsidian_adapter.asyncio.create_subprocess_exec",
                 new=AsyncMock(return_value=mock_proc),
             ):
-                with patch(
-                    "src.common.obsidian_adapter.asyncio.wait_for",
-                    new=AsyncMock(return_value=(b"", b"some error")),
-                ):
-                    with pytest.raises(ObsidianCliError):
-                        await adapter._run("vaults")
+                with pytest.raises(ObsidianCliError):
+                    await adapter._run("vaults")
 
     @pytest.mark.asyncio
     async def test_run_success_returns_cleaned_stdout(self):
         """Successful run returns cleaned stdout (lines 329-334)."""
         mock_proc = MagicMock()
         mock_proc.returncode = 0
+        mock_proc.communicate = AsyncMock(return_value=(b"vault1\nvault2\n", b""))
 
         adapter = _make_adapter()
         with _with_real_run(adapter):
@@ -136,11 +140,7 @@ class TestRun:
                 "src.common.obsidian_adapter.asyncio.create_subprocess_exec",
                 new=AsyncMock(return_value=mock_proc),
             ):
-                with patch(
-                    "src.common.obsidian_adapter.asyncio.wait_for",
-                    new=AsyncMock(return_value=(b"vault1\nvault2\n", b"")),
-                ):
-                    result = await adapter._run("vaults")
+                result = await adapter._run("vaults")
         assert "vault1" in result
 
 

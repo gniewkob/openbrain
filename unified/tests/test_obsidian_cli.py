@@ -61,6 +61,7 @@ class ObsidianCliHelperTests(unittest.TestCase):
 
         fake_schemas.SourceMetadata = FakeSourceMetadata
         fake_schemas.MemoryWriteRecord = FakeMemoryWriteRecord
+        previous_schemas = sys.modules.get("src.schemas")
         sys.modules["src.schemas"] = fake_schemas
         try:
             note = ObsidianNote(
@@ -94,7 +95,10 @@ class ObsidianCliHelperTests(unittest.TestCase):
             self.assertEqual(record.tags, ["sync", "openbrain", "obsidian"])
             self.assertEqual(record.obsidian_ref, "Architecture/OpenBrain.md")
         finally:
-            del sys.modules["src.schemas"]
+            if previous_schemas is not None:
+                sys.modules["src.schemas"] = previous_schemas
+            else:
+                sys.modules.pop("src.schemas", None)
 
 
 class ObsidianVaultDiscoveryTests(unittest.IsolatedAsyncioTestCase):

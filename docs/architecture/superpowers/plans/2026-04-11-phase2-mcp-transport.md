@@ -175,7 +175,7 @@ def test_http_transport_is_retired():
 - [ ] **Step 3A.2: Run test to confirm it fails**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_transport_parity.py::test_http_transport_is_retired -v
 ```
 
@@ -202,7 +202,7 @@ Remove or update any remaining imports.
 - [ ] **Step 3A.6: Run retirement test**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_transport_parity.py::test_http_transport_is_retired -v
 ```
 
@@ -211,7 +211,7 @@ Expected: PASS.
 - [ ] **Step 3A.7: Run full test suite**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/ --ignore=unified/tests/integration --tb=short -q
 ```
 
@@ -238,7 +238,7 @@ Move each `async def brain_*` function to `mcp_http_tools.py`. Import them back 
 - [ ] **Step 3B.2: Run parity tests after split**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_transport_parity.py \
   unified/tests/test_combined_transport_contract.py \
   -v --tb=short
@@ -276,7 +276,7 @@ Both `mcp_transport.py` and `mcp-gateway/src/main.py` delegate to `brain_tools.p
 - [ ] **Step 3C.3: Run parity tests**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_transport_parity.py \
   unified/tests/test_combined_transport_contract.py \
   -v --tb=short
@@ -298,7 +298,7 @@ git commit -m "refactor(transport): extract shared brain_tools module (ADR-001 O
 - [ ] **Step 4.1: Run transport parity tests**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_transport_parity.py \
   unified/tests/test_combined_transport_contract.py \
   unified/tests/test_mcp_transport.py \

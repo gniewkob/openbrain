@@ -30,7 +30,7 @@
 - [ ] **Step 1.1: Install interrogate if missing**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pip install interrogate -q
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pip install interrogate -q
 ```
 
 Expected: installs or already satisfied.
@@ -38,7 +38,7 @@ Expected: installs or already satisfied.
 - [ ] **Step 1.2: Measure current docstring coverage**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/ -v 2>&1 | tail -20
 ```
 
@@ -47,7 +47,7 @@ Record the output. Note which modules have <50% coverage.
 - [ ] **Step 1.3: Measure current test coverage**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/ --ignore=unified/tests/integration \
   --cov=unified/src --cov-report=term-missing -q 2>&1 | grep -E "^unified/src|TOTAL"
 ```
@@ -64,7 +64,7 @@ Record the output. Note which files have <50% coverage.
 - [ ] **Step 2.1: List undocumented functions**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/auth.py -v 2>&1 | grep "FAIL"
 ```
 
@@ -92,7 +92,7 @@ Read each function body before writing the docstring — the description must ac
 - [ ] **Step 2.3: Verify auth.py docstring coverage**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/auth.py -v 2>&1 | tail -5
 ```
 
@@ -116,7 +116,7 @@ git commit -m "docs(auth): add docstrings to all public functions"
 - [ ] **Step 3.1: Add docstrings to memory_reads.py**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/memory_reads.py -v 2>&1 | grep "FAIL"
 ```
 
@@ -128,7 +128,7 @@ For each undocumented public function, add a docstring describing:
 - [ ] **Step 3.2: Add docstrings to memory_writes.py**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/memory_writes.py -v 2>&1 | grep "FAIL"
 ```
 
@@ -139,7 +139,7 @@ For each undocumented public function, add a docstring. For write functions incl
 - [ ] **Step 3.3: Verify coverage for both files**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/memory_reads.py unified/src/memory_writes.py -v 2>&1 | tail -5
 ```
 
@@ -168,7 +168,7 @@ ls unified/src/api/v1/
 - [ ] **Step 4.2: Check docstring coverage per file**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/api/v1/ -v 2>&1 | grep "FAIL"
 ```
 
@@ -210,7 +210,7 @@ git commit -m "docs(api): add docstrings to all v1 endpoint functions"
 - [ ] **Step 5.1: Check overall docstring coverage**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/ 2>&1 | tail -3
 ```
 
@@ -220,7 +220,7 @@ If <80%: continue.
 - [ ] **Step 5.2: Identify top modules with lowest coverage**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/ -v 2>&1 | grep -E "^unified" | sort -t'%' -k1 -n | head -10
 ```
 
@@ -233,7 +233,7 @@ Work module by module starting from lowest coverage. For each module:
 - [ ] **Step 5.4: Verify 80% threshold**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/ --fail-under=80
 ```
 
@@ -256,7 +256,7 @@ git commit -m "docs(src): complete docstring coverage to 80% threshold"
 - [ ] **Step 6.1: Identify uncovered lines in memory_reads.py**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/ --ignore=unified/tests/integration \
   --cov=unified/src/memory_reads --cov-report=term-missing -q 2>&1 | grep "memory_reads"
 ```
@@ -314,7 +314,7 @@ Expand this file to cover additional uncovered lines identified in Step 6.1.
 - [ ] **Step 6.3: Run new tests**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_memory_reads_coverage.py -v --tb=short
 ```
 
@@ -337,7 +337,7 @@ git commit -m "test(memory_reads): add coverage tests for uncovered paths"
 - [ ] **Step 7.1: Identify uncovered lines**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/ --ignore=unified/tests/integration \
   --cov=unified/src/obsidian_sync --cov-report=term-missing -q 2>&1 | grep "obsidian_sync"
 ```
@@ -425,7 +425,7 @@ Expand with more cases targeting the specific uncovered lines from Step 7.1.
 - [ ] **Step 7.3: Run new tests**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_obsidian_sync_coverage.py -v --tb=short
 ```
 
@@ -449,7 +449,7 @@ git commit -m "test(obsidian_sync): add coverage tests for detect_changes branch
 
 ```bash
 ls unified/src/repositories/
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/ --ignore=unified/tests/integration \
   --cov=unified/src/repositories --cov-report=term-missing -q 2>&1 | grep "repositories"
 ```
@@ -488,7 +488,7 @@ Expand with specific tests for the repository methods identified in Step 8.1.
 - [ ] **Step 8.3: Run new tests**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/test_repositories_coverage.py -v --tb=short
 ```
 
@@ -621,7 +621,7 @@ class TestObsidianDryRun:
 - [ ] **Step 9.3: Run integration tests (with backend)**
 
 ```bash
-INTEGRATION=1 /Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+INTEGRATION=1 /Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/integration/test_obsidian_roundtrip.py -v --tb=short
 ```
 
@@ -630,7 +630,7 @@ Expected: pass (requires live backend). If backend unavailable: tests skip, not 
 - [ ] **Step 9.4: Run without INTEGRATION= to confirm skip behavior**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/integration/test_obsidian_roundtrip.py -v
 ```
 
@@ -650,7 +650,7 @@ git commit -m "test(obsidian): add 4-scenario integration roundtrip tests"
 - [ ] **Step 10.1: Run full coverage report**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/ --ignore=unified/tests/integration \
   --cov=unified/src --cov-report=term-missing -q 2>&1 | grep "TOTAL"
 ```
@@ -660,7 +660,7 @@ If TOTAL < 70%: identify the files with lowest coverage from Step 10.1 output an
 - [ ] **Step 10.2: Verify 70% threshold**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/pytest \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/pytest \
   unified/tests/ --ignore=unified/tests/integration \
   --cov=unified/src --cov-fail-under=70 -q
 ```
@@ -670,7 +670,7 @@ Expected: exit code 0.
 - [ ] **Step 10.3: Verify docstring threshold**
 
 ```bash
-/Users/gniewkob/Repos/openbrain/unified/.venv/bin/interrogate \
+/Users/<user>/Repos/openbrain/unified/.venv/bin/interrogate \
   unified/src/ --fail-under=80
 ```
 

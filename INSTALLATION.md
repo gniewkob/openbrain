@@ -84,9 +84,9 @@ Use a local `stdio` server for maximum performance and reliable authentication. 
   "mcpServers": {
     "openbrain": {
       "type": "stdio",
-      "command": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway/.venv/bin/python",
+      "command": "/Users/<user>/Repos/openbrain/unified/mcp-gateway/.venv/bin/python",
       "args": ["-m", "src.main"],
-      "cwd": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway",
+      "cwd": "/Users/<user>/Repos/openbrain/unified/mcp-gateway",
       "env": {
         "BRAIN_URL": "http://127.0.0.1:7010",
         "INTERNAL_API_KEY": "set-a-unique-local-key-if-public-mode-is-enabled",
@@ -105,9 +105,9 @@ If `PUBLIC_MODE=true` is active, Claude Desktop must also provide the `INTERNAL_
 {
   "mcpServers": {
     "openbrain": {
-      "command": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway/.venv/bin/python",
+      "command": "/Users/<user>/Repos/openbrain/unified/mcp-gateway/.venv/bin/python",
       "args": ["-m", "src.main"],
-      "cwd": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway",
+      "cwd": "/Users/<user>/Repos/openbrain/unified/mcp-gateway",
       "env": {
         "BRAIN_URL": "http://127.0.0.1:7010",
         "INTERNAL_API_KEY": "set-a-unique-local-key-if-public-mode-is-enabled",

@@ -7,7 +7,7 @@ Observability i health truthfulness (release gate telemetry)
 Mieliśmy opis polityki branch protection w dokumentacji, ale brakowało automatycznego, powtarzalnego checku operacyjnego, który wykrywa drift release gate.
 
 ## Evidence
-- `gh api repos/gniewkob/openbrain/branches/master/protection` zwraca `404` (branch niechroniony).
+- `gh api repos/<owner>/openbrain/branches/master/protection` zwraca `404` (branch niechroniony).
 - Brak skryptu, który porównuje aktywną konfigurację protection z wymaganym zestawem checków.
 
 ## Decision

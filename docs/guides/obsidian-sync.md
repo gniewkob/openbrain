@@ -357,7 +357,7 @@ for change in result["changes"]:
 **Rozwiązanie:**
 ```bash
 # Sprawdź czy ścieżka istnieje
-ls -la "/Users/gniewkob/Library/Mobile Documents/iCloud~md~obsidian/Documents"
+ls -la "/Users/<user>/Library/Mobile Documents/iCloud~md~obsidian/Documents"
 
 # Jeśli nie - włącz synchronizację w Obsidian
 ```

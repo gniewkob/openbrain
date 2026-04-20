@@ -13,7 +13,7 @@
 
 ### Aktywny klucz
 
-- **Lokalizacja:** `/Users/gniewkob/Repos/openbrain/.env` → `INTERNAL_API_KEY=<klucz>`
+- **Lokalizacja:** `/Users/<user>/Repos/openbrain/.env` → `INTERNAL_API_KEY=<klucz>`
 - **Nigdy nie umieszczać klucza bezpośrednio w docker-compose.unified.yml**
 
 ### 1. Lokalny Gateway (stdio) - Claude Desktop/Code
@@ -80,7 +80,7 @@ Plik: `~/Library/Application Support/Claude/claude_desktop_config.json`
 {
   "mcpServers": {
     "openbrain": {
-      "command": "/Users/gniewkob/Repos/openbrain/unified/mcp-gateway/run-mcp.sh",
+      "command": "/Users/<user>/Repos/openbrain/unified/mcp-gateway/run-mcp.sh",
       "env": {
         "BRAIN_URL": "http://127.0.0.1:7010",
         "INTERNAL_API_KEY": "<wartość INTERNAL_API_KEY z .env>",
@@ -166,7 +166,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 Następnie zaktualizuj **tylko**:
-1. `/Users/gniewkob/Repos/openbrain/.env` → `INTERNAL_API_KEY=<nowy_klucz>`
+1. `/Users/<user>/Repos/openbrain/.env` → `INTERNAL_API_KEY=<nowy_klucz>`
 2. `~/Library/Application Support/Claude/claude_desktop_config.json` → pole `INTERNAL_API_KEY`
 3. Zrestartuj kontenery: `docker compose -f docker-compose.unified.yml up -d`
 

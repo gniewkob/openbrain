@@ -98,7 +98,7 @@ def test_memory_out_title_from_custom_fields():
 - [ ] **Step 1.2: Run to confirm FAIL**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 uv run --project unified pytest unified/tests/test_obsidian_export_title.py -v
 # Expected: AttributeError or similar — MemoryOut has no 'title' field
 ```
@@ -149,7 +149,7 @@ uv run --project unified pytest unified/tests/ -q --tb=short -x
 - [ ] **Step 1.7: Commit**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git add unified/src/schemas.py unified/tests/test_obsidian_export_title.py
 git commit -m "fix(schemas): add title property to MemoryOut from custom_fields
 
@@ -776,7 +776,7 @@ Add/update a section in `docs/architecture/overview.md`:
 - [ ] **Step 8.2: Stage and push all changes**
 
 ```bash
-cd /Users/gniewkob/Repos/openbrain
+cd /Users/<user>/Repos/openbrain
 git push origin master
 ```
 
