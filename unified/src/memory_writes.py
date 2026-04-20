@@ -607,7 +607,7 @@ async def store_memory(
 async def store_memories_bulk(
     session: AsyncSession, items: list[MemoryCreate]
 ) -> list[MemoryOut]:
-    """Bulk-write multiple new memories using upsert mode and return their output records."""
+    """Bulk-write new memories with upsert mode and return output records."""
     records = [
         MemoryWriteRecord(
             content=item.content,
@@ -756,7 +756,7 @@ def _classify_bulk_results(
 async def upsert_memories_bulk(
     session: AsyncSession, items: list[MemoryUpsertItem]
 ) -> BulkUpsertResult:
-    """Upsert a batch of memories keyed by match_key; all items must have match_key set."""
+    """Upsert a batch keyed by match_key; each item must include match_key."""
     missing_match_keys = [
         str(index) for index, item in enumerate(items) if not item.match_key
     ]
@@ -803,7 +803,10 @@ async def upsert_memories_bulk(
 async def run_maintenance(
     session: AsyncSession, req: MaintenanceRequest, actor: str = "agent"
 ) -> MaintenanceReport:
-    """Run maintenance with a configurable timeout (MAINTENANCE_TIMEOUT_S, default 300s)."""
+    """Run maintenance with configurable timeout.
+
+    Uses MAINTENANCE_TIMEOUT_S with a default of 300 seconds.
+    """
     timeout_s = float(os.environ.get("MAINTENANCE_TIMEOUT_S", "300"))
     async with asyncio.timeout(timeout_s):
         return await _run_maintenance_inner(session, req, actor)
@@ -952,7 +955,10 @@ async def _fix_superseded_links(
                         MaintenanceAction(
                             action="policy_skip",
                             memory_id=memory.id,
-                            detail="Skipped supersession link repair for append-only memory",
+                            detail=(
+                                "Skipped supersession link repair "
+                                "for append-only memory"
+                            ),
                         )
                     )
                     continue

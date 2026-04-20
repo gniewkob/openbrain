@@ -56,7 +56,9 @@ async def _send_root_redirect(send) -> None:
         await send(
             {
                 "type": "http.response.body",
-                "body": b'{"detail":"Invalid MCP streamable transport path configuration"}',
+                "body": (
+                    b'{"detail":"Invalid MCP streamable transport path configuration"}'
+                ),
             }
         )
         return

@@ -20,11 +20,13 @@ def _validate_metadata(data: dict[str, Any]) -> dict[str, Any]:
     for version, description in changelog.items():
         if not isinstance(version, str) or not _SEMVER.fullmatch(version):
             raise ValueError(
-                "capabilities_metadata.schema_changelog keys must match MAJOR.MINOR.PATCH"
+                "capabilities_metadata.schema_changelog keys must match "
+                "MAJOR.MINOR.PATCH"
             )
         if not isinstance(description, str) or not description.strip():
             raise ValueError(
-                "capabilities_metadata.schema_changelog values must be non-empty strings"
+                "capabilities_metadata.schema_changelog values must be "
+                "non-empty strings"
             )
     if api_version not in changelog:
         raise ValueError(

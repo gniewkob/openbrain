@@ -165,7 +165,8 @@ class MCPConfig(BaseSettings):
             )
         if "\\" in value or "//" in value:
             raise ValueError(
-                "MCP_STREAMABLE_HTTP_PATH must not include backslashes or double slashes"
+                "MCP_STREAMABLE_HTTP_PATH must not include backslashes "
+                "or double slashes"
             )
         segments = value.split("/")
         if any(segment in {".", ".."} for segment in segments):

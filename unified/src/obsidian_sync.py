@@ -642,7 +642,7 @@ class BidirectionalSyncEngine:
         adapter: "ObsidianCliAdapter",
         change: SyncChange,
     ) -> None:
-        """Import an Obsidian note into OpenBrain as a new memory (CREATED from obsidian)."""
+        """Import an Obsidian note into OpenBrain as a new memory."""
         from .memory_writes import handle_memory_write
         from .schemas import MemoryWriteRequest, MemoryWriteRecord, WriteMode
 
@@ -691,7 +691,7 @@ class BidirectionalSyncEngine:
         adapter: "ObsidianCliAdapter",
         change: SyncChange,
     ) -> None:
-        """Update an existing memory from an Obsidian note (obsidian-wins conflict resolution)."""
+        """Update an existing memory from an Obsidian note."""
         from .memory_writes import update_memory
         from .schemas import MemoryUpdate
 
@@ -714,7 +714,10 @@ class BidirectionalSyncEngine:
             )
             if updated is None:
                 log.warning(
-                    "update_from_obsidian_memory_not_found: memory_id=%s vault=%s path=%s",
+                    (
+                        "update_from_obsidian_memory_not_found: "
+                        "memory_id=%s vault=%s path=%s"
+                    ),
                     change.memory_id,
                     change.vault,
                     change.obsidian_path,
@@ -757,7 +760,7 @@ class BidirectionalSyncEngine:
         adapter: "ObsidianCliAdapter",
         change: SyncChange,
     ) -> None:
-        """Export a new OpenBrain memory to an Obsidian note (creates, does not overwrite)."""
+        """Export a new OpenBrain memory to an Obsidian note without overwrite."""
         from .memory_reads import get_memory
         from .services.converter import memory_to_frontmatter, memory_to_note_content
 
@@ -817,7 +820,7 @@ class BidirectionalSyncEngine:
         adapter: "ObsidianCliAdapter",
         change: SyncChange,
     ) -> None:
-        """Overwrite an Obsidian note with authoritative OpenBrain content (openbrain wins)."""
+        """Overwrite an Obsidian note with authoritative OpenBrain content."""
         from .memory_reads import get_memory
         from .services.converter import memory_to_frontmatter, memory_to_note_content
 
@@ -881,14 +884,18 @@ class BidirectionalSyncEngine:
         from .memory_writes import delete_memory
 
         if change.source == "obsidian":
-            # Note removed from Obsidian → delete corresponding memory (non-corporate only)
+            # Note removed from Obsidian -> delete corresponding memory
+            # (non-corporate only).
             if change.memory_id:
                 try:
                     await delete_memory(
                         session, change.memory_id, actor="obsidian-sync"
                     )
                     log.info(
-                        "deleted_memory_from_obsidian_signal: memory_id=%s vault=%s path=%s",
+                        (
+                            "deleted_memory_from_obsidian_signal: "
+                            "memory_id=%s vault=%s path=%s"
+                        ),
                         change.memory_id,
                         change.vault,
                         change.obsidian_path,

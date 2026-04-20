@@ -197,7 +197,10 @@ async def v1_update(
     session: AsyncSession = Depends(get_session),
     _user: dict = Depends(require_auth),
 ) -> MemoryRecord:
-    """Update an existing memory by ID (in-place for build/personal, new version for corporate)."""
+    """Update an existing memory by ID.
+
+    Uses in-place updates for build/personal and append-version for corporate.
+    """
     record, memory_out = await get_memory_as_record(session, memory_id)
     if record is None or memory_out is None:
         raise HTTPException(status_code=404, detail="Memory not found")

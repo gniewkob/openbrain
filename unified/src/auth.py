@@ -427,7 +427,7 @@ def get_domain_scope(claims: dict[str, Any], action: str) -> set[str]:
 
 
 def get_registry_domain_scope(subject: str, tenant_id: str, action: str) -> set[str]:
-    """Return allowed domain set for the given subject/tenant/action from the registry."""
+    """Return allowed domains from the registry for subject, tenant, and action."""
     action = action.lower()
     allowed_domains = {"corporate", "build", "personal"}
 

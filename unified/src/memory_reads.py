@@ -196,7 +196,8 @@ def _apply_filters_to_stmt(
         for key, val in cf_filters.items():
             if not _SAFE_CF_KEY.match(key):
                 raise ValueError(
-                    f"custom_fields key '{key[:32]}' must match ^[A-Za-z0-9_.\\-]{{1,64}}$"
+                    f"custom_fields key '{key[:32]}' must match "
+                    r"^[A-Za-z0-9_.\-]{1,64}$"
                 )
             if isinstance(val, bool):
                 coerced = "true" if val else "false"
@@ -515,7 +516,8 @@ def _build_hygiene_recommendations(
                 priority="high",
                 summary=(
                     "Hidden test-data share is elevated (>=25% of active records); "
-                    "prioritize cleanup/quarantine to restore dashboard and retrieval trust."
+                    "prioritize cleanup/quarantine to restore dashboard and "
+                    "retrieval trust."
                 ),
             )
         )
@@ -525,7 +527,8 @@ def _build_hygiene_recommendations(
                 code="review_corporate_test_data",
                 priority="high",
                 summary=(
-                    "Corporate-domain test data detected; keep append-only constraints and "
+                    "Corporate-domain test data detected; keep append-only "
+                    "constraints and "
                     "review quarantine-only remediation."
                 ),
             )
@@ -536,7 +539,8 @@ def _build_hygiene_recommendations(
                 code="normalize_missing_match_keys",
                 priority="medium",
                 summary=(
-                    "Some test-data records have null match_key; add deterministic key policy "
+                    "Some test-data records have null match_key; add "
+                    "deterministic key policy "
                     "to improve dedup and cleanup safety."
                 ),
             )
@@ -547,7 +551,8 @@ def _build_hygiene_recommendations(
                 code="owner_feedback_loop",
                 priority="medium",
                 summary=(
-                    "Top owners are identifiable; align ingestion hygiene with owners to reduce "
+                    "Top owners are identifiable; align ingestion hygiene with "
+                    "owners to reduce "
                     "future test-data churn."
                 ),
             )

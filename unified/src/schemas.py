@@ -459,7 +459,7 @@ class ObsidianConflictsResponse(BaseModel):
 
 
 class SyncCheckRequest(BaseModel):
-    """Request to check sync status between OpenBrain and Obsidian for a single record."""
+    """Request sync status between OpenBrain and Obsidian for one record."""
 
     memory_id: Optional[str] = Field(default=None, max_length=64)
     match_key: Optional[MatchKeyStr] = None
@@ -568,7 +568,7 @@ class MemoryCreate(BaseModel):
 
 
 class MemoryUpdate(BaseModel):
-    """Partial update payload; only provided fields are applied to the existing record."""
+    """Partial update payload; applies only provided fields."""
 
     content: Optional[ContentStr] = None
     title: Optional[TitleStr] = None
@@ -584,12 +584,15 @@ class MemoryUpdate(BaseModel):
     @field_validator("custom_fields", mode="before")
     @classmethod
     def _check_custom_fields(cls, v: Any) -> Any:
-        """Delegate to shared custom_fields validator (None is allowed for partial updates)."""
+        """Delegate to shared custom_fields validator.
+
+        None is allowed for partial updates.
+        """
         return _validate_custom_fields(v) if v is not None else v
 
 
 class MemoryUpsertItem(BaseModel):
-    """Single item in a bulk upsert request; requires match_key for idempotent writes."""
+    """Single bulk-upsert item; requires match_key for idempotent writes."""
 
     content: ContentStr
     domain: Literal["corporate", "build", "personal"] = "corporate"

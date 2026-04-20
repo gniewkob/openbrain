@@ -113,7 +113,7 @@ class RedisCounterBackend:
         self._client.hincrby(self._hash_key, name, value)
 
     def snapshot(self) -> dict[str, int]:
-        """Fetch all counter values from Redis, defaulting missing known counters to 0."""
+        """Fetch all counter values and default missing known counters to zero."""
         payload: dict[str, str] = cast(
             dict[str, str], self._client.hgetall(self._hash_key)
         )
@@ -128,7 +128,7 @@ class RedisCounterBackend:
         return dict(sorted(result.items()))
 
     def bulk_load(self, values: dict[str, int]) -> None:
-        """Write counter values directly into Redis (used for restoring persisted state)."""
+        """Write counter values directly into Redis for state restore."""
         if not values:
             return
         pipe = self._client.pipeline(transaction=False)

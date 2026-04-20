@@ -13,7 +13,7 @@
 | — | `aiofiles` jako oficjalna zależność projektu | ✅ DONE |
 | — | Refaktoryzacja `detect_changes()` | 🔄 PARTIAL (C901 clean, dalsza dekompozycja opcjonalna) |
 | — | Refaktoryzacja `run_maintenance()` | ✅ DONE |
-| 1.1 | Naprawa E501 long lines | ⏳ TODO |
+| 1.1 | Naprawa E501 long lines | ✅ DONE |
 | 1.2 | Ruff format enforcement w CI | ✅ DONE |
 
 ---
@@ -27,21 +27,15 @@
 #### 1.1 Naprawa E501 - Za długie linie
 **Cel**: Wszystkie linie <88 znaków (standard Ruff)
 
-**Szacunkowa liczba**: ~200 linii do naprawy
+**Status**: ✅ DONE (2026-04-20)  
+`ruff check src/ --select E501` przechodzi bez błędów.
 
 **Kroki**:
 ```bash
-# Automatyczna naprawa (szacunkowo 50% przypadków)
+# Walidacja
 cd unified
-ruff check src/ --select=E501 --fix
-
-# Ręczna naprawa pozostałych (ciężkie przypadki)
-# - Długie stringi → podzielić na wielolinijkowe
-# - Zagnieżdżone wywołania → zmienne tymczasowe
-# - Długie listy/dict → jeden element na linię
+ruff check src/ --select=E501
 ```
-
-**Szacunkowy czas**: 8h
 
 ---
 

@@ -82,7 +82,8 @@ async def lifespan(app):
         # Broad exception catch because this is startup telemetry only
         log.error("telemetry_load_failed", error=str(exc), exc_info=True)
 
-    # Keep active-memory gauges truthful even if persisted telemetry table is unavailable.
+    # Keep active-memory gauges truthful even if persisted telemetry table
+    # is unavailable.
     try:
         async with AsyncSessionLocal() as session:
             gauges = await refresh_memory_gauges(session)
