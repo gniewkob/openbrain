@@ -308,6 +308,8 @@ Pozycje wynikłe z review obsidian-sync + zmian infrastrukturalnych (commity `5a
 
 - [ ] **Sprzeczność w `~/claude-config/CLAUDE.md`** vs faktyczna intencja "OpenBrain always-on" — zaktualizowane lokalnie (2026-05-13), ale jeśli notatka pojawi się gdzieś w `docs/` repo, też trzeba uspójnić.
 
+- [ ] **Grafana provisioning Prometheus datasource z openbrain repo** — kontener `shared-grafana` montuje tylko `monitoring/grafana/dashboards/openbrain/` z tego repo, **bez** folderu `provisioning/datasources/`. W rezultacie nasz plik `monitoring/grafana/provisioning/datasources/prometheus.yml` (deklarujący UID `openbrain-prometheus`) leży w repo jako dead-code, a runtime używa UID `shared-prometheus` z marketplace repo `~/Repos/priv/monitoring/`. Komit `5e7b804` przepisał wszystkie dashboardy na `shared-prometheus` jako workaround. Decyzja na później: (a) podmontować nasz `provisioning/` do kontenera w shared compose, albo (b) usunąć dead-code i przyjąć `shared-prometheus` jako konwencję per repo.
+
 ### P4 — opcjonalne
 - [ ] Wskazówki w skryptach `unified/scripts/*.py` co do uruchamiania (README albo docstring z przykładami) — szczególnie `cleanup_frontmatter_content.py` (dry-run vs --apply) i `generate_openbrain_obsidian_dashboard.py` (wymagane env vary).
 
