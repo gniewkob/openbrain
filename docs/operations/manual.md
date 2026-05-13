@@ -7,12 +7,13 @@ The system runs on Docker Compose. The primary entry point is `src.combined:app`
 - `db`: PostgreSQL with `pgvector` extension.
 - `unified-server`: Hybrid server (FastAPI for REST + Starlette for MCP).
 - `embedding-service`: Local Ollama instance (`nomic-embed-text`).
-- `ngrok`: Secure tunnel for external access (optional Compose `public` profile, disabled by default).
+- `ngrok`: Secure tunnel for external access (**always-on by design**; OpenBrain MCP must be reachable both locally and externally for Claude Desktop / ChatGPT SSE clients). Public entry is `mcp-http:7011`, authenticated via `INTERNAL_API_KEY` + OAuth tokens stored in Redis. To stop temporarily: `docker compose stop ngrok`.
 
 ### Quick Start
 ```bash
 ./start_unified.sh start
-ENABLE_NGROK=1 ./start_unified.sh start   # enable external ngrok tunnel
+# ngrok starts automatically with the rest of the stack.
+# To stop ngrok after startup (keep the rest running): docker compose -f docker-compose.unified.yml stop ngrok
 ```
 
 For dev sessions, also start the MCP dev tools layer:

@@ -25,10 +25,10 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v8
       with:
         version: ${{ env.UV_VERSION }}
     
@@ -54,10 +54,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v8
       with:
         version: ${{ env.UV_VERSION }}
     
@@ -89,10 +89,10 @@ jobs:
     name: Security Audit (pip-audit)
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v8
       with:
         version: ${{ env.UV_VERSION }}
     
@@ -113,10 +113,10 @@ jobs:
     name: Security Lint (Bandit)
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v8
       with:
         version: ${{ env.UV_VERSION }}
     
@@ -135,12 +135,12 @@ jobs:
     name: Secret Scan
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     
@@ -156,10 +156,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
 
@@ -212,10 +212,10 @@ jobs:
           - 6379:6379
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v8
       with:
         version: ${{ env.UV_VERSION }}
     
@@ -241,7 +241,7 @@ jobs:
           --cov-fail-under=90
     
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v6
       with:
         file: ./unified/coverage.xml
         flags: unittests
@@ -283,10 +283,10 @@ jobs:
           - 6379:6379
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v8
       with:
         version: ${{ env.UV_VERSION }}
     
@@ -313,10 +313,10 @@ jobs:
     needs: [test, security-audit, security-lint]
     if: github.ref == 'refs/heads/main'
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v8
       with:
         version: ${{ env.UV_VERSION }}
     
@@ -326,7 +326,7 @@ jobs:
         uv build
     
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: dist
         path: unified/dist/

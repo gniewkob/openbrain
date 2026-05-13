@@ -37,12 +37,11 @@ Każdy plik compose ma unikalną nazwę projektu (`name:` w YAML). Dzięki temu 
 
 ```bash
 cd ~/Repos/openbrain
-./start_unified.sh start     # Starts local-only services: DB + Ollama + Server + Monitoring
-ENABLE_NGROK=1 ./start_unified.sh start   # Also enables the public ngrok profile
+./start_unified.sh start     # Starts full stack: DB + Ollama + Server + Monitoring + ngrok
 ./start_unified.sh status    # Check status and view current URLs
 ```
 
-**Note:** ngrok is now **disabled by default**. Enable it only for explicit public/remote use with `ENABLE_NGROK=1`. The public URL for ChatGPT changes on every restart unless you use a static ngrok domain.
+**Note:** ngrok is **always-on by design** — OpenBrain MCP must be reachable both locally (stdio gateway) and externally (Claude Desktop / ChatGPT via SSE). The public entry is `mcp-http:7011`, authenticated by `INTERNAL_API_KEY` + OAuth tokens (Redis db 1, TTL). The public URL changes on every restart unless you use a static ngrok domain. To stop ngrok temporarily: `docker compose stop ngrok`.
 
 ### Monitoring Endpoints
 

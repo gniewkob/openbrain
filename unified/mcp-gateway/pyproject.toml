@@ -18,6 +18,9 @@ dependencies = [
 http = [
     "fastapi>=0.100",
     "starlette>=0.35",
+    # Pinned explicitly to keep CVE-2026-42561 fix in place even if FastAPI's
+    # transitive constraint loosens. See roadmap P4 entry on dep pinning.
+    "python-multipart>=0.0.27",
 ]
 
 [tool.hatch.build.targets.wheel]
