@@ -123,3 +123,28 @@ Alerting note:
 | `monitoring/prometheus/prometheus.yml` | Prometheus scrape config (committed) |
 | `~/Library/LaunchAgents/com.openbrain.metrics.bridge.plist` | LaunchAgent (local, not committed) |
 | `.env` | Contains `INTERNAL_API_KEY` (gitignored) |
+
+---
+
+## Grafana datasource convention
+
+The `shared-grafana` container does **not** read provisioning config from this
+repo. The container's `/etc/grafana/provisioning/` is mounted from a separate
+marketplace repo (`~/Repos/priv/monitoring/grafana/provisioning/`) which
+provisions a single Prometheus datasource with **`uid: shared-prometheus`**.
+
+**All dashboards in this repo (`monitoring/grafana/dashboards/`) must use
+`uid: shared-prometheus`** in their `datasource` references. Using
+`openbrain-prometheus` or any other ID that the shared provisioning doesn't
+declare makes every panel render `No data` regardless of metric availability.
+
+History:
+- 2026-05-13 (commit `5e7b804`): rewrote 42 references from
+  `openbrain-prometheus` → `shared-prometheus` across the openbrain, salonbw,
+  and mail dashboards.
+- 2026-05-13: removed the dead `monitoring/grafana/provisioning/` subtree
+  from the repo (it was never mounted into the container).
+
+If you ever need a dedicated `openbrain-prometheus` UID, the right move is
+either (a) add a second datasource entry in the shared marketplace repo, or
+(b) mount this repo's own `provisioning/` into the container at startup.
