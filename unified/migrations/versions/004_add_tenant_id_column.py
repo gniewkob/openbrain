@@ -4,6 +4,7 @@ Revision ID: 004_add_tenant_id_column
 Revises: 003_match_key_unique_active
 Create Date: 2026-03-30 19:10:00.000000
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -16,7 +17,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("memories", sa.Column("tenant_id", sa.String(length=128), nullable=True))
+    op.add_column(
+        "memories", sa.Column("tenant_id", sa.String(length=128), nullable=True)
+    )
     op.create_index("ix_memories_tenant_id", "memories", ["tenant_id"], unique=False)
     op.execute(
         """

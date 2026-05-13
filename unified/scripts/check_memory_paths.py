@@ -52,7 +52,10 @@ def main() -> int:
             missing.append(f"  {name!r}: {full_path!r}")
 
     if missing:
-        print("FAIL: the following paths in memory_paths.json are NOT registered:", file=sys.stderr)
+        print(
+            "FAIL: the following paths in memory_paths.json are NOT registered:",
+            file=sys.stderr,
+        )
         for line in missing:
             print(line, file=sys.stderr)
         print(

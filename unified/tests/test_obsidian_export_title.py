@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
-
 
 def _make_memory_out(**overrides):
     from src.schemas import MemoryOut

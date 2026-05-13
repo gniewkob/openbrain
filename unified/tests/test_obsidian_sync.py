@@ -465,7 +465,6 @@ class TestLoadStateError:
     """Tests for _load_state error recovery."""
 
     def test_corrupted_json_resets_state(self, tmp_path):
-        import json
 
         storage_path = tmp_path / "sync_state.json"
         storage_path.write_text("{{invalid json{{")

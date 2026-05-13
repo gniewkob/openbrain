@@ -166,7 +166,7 @@ class TestDataHygieneReportEndpointTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_test_data_hygiene_report_returns_no_action_for_empty_state(
         self,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        datetime.now(timezone.utc)
         session = AsyncMock()
         with (
             patch.object(

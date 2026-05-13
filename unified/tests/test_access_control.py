@@ -3,18 +3,11 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from fastapi import HTTPException
-from fastapi.testclient import TestClient
 
 from src.schemas import (
-    ExportRequest,
-    MemoryCreate,
-    MemoryFindRequest,
     MemoryOut,
-    MemoryUpdate,
     MemoryWriteRecord,
     MemoryWriteRequest,
-    SyncCheckRequest,
 )
 from src.security.policy import _effective_domain_scope
 

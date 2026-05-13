@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 def test_models_now_returns_datetime():
     """_now() returns a timezone-aware datetime (line 37)."""
-    from datetime import datetime, timezone
+    from datetime import datetime
     from src.models import _now
 
     result = _now()

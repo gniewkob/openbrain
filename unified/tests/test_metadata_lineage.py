@@ -5,7 +5,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from src import crud, memory_writes
+from src import memory_writes
 from src.crud_common import _to_out
 from src.models import DomainEnum, Memory
 from src.schemas import MemoryCreate, MemoryWriteRecord, MemoryWriteRequest, WriteMode

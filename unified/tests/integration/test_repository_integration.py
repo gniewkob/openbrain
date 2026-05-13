@@ -7,7 +7,6 @@ Skip if Docker is not available.
 
 from __future__ import annotations
 
-import asyncio
 import os
 import unittest
 from typing import AsyncGenerator
@@ -34,9 +33,11 @@ pytestmark = pytest.mark.skipif(
     reason="Integration tests skipped via SKIP_INTEGRATION_TESTS",
 )
 
-from src.models import Base, Memory
-from src.repositories import SQLAlchemyMemoryRepository
-from src.schemas import MemoryCreate, MemoryUpdate
+# noqa: E402 — imports deferred until after the skip guards above (testcontainers
+# may not be installed in CI; we must skip cleanly before touching app modules).
+from src.models import Base  # noqa: E402
+from src.repositories import SQLAlchemyMemoryRepository  # noqa: E402
+from src.schemas import MemoryCreate, MemoryUpdate  # noqa: E402
 
 
 @pytest_asyncio.fixture(scope="module")

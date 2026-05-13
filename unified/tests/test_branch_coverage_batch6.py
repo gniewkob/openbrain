@@ -273,7 +273,6 @@ def test_determine_change_only_obsidian_changed():
     from src.obsidian_sync import (
         BidirectionalSyncEngine,
         SyncState,
-        ChangeType,
         SyncStrategy,
     )
     from datetime import datetime, timezone

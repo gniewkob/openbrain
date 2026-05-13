@@ -6,6 +6,7 @@ Create Date: 2026-03-24 12:00:00.000000
 
 Adds missing columns for unified governance model without losing existing data.
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -20,15 +21,36 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Add governance columns with defaults
-    op.add_column("memories", sa.Column("owner", sa.String(128), nullable=False, server_default=""))
-    op.add_column("memories", sa.Column("created_by", sa.String(128), nullable=False, server_default="agent"))
-    op.add_column("memories", sa.Column("status", sa.String(32), nullable=False, server_default="active"))
-    op.add_column("memories", sa.Column("version", sa.Integer(), nullable=False, server_default="1"))
-    op.add_column("memories", sa.Column("sensitivity", sa.String(32), nullable=False, server_default="internal"))
+    op.add_column(
+        "memories",
+        sa.Column("owner", sa.String(128), nullable=False, server_default=""),
+    )
+    op.add_column(
+        "memories",
+        sa.Column("created_by", sa.String(128), nullable=False, server_default="agent"),
+    )
+    op.add_column(
+        "memories",
+        sa.Column("status", sa.String(32), nullable=False, server_default="active"),
+    )
+    op.add_column(
+        "memories",
+        sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
+    )
+    op.add_column(
+        "memories",
+        sa.Column(
+            "sensitivity", sa.String(32), nullable=False, server_default="internal"
+        ),
+    )
     op.add_column("memories", sa.Column("superseded_by", sa.String(), nullable=True))
-    op.add_column("memories", sa.Column("tags", postgresql.ARRAY(sa.Text()), nullable=True))
+    op.add_column(
+        "memories", sa.Column("tags", postgresql.ARRAY(sa.Text()), nullable=True)
+    )
     op.add_column("memories", sa.Column("match_key", sa.String(256), nullable=True))
-    op.add_column("memories", sa.Column("valid_from", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "memories", sa.Column("valid_from", sa.DateTime(timezone=True), nullable=True)
+    )
 
     # Skip FK constraint — id is varchar, not uuid in existing table
 
@@ -53,8 +75,18 @@ def upgrade() -> None:
         sa.Column("tool_name", sa.String(64), nullable=False, server_default=""),
         sa.Column("memory_id", sa.String(), nullable=True),
         sa.Column("actor", sa.String(128), nullable=False, server_default="agent"),
-        sa.Column("meta", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default="{}"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "meta",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="{}",
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
 

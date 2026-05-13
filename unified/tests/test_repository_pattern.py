@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import asyncio
 import unittest
-from datetime import datetime, timezone
 
 from src.repositories import InMemoryMemoryRepository
 from src.models import Memory

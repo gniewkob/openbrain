@@ -84,11 +84,11 @@ class GatewayContractIntegrityTests(unittest.TestCase):
         )
         self.assertEqual(
             gateway.memory_absolute_path("find"),
-            f'{paths["memory_base"]}{paths["paths"]["find"]}',
+            f"{paths['memory_base']}{paths['paths']['find']}",
         )
         self.assertEqual(
             gateway.memory_absolute_path("sync_check"),
-            f'{paths["memory_base"]}{paths["paths"]["sync_check"]}',
+            f"{paths['memory_base']}{paths['paths']['sync_check']}",
         )
 
     def test_capabilities_tools_map_to_real_gateway_functions(self) -> None:
@@ -112,7 +112,9 @@ class GatewayContractIntegrityTests(unittest.TestCase):
                 f"brain_{tool} must be implemented by gateway runtime",
             )
 
-    def test_gateway_obsidian_capabilities_follow_runtime_registration_state(self) -> None:
+    def test_gateway_obsidian_capabilities_follow_runtime_registration_state(
+        self,
+    ) -> None:
         gateway = load_gateway_main()
         caps_manifest = json.loads(
             (self._contracts_dir() / "capabilities_manifest.json").read_text(
@@ -128,21 +130,30 @@ class GatewayContractIntegrityTests(unittest.TestCase):
         }
 
         with (
-            patch("_gateway_src.main._get_backend_status", AsyncMock(return_value=backend)),
+            patch(
+                "_gateway_src.main._get_backend_status", AsyncMock(return_value=backend)
+            ),
             patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=True),
-            patch("_gateway_src.main._local_obsidian_tools_registered", return_value=True),
+            patch(
+                "_gateway_src.main._local_obsidian_tools_registered", return_value=True
+            ),
         ):
             enabled_caps = asyncio.run(gateway.brain_capabilities())
 
         self.assertEqual(enabled_caps["obsidian_local"]["status"], "enabled")
         self.assertEqual(
-            enabled_caps["obsidian_local"]["tools"], caps_manifest["local_obsidian_tools"]
+            enabled_caps["obsidian_local"]["tools"],
+            caps_manifest["local_obsidian_tools"],
         )
 
         with (
-            patch("_gateway_src.main._get_backend_status", AsyncMock(return_value=backend)),
+            patch(
+                "_gateway_src.main._get_backend_status", AsyncMock(return_value=backend)
+            ),
             patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=True),
-            patch("_gateway_src.main._local_obsidian_tools_registered", return_value=False),
+            patch(
+                "_gateway_src.main._local_obsidian_tools_registered", return_value=False
+            ),
         ):
             disabled_caps = asyncio.run(gateway.brain_capabilities())
 

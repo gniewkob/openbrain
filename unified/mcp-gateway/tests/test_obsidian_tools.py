@@ -420,7 +420,6 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
     async def test_brain_obsidian_sync_429_exponential_backoff(self) -> None:
         """post_write_many sleeps with exponential backoff (base*2^attempt) on
         repeated 429 responses, and applies jitter via random.uniform."""
-        import asyncio
 
         gateway = load_gateway_main()
 

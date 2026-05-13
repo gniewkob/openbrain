@@ -36,5 +36,12 @@ def _import_adapter():
     return ObsidianCliAdapter, ObsidianCliError, ObsidianNote, note_to_write_payload
 
 
-ObsidianCliAdapter, ObsidianCliError, ObsidianNote, note_to_write_payload = _import_adapter()
-__all__ = ["ObsidianCliAdapter", "ObsidianCliError", "ObsidianNote", "note_to_write_payload"]
+ObsidianCliAdapter, ObsidianCliError, ObsidianNote, note_to_write_payload = (
+    _import_adapter()
+)
+__all__ = [
+    "ObsidianCliAdapter",
+    "ObsidianCliError",
+    "ObsidianNote",
+    "note_to_write_payload",
+]

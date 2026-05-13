@@ -27,7 +27,6 @@ from __future__ import annotations
 import asyncio
 import os
 import types
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -446,9 +445,7 @@ class TestWriteNote:
 
         adapter = _make_adapter()
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
-            result = await adapter.write_note(
-                "myvault", "note.md", "# Updated", overwrite=True
-            )
+            await adapter.write_note("myvault", "note.md", "# Updated", overwrite=True)
 
         assert "Updated" in (vault_dir / "note.md").read_text()
 

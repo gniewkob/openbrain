@@ -108,4 +108,3 @@ class GatewaySharedClientReuseTests(unittest.IsolatedAsyncioTestCase):
             async with gateway._client() as c2:
                 self.assertEqual(c2.kwargs["base_url"], "http://127.0.0.1:7020")
             log_warning.assert_called_once()
-

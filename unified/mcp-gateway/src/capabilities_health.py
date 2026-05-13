@@ -21,7 +21,9 @@ def _store_component(state: str) -> str:
     return "unknown"
 
 
-def build_capabilities_health(backend: dict[str, Any], obsidian_status: str) -> dict[str, Any]:
+def build_capabilities_health(
+    backend: dict[str, Any], obsidian_status: str
+) -> dict[str, Any]:
     api = _api_component(str(backend.get("api", "unknown")))
     db = _store_component(str(backend.get("db", "unknown")))
     vector_store = _store_component(str(backend.get("vector_store", "unknown")))

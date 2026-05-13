@@ -14,7 +14,6 @@ from fastapi import HTTPException
 
 from src.schemas import PolicyRegistry
 from src.api.v1.memory import read_policy_registry, update_policy_registry
-from src.auth import PUBLIC_EXPOSURE as PUBLIC_MODE, is_privileged_user
 
 
 AUTH_MODULE = "src.auth"

@@ -1,7 +1,7 @@
 """Tests for src/security/policy.py — domain access enforcement and scoping."""
 
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException

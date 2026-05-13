@@ -404,7 +404,7 @@ async def test_search_skips_zero_norm_query_embedding():
 # ---------------------------------------------------------------------------
 
 
-from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
+from unittest.mock import AsyncMock, patch  # noqa: E402
 
 from src.repositories.memory_repository import SQLAlchemyMemoryRepository  # noqa: E402
 
@@ -505,7 +505,7 @@ async def test_sa_create_adds_and_returns():
     repo = SQLAlchemyMemoryRepository(session)
 
     with patch("src.repositories.memory_repository.Memory", return_value=mock_mem):
-        result = await repo.create(_create_data())
+        await repo.create(_create_data())
 
     session.add.assert_called_once_with(mock_mem)
     session.flush.assert_called_once()

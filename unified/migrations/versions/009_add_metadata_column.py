@@ -5,6 +5,7 @@ Revises: 008
 Create Date: 2026-04-04 19:40:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -20,7 +21,12 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column(
         "memories",
-        sa.Column("metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default="{}")
+        sa.Column(
+            "metadata",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="{}",
+        ),
     )
 
 

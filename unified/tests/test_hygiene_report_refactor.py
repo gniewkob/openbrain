@@ -1,7 +1,6 @@
 """Tests for get_test_data_hygiene_report extracted helpers."""
 
 from __future__ import annotations
-import pytest
 
 
 class TestComputeHiddenRatios:

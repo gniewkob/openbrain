@@ -8,8 +8,6 @@ from src.schemas import (
     MemoryWriteRequest,
     MemoryWriteRecord,
     WriteMode,
-    SourceMetadata,
-    MemoryRelations,
 )
 
 
@@ -136,7 +134,6 @@ class TestLogDuplicateRisk:
 
     def test_logs_warning_without_match_key(self, caplog):
         """Test that warning is logged when no match_key."""
-        import structlog
         from src.memory_writes import _log_duplicate_risk
 
         rec = Mock()
@@ -216,8 +213,6 @@ class TestWriteTruncationWarning:
         from unittest.mock import AsyncMock, MagicMock, patch
         from src.embed import EMBED_MAX_CHARS
         from src.schemas import (
-            MemoryWriteRequest,
-            MemoryWriteRecord,
             WriteMode,
             MemoryWriteResponse,
         )

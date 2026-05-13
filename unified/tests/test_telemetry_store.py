@@ -1,7 +1,7 @@
 """Tests for src/telemetry_store.py — DB-backed telemetry persistence."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 
 # ---------------------------------------------------------------------------

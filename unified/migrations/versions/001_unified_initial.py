@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-03-24 10:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -37,17 +38,26 @@ def upgrade() -> None:
         sa.Column("domain_temp", sa.String(32), nullable=False),
         sa.Column("entity_type", sa.String(64), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("embedding", pgvector.sqlalchemy.vector.VECTOR(dim=768), nullable=True),
+        sa.Column(
+            "embedding", pgvector.sqlalchemy.vector.VECTOR(dim=768), nullable=True
+        ),
         # governance
         sa.Column("owner", sa.String(128), nullable=False, server_default=""),
         sa.Column("created_by", sa.String(128), nullable=False, server_default="agent"),
         sa.Column("status", sa.String(32), nullable=False, server_default="active"),
         sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
-        sa.Column("sensitivity", sa.String(32), nullable=False, server_default="internal"),
+        sa.Column(
+            "sensitivity", sa.String(32), nullable=False, server_default="internal"
+        ),
         sa.Column("superseded_by", postgresql.UUID(as_uuid=False), nullable=True),
         # tags & relations
         sa.Column("tags", postgresql.ARRAY(sa.Text()), nullable=True),
-        sa.Column("relations", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default="{}"),
+        sa.Column(
+            "relations",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="{}",
+        ),
         # obsidian sync
         sa.Column("obsidian_ref", sa.Text(), nullable=True),
         sa.Column("content_hash", sa.String(64), nullable=False, server_default=""),
@@ -55,16 +65,30 @@ def upgrade() -> None:
         sa.Column("match_key", sa.String(256), nullable=True),
         # timestamps
         sa.Column("valid_from", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         # constraints
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(["superseded_by"], ["memories.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["superseded_by"], ["memories.id"], ondelete="SET NULL"
+        ),
     )
 
     # Cast domain column to enum
     op.execute("ALTER TABLE memories RENAME COLUMN domain_temp TO domain")
-    op.execute("ALTER TABLE memories ALTER COLUMN domain TYPE domainenum USING domain::domainenum")
+    op.execute(
+        "ALTER TABLE memories ALTER COLUMN domain TYPE domainenum USING domain::domainenum"
+    )
 
     # Indexes
     op.create_index("ix_memories_domain", "memories", ["domain"])
@@ -86,15 +110,27 @@ def upgrade() -> None:
         sa.Column("tool_name", sa.String(64), nullable=False, server_default=""),
         sa.Column("memory_id", postgresql.UUID(as_uuid=False), nullable=True),
         sa.Column("actor", sa.String(128), nullable=False, server_default="agent"),
-        sa.Column("meta", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default="{}"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "meta",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="{}",
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
 
 
 def downgrade() -> None:
     op.drop_table("audit_log")
-    op.drop_index("ix_memories_embedding_hnsw", table_name="memories", postgresql_using="hnsw")
+    op.drop_index(
+        "ix_memories_embedding_hnsw", table_name="memories", postgresql_using="hnsw"
+    )
     op.drop_index("ix_memories_match_key", table_name="memories")
     op.drop_index("ix_memories_obsidian_ref", table_name="memories")
     op.drop_index("ix_memories_status_entity", table_name="memories")

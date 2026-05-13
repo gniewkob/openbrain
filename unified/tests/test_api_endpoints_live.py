@@ -5,10 +5,8 @@ Tests all endpoints without requiring external database.
 
 from __future__ import annotations
 
-import json
 import os
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 

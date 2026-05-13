@@ -16,7 +16,6 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 import os
 import time
 from datetime import datetime, timezone
@@ -305,7 +304,7 @@ async def test_check_vector_store_non_200_returns_degraded():
 # Capture before session fixture patches it
 # ---------------------------------------------------------------------------
 
-import src.api.v1.obsidian as _obsidian_mod
+import src.api.v1.obsidian as _obsidian_mod  # noqa: E402
 
 _REAL_GET_SYNC_ENGINE = _obsidian_mod._get_sync_engine
 

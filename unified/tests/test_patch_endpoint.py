@@ -15,17 +15,14 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timezone
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-from fastapi.testclient import TestClient
 
 from src.schemas import (
     MemoryOut,
     MemoryRecord,
     MemoryRelations,
     MemoryUpdate,
-    MemoryWriteResponse,
     SourceMetadata,
     GovernanceMetadata,
 )

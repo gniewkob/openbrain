@@ -38,7 +38,12 @@ class GatewayRequestBuildersTests(unittest.TestCase):
         )
         self.assertEqual(
             payload,
-            {"query": "ops", "limit": 4, "offset": 0, "filters": {"domain": "corporate"}},
+            {
+                "query": "ops",
+                "limit": 4,
+                "offset": 0,
+                "filters": {"domain": "corporate"},
+            },
         )
 
     def test_build_sync_check_payload(self) -> None:

@@ -7,7 +7,6 @@ lines, then calls each tool's function body directly.
 
 from __future__ import annotations
 
-import importlib
 import os
 import sys
 import pytest

@@ -33,7 +33,11 @@ _CONTRACT = _load_contract()
 
 
 def backend_error_message(status_code: int, detail: Any) -> str:
-    detail_text = json.dumps(detail, ensure_ascii=False) if isinstance(detail, (dict, list)) else str(detail)
+    detail_text = (
+        json.dumps(detail, ensure_ascii=False)
+        if isinstance(detail, (dict, list))
+        else str(detail)
+    )
     detail_hints = _CONTRACT.get("detail_hints", {})
     for hint in detail_hints.values():
         if not isinstance(hint, dict):
@@ -44,7 +48,9 @@ def backend_error_message(status_code: int, detail: Any) -> str:
         if not needle:
             continue
         if needle in detail_text:
-            message = str(hint.get("message", "")).strip() or _CONTRACT["fallback_other"]
+            message = (
+                str(hint.get("message", "")).strip() or _CONTRACT["fallback_other"]
+            )
             return f"Backend {status_code}: {message}"
 
     is_production = os.environ.get("ENV", "development").lower() == "production"
@@ -52,7 +58,9 @@ def backend_error_message(status_code: int, detail: Any) -> str:
         labels = _CONTRACT["status_labels"]
         label = labels.get(
             str(status_code),
-            _CONTRACT["fallback_5xx"] if status_code >= 500 else _CONTRACT["fallback_other"],
+            _CONTRACT["fallback_5xx"]
+            if status_code >= 500
+            else _CONTRACT["fallback_other"],
         )
         return f"Backend {status_code}: {label}"
 

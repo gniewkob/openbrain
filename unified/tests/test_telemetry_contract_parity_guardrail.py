@@ -41,7 +41,7 @@ def build():
 
 
 def test_telemetry_contract_parity_detects_missing_metric() -> None:
-    module = _load_telemetry_contract_parity_module()
+    _load_telemetry_contract_parity_module()
     gauge_names = {"active_memories_total", "active_memories_all_total"}
     required = {"active_memories_total"}
     missing = sorted(name for name in gauge_names if name not in required)

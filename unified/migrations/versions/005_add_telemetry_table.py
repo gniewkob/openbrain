@@ -4,6 +4,7 @@ Revision ID: 005_add_telemetry_table
 Revises: 004_add_tenant_id_column
 Create Date: 2026-03-31 12:00:00.000000
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -20,8 +21,13 @@ def upgrade() -> None:
         "telemetry_counters",
         sa.Column("name", sa.String(length=128), nullable=False),
         sa.Column("value", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.PrimaryKeyConstraint("name")
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.PrimaryKeyConstraint("name"),
     )
 
 

@@ -178,7 +178,7 @@ def test_apply_filters_custom_fields_bool_true_uses_lowercase():
         )
     )
     assert "'true'" in compiled, f"Expected 'true' in compiled SQL, got:\n{compiled}"
-    assert "'True'" not in compiled, f"Got Python-cased 'True' instead of JSON 'true'"
+    assert "'True'" not in compiled, "Got Python-cased 'True' instead of JSON 'true'"
 
 
 def test_apply_filters_custom_fields_bool_false_uses_lowercase():

@@ -18,6 +18,7 @@ The index form is:
     ON memories (match_key)
     WHERE status = 'active' AND match_key IS NOT NULL;
 """
+
 from typing import Sequence, Union
 
 from alembic import op

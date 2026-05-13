@@ -108,7 +108,7 @@ async def test_get_memory_with_repo_returns_out_when_found():
         patch("src.memory_reads.get_repository", return_value=mock_repo),
         patch("src.memory_reads._to_out", return_value=MagicMock()) as mock_to_out,
     ):
-        result = await get_memory_with_repo(session, "m1")
+        await get_memory_with_repo(session, "m1")
 
     mock_to_out.assert_called_once_with(mock_mem)
 

@@ -27,6 +27,7 @@ from urllib.parse import urlencode
 from urllib.parse import urlparse
 
 import redis.asyncio as aioredis
+from fastmcp.server.auth.auth import OAuthProvider
 from mcp.server.auth.provider import (
     AccessToken,
     AuthorizationCode,
@@ -38,6 +39,8 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
+
+from .main import mcp
 
 
 class _OpenRedirectClient(OAuthClientInformationFull):
@@ -53,18 +56,13 @@ class _OpenRedirectClient(OAuthClientInformationFull):
         uri_str = str(redirect_uri)
         if not uri_str.startswith("https://"):
             raise ValueError(f"Only HTTPS redirect URIs allowed, got: {uri_str}")
-        
+
         # Ensure it's in the list so that internal mcp-server checks pass
         if redirect_uri not in self.redirect_uris:
             self.redirect_uris.append(redirect_uri)
-            
+
         return redirect_uri
 
-
-from fastmcp.server.auth.auth import OAuthProvider
-
-# Re-use the shared FastMCP instance with all brain_* tools
-from .main import mcp
 
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "").strip()
 PUBLIC_BASE_URL_RAW: str = os.environ.get("PUBLIC_BASE_URL", "")
@@ -90,9 +88,7 @@ def _normalize_public_base_url(value: str | None) -> str:
         raise ValueError("PUBLIC_BASE_URL must be a valid http(s) URL")
     host = (parsed.hostname or "").lower()
     if parsed.scheme == "http" and host not in {"localhost", "127.0.0.1", "::1"}:
-        raise ValueError(
-            "PUBLIC_BASE_URL must use https outside localhost development"
-        )
+        raise ValueError("PUBLIC_BASE_URL must use https outside localhost development")
     if parsed.path not in {"", "/"}:
         raise ValueError("PUBLIC_BASE_URL must not include path")
     if parsed.query or parsed.fragment:
@@ -146,7 +142,7 @@ class SimpleKeyOAuthProvider(OAuthProvider):
             # Use _OpenRedirectClient instead of the base class to ensure
             # custom validate_redirect_uri is used even after loading from Redis.
             return _OpenRedirectClient(**json.loads(raw))
-        
+
         # Auto-register any client that skips DCR (e.g. ChatGPT).
         auto = _OpenRedirectClient(
             client_id=client_id,

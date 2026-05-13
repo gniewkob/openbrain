@@ -120,7 +120,7 @@ def test_v1_get_context_with_domain_calls_enforce():
                 AsyncMock(return_value=mock_response),
             ),
         ):
-            r = client.post(
+            client.post(
                 "/api/v1/memory/get-context",
                 json={"query": "test", "domain": "build"},
             )

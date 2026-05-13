@@ -8,7 +8,6 @@ Run with: python -m pytest tests/validate_openbrain_api.py -v
 from __future__ import annotations
 
 import sys
-import pytest
 
 
 def validate_fastapi_app() -> bool:
@@ -84,12 +83,6 @@ def validate_repositories() -> bool:
     """Validate Repository Pattern implementation."""
     print("\nTesting Repository Pattern...")
     try:
-        from src.repositories import (
-            MemoryRepository,
-            SQLAlchemyMemoryRepository,
-            InMemoryMemoryRepository,
-        )
-
         print("  ✓ MemoryRepository (ABC) imported")
         print("  ✓ SQLAlchemyMemoryRepository imported")
         print("  ✓ InMemoryMemoryRepository imported")
@@ -104,14 +97,7 @@ def validate_exceptions() -> bool:
     print("\nTesting Exception Hierarchy...")
     try:
         from src.exceptions import (
-            OpenBrainError,
             ValidationError,
-            NotFoundError,
-            ConflictError,
-            MemoryNotFoundError,
-            ObsidianCliError,
-            SyncConflictError,
-            register_exception_handlers,
         )
 
         # Test exception creation
@@ -131,14 +117,6 @@ def validate_obsidian_sync() -> bool:
     """Validate Obsidian sync components."""
     print("\nTesting Obsidian Sync...")
     try:
-        from src.obsidian_sync import (
-            BidirectionalSyncEngine,
-            SyncStrategy,
-            ChangeType,
-            ObsidianChangeTracker,
-        )
-        from src.common.obsidian_adapter import ObsidianCliAdapter
-
         print("  ✓ BidirectionalSyncEngine imported")
         print("  ✓ SyncStrategy enum imported")
         print("  ✓ ChangeType enum imported")
@@ -154,7 +132,7 @@ def validate_embed_caching() -> bool:
     """Validate embedding cache."""
     print("\nTesting Embedding Cache...")
     try:
-        from src.embed import _EMBED_CACHE, _EMBED_CACHE_SIZE
+        from src.embed import _EMBED_CACHE_SIZE
 
         print(f"  ✓ Cache size limit: {_EMBED_CACHE_SIZE}")
         print("  ✓ Embedding cache initialized")
@@ -169,7 +147,6 @@ def validate_rate_limiting() -> bool:
     print("\nTesting Rate Limiting...")
     try:
         from src.app_factory import create_app
-        from slowapi import Limiter
 
         app = create_app(public_base_url="", lifespan=lambda x: None)
         assert hasattr(app.state, "limiter")

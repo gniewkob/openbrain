@@ -14,7 +14,6 @@ Covers uncovered lines in subprocess-free utility code:
 from __future__ import annotations
 
 import os
-import pytest
 from unittest.mock import patch
 
 

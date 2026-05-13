@@ -45,8 +45,13 @@ class GatewayCapabilitiesResponseContractTests(unittest.IsolatedAsyncioTestCase)
         }
 
         with (
-            patch("_gateway_src.main._get_backend_status", new=AsyncMock(return_value=backend)),
-            patch("_gateway_src.main._obsidian_local_tools_enabled", return_value=False),
+            patch(
+                "_gateway_src.main._get_backend_status",
+                new=AsyncMock(return_value=backend),
+            ),
+            patch(
+                "_gateway_src.main._obsidian_local_tools_enabled", return_value=False
+            ),
         ):
             caps = await gateway.brain_capabilities()
 

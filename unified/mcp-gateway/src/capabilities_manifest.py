@@ -38,7 +38,9 @@ def _validate_manifest(data: Any) -> dict[str, list[str]]:
         if not isinstance(value, list) or not all(
             isinstance(item, str) and item.strip() for item in value
         ):
-            raise ValueError(f"capabilities_manifest.{key} must be a non-empty string list")
+            raise ValueError(
+                f"capabilities_manifest.{key} must be a non-empty string list"
+            )
         if len(set(value)) != len(value):
             raise ValueError(f"capabilities_manifest.{key} must not contain duplicates")
         normalized[key] = value

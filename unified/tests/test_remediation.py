@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timezone
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from src import memory_reads, memory_writes
 from src.crud_common import STATUS_DUPLICATE, STATUS_SUPERSEDED
 from src.models import DomainEnum, Memory
-from src.schemas import MaintenanceRequest, SearchRequest, MemoryFindRequest
+from src.schemas import MaintenanceRequest
 
 
 class RemediationTests(unittest.IsolatedAsyncioTestCase):

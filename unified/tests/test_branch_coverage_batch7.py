@@ -36,7 +36,7 @@ async def test_client_adds_internal_key_header_when_set():
 
         with patch("src.mcp_transport.httpx.AsyncClient") as mock_cls:
             mock_cls.return_value = MagicMock()
-            async with mcp_mod._client() as c:
+            async with mcp_mod._client():
                 pass
 
         call_kwargs = mock_cls.call_args[1]

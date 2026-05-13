@@ -1,7 +1,6 @@
 """Tests for update_memory and upsert_memories_bulk extracted helpers."""
 
 from __future__ import annotations
-import pytest
 from unittest.mock import MagicMock
 
 

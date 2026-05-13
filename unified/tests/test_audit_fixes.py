@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src import crud, memory_reads, memory_writes, middleware as middleware_module
+from src import memory_reads, memory_writes, middleware as middleware_module
 from src.models import DomainEnum, Memory
 from src.schemas import (
     MemoryCreate,
@@ -274,7 +274,7 @@ class MatchKeySelectForUpdateTest(unittest.IsolatedAsyncioTestCase):
         session.commit = AsyncMock()
         session.refresh = AsyncMock()
 
-        now = datetime.now(timezone.utc)
+        datetime.now(timezone.utc)
 
         async def _flush_side_effect(sess, req, actor, _commit=True):
             # Simulate flush assigning id
@@ -310,7 +310,7 @@ class StoreBulkFieldMappingTest(unittest.IsolatedAsyncioTestCase):
         captured_reqs: list[MemoryWriteRequest] = []
 
         now = datetime.now(timezone.utc)
-        result_out = MemoryOut(
+        MemoryOut(
             id="m1",
             domain="build",
             entity_type="Note",
@@ -438,9 +438,8 @@ class SensitivityOnlyChangeTest(unittest.IsolatedAsyncioTestCase):
     """A2 — sensitivity-only change must NOT be skipped (triggers update, not 'skipped')."""
 
     async def test_sensitivity_only_change_is_not_skipped(self) -> None:
-        from sqlalchemy import select as sa_select
 
-        now = datetime.now(timezone.utc)
+        datetime.now(timezone.utc)
         existing = _mem(
             sensitivity="internal", content="same", content_hash="hash-same"
         )
@@ -583,7 +582,7 @@ class DryRunAuditLogTest(unittest.IsolatedAsyncioTestCase):
         req = MaintenanceRequest(
             dry_run=True, dedup_threshold=0.0, fix_superseded_links=False
         )
-        report = await memory_writes.run_maintenance(session, req)
+        await memory_writes.run_maintenance(session, req)
 
         from src.models import AuditLog
 
@@ -657,15 +656,11 @@ class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
     """Fix4 — RequestIDMiddleware must reject malformed X-Request-ID headers."""
 
     async def test_valid_uuid_header_is_preserved(self) -> None:
-        captured: list[str] = []
 
         async def fake_next(request):
             from starlette.responses import Response
 
             return Response()
-
-        from starlette.testclient import TestClient
-        from starlette.requests import Request as StarletteRequest
 
         valid_id = "123e4567-e89b-12d3-a456-426614174000"
         scope = {
@@ -701,7 +696,6 @@ class RequestIdSanitizationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req_ids[0], valid_id)
 
     def test_malformed_header_is_rejected(self) -> None:
-        import re
 
         self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("inject\nnewline")))
         self.assertFalse(bool(middleware_module.REQUEST_ID_RE.match("x" * 65)))

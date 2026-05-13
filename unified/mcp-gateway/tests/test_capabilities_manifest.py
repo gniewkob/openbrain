@@ -12,4 +12,3 @@ class GatewayCapabilitiesManifestTests(unittest.TestCase):
         self.assertEqual(gateway.ADVANCED_TOOLS, manifest["advanced_tools"])
         self.assertEqual(gateway.ADMIN_TOOLS, manifest["admin_tools"])
         self.assertEqual(gateway.OBSIDIAN_LOCAL_TOOLS, manifest["local_obsidian_tools"])
-

@@ -1048,7 +1048,7 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         response = _FakeResponse(200, payload={"query": "q", "records": []})
         fake_client = _FakeClient(response)
         with patch.object(mcp_transport, "_client", return_value=fake_client):
-            result = await mcp_transport.brain_get_context("test query")
+            await mcp_transport.brain_get_context("test query")
         self.assertIn("query", fake_client.last_request[2]["json"])
         self.assertEqual(fake_client.last_request[2]["json"]["query"], "test query")
 

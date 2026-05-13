@@ -13,7 +13,7 @@ GATEWAY_TESTS = ROOT / "mcp-gateway" / "tests"
 if str(GATEWAY_TESTS) not in sys.path:
     sys.path.insert(0, str(GATEWAY_TESTS))
 
-from helpers import load_gateway_main
+from helpers import load_gateway_main  # noqa: E402  (requires sys.path mutation above)
 
 try:
     gateway = load_gateway_main()
