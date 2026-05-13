@@ -331,3 +331,38 @@ def test_clip_text_no_counter_when_within_limit():
     after = registry.snapshot().get("obsidian_clip_truncation_total", 0)
     assert result == "short"
     assert after == before
+
+
+# ---------------------------------------------------------------------------
+# _classify_error_code — error message → stable code (backend-side)
+# ---------------------------------------------------------------------------
+
+
+def test_classify_error_code_owner_required():
+    from src.memory_writes import _classify_error_code
+
+    assert (
+        _classify_error_code("Owner is required for corporate domain.")
+        == "owner_required_corporate"
+    )
+
+
+def test_classify_error_code_secret_detected():
+    from src.memory_writes import _classify_error_code
+
+    assert _classify_error_code("secret_detected: AWS key") == "secret_detected"
+    assert _classify_error_code("plaintext secret detected") == "secret_detected"
+
+
+def test_classify_error_code_embed_400():
+    from src.memory_writes import _classify_error_code
+
+    assert _classify_error_code("POST /api/embed failed: 400") == "embed_400"
+
+
+def test_classify_error_code_unknown_returns_none():
+    from src.memory_writes import _classify_error_code
+
+    assert _classify_error_code("some other error") is None
+    assert _classify_error_code(None) is None
+    assert _classify_error_code("") is None

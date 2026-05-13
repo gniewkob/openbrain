@@ -485,7 +485,11 @@ class _ObsidianSyncRunner:
         batch_input_indices: list[int],
     ) -> None:
         """Backend may return 200 with per-item `status: failed`. For single-record
-        chunks, try remediation on the failed item before accepting the failure."""
+        chunks, try remediation on the failed item before accepting the failure.
+
+        Prefers the backend's structured `error_code` field when present;
+        falls back to substring classification on `error` for older backends.
+        """
         result = response.json()
         items = result.get("results", [])
         if (
@@ -494,9 +498,11 @@ class _ObsidianSyncRunner:
             and isinstance(items[0], dict)
             and items[0].get("status") == "failed"
         ):
-            error_text = str(items[0].get("error", "")).lower()
-            kind = _obsidian_classify_error(error_text)
-            if kind != "other":
+            item = items[0]
+            kind = item.get("error_code") or _obsidian_classify_error(
+                str(item.get("error", "")).lower()
+            )
+            if kind and kind != "other":
                 if await self.apply_remediation(
                     batch_records[0], batch_input_indices[0], kind
                 ):

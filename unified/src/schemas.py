@@ -525,6 +525,12 @@ class BatchResultItem(BaseModel):
     match_key: Optional[str] = None
     warnings: list[str] = Field(default_factory=list)
     error: Optional[str] = None
+    # Stable machine-readable classifier for `error`. Lets clients (e.g. the
+    # MCP gateway) apply remediation without string-matching on the message.
+    # Known codes: "owner_required_corporate", "secret_detected", "embed_400",
+    # "validation_error". `None` means "no known classifier" — clients should
+    # treat as generic failure.
+    error_code: Optional[str] = None
 
 
 class MemoryWriteManyResponse(BaseModel):

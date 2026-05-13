@@ -477,6 +477,24 @@ def _compute_overall_status(summary: dict[str, Any], total: int) -> str:
     return "failed"
 
 
+def _classify_error_code(error_message: str | None) -> str | None:
+    """Map a free-text error message to a stable error_code for BatchResultItem.
+
+    Allows MCP gateway / other clients to apply remediation without parsing
+    the human-readable message. Returns None when no known classifier matches.
+    """
+    if not error_message:
+        return None
+    lowered = error_message.lower()
+    if "secret_detected" in lowered or "plaintext secret detected" in lowered:
+        return "secret_detected"
+    if "owner is required for corporate domain" in lowered:
+        return "owner_required_corporate"
+    if "/api/embed" in lowered:
+        return "embed_400"
+    return None
+
+
 async def handle_memory_write_many(
     session: AsyncSession,
     request: MemoryWriteManyRequest,
@@ -512,6 +530,7 @@ async def handle_memory_write_many(
                     actor=actor,
                     _commit=commit_each,
                 )
+                _err = res.errors[0] if res.errors else None
                 results.append(
                     BatchResultItem(
                         input_index=index,
@@ -522,7 +541,8 @@ async def handle_memory_write_many(
                         else None,
                         match_key=record.match_key,
                         warnings=res.warnings,
-                        error=res.errors[0] if res.errors else None,
+                        error=_err,
+                        error_code=_classify_error_code(_err),
                     )
                 )
                 summary[res.status] = summary.get(res.status, 0) + 1
@@ -533,12 +553,14 @@ async def handle_memory_write_many(
                     match_key=record.match_key,
                     error=str(exc),
                 )
+                _exc_msg = str(exc)
                 results.append(
                     BatchResultItem(
                         input_index=index,
                         status="failed",
                         match_key=record.match_key,
-                        error=str(exc),
+                        error=_exc_msg,
+                        error_code=_classify_error_code(_exc_msg),
                     )
                 )
                 summary["failed"] += 1

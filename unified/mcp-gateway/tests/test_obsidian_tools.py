@@ -285,6 +285,73 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.post.await_count, 2)
         self.assertEqual(result["summary"].get("created"), 1)
 
+    async def test_brain_obsidian_sync_uses_backend_error_code_when_present(
+        self,
+    ) -> None:
+        """Backend 200-with-failed item: gateway prefers `error_code` over the
+        free-text `error` message for classifying the remediation kind."""
+        gateway = load_gateway_main()
+
+        # Backend signals owner_required via error_code; the message itself is
+        # generic so the old string-match would NOT pick "owner_required_corporate".
+        failed_with_code = Mock()
+        failed_with_code.is_error = False
+        failed_with_code.status_code = 200
+        failed_with_code.json.return_value = {
+            "summary": {"failed": 1},
+            "results": [
+                {
+                    "input_index": 0,
+                    "status": "failed",
+                    "error": "some opaque message",
+                    "error_code": "owner_required_corporate",
+                }
+            ],
+        }
+
+        # Remediation retry returns 200 OK with created
+        retry_ok = Mock()
+        retry_ok.is_error = False
+        retry_ok.status_code = 200
+        retry_ok.json.return_value = {
+            "summary": {"created": 1},
+            "results": [{"input_index": 0, "status": "created"}],
+        }
+
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls,
+            patch("_gateway_src.main._client") as mock_client,
+        ):
+            adapter = AsyncMock()
+            adapter.list_files.return_value = ["Inbox/T.md"]
+            adapter.read_note.return_value = Mock(
+                vault="Documents",
+                path="Inbox/T.md",
+                title="T",
+                content="c",
+                frontmatter={},
+                tags=["openbrain"],
+                file_hash="h",
+            )
+            adapter_cls.return_value = adapter
+
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.side_effect = [failed_with_code, retry_ok]
+            mock_client.return_value = client
+
+            result = await gateway.brain_obsidian_sync(
+                vault="Documents", folder="Inbox", limit=1
+            )
+
+        # Two posts: original (failed) + remediation retry (succeeded)
+        self.assertEqual(client.post.await_count, 2)
+        self.assertEqual(result["summary"].get("created"), 1)
+        # sync_stats counter for owner autofix bumped
+        self.assertEqual(result["summary"].get("owner_autofix_retries"), 1)
+
     async def test_brain_obsidian_sync_continues_when_single_note_read_fails(
         self,
     ) -> None:
