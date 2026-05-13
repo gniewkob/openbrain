@@ -6,7 +6,7 @@ import asyncio
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +41,7 @@ from ...schemas import (
     ObsidianSyncRequest,
     ObsidianSyncResponse,
     ObsidianSyncStatus,
+    ObsidianUpdateRequest,
     ObsidianWriteRequest,
     ObsidianWriteResponse,
     SearchRequest,
@@ -479,30 +480,52 @@ async def v1_obsidian_resolve_conflict(
 
 @router.post("/update-note")
 async def v1_obsidian_update_note(
-    vault: str,
-    path: str,
-    content: str | None = None,
-    append: bool = False,
-    tags: list[str] | None = None,
+    body: ObsidianUpdateRequest | None = Body(None),
+    vault: str | None = Query(None),
+    path: str | None = Query(None),
+    content: str | None = Query(None),
+    append: bool | None = Query(None),
+    tags: list[str] | None = Query(None),
     _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianWriteResponse:
-    """Update an existing note in Obsidian."""
+    """Update an existing note in Obsidian.
+
+    Accepts either a JSON body (preferred) or legacy query parameters for
+    backward compatibility with pre-body callers.
+    """
     require_admin(_user)
+
+    if body is not None:
+        req = body
+    else:
+        if not path:
+            raise HTTPException(
+                status_code=422,
+                detail="path is required (provide JSON body or query params)",
+            )
+        req = ObsidianUpdateRequest(
+            vault=vault or "Documents",
+            path=path,
+            content=content,
+            append=bool(append) if append is not None else False,
+            tags=tags,
+        )
 
     adapter = ObsidianCliAdapter()
 
-    # Build frontmatter update if tags provided
+    # Build frontmatter update if tags explicitly provided.
+    # None = don't touch frontmatter; [] = clear tags; [...] = set tags.
     frontmatter = None
-    if tags:
-        frontmatter = {"tags": tags}
+    if req.tags is not None:
+        frontmatter = {"tags": req.tags}
 
     try:
         note = await adapter.update_note(
-            vault=vault,
-            path=path,
-            content=content,
+            vault=req.vault,
+            path=req.path,
+            content=req.content,
             frontmatter=frontmatter,
-            append=append,
+            append=req.append,
         )
 
         return ObsidianWriteResponse(

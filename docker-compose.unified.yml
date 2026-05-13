@@ -1,5 +1,8 @@
 name: openbrain
 
+# UWAGA: postgres + redis na BIND MOUNTACH (./data/...) — chroni przed `docker volume prune` / CleanMyMac.
+# Backup robi scripts/backup_postgres.sh (uruchamiany przez launchd, używa docker exec).
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -9,7 +12,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - openbrain_postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
     networks:
@@ -25,7 +28,7 @@ services:
     image: redis:7-alpine
     container_name: openbrain-unified-redis
     volumes:
-      - openbrain_redis_data:/data
+      - ./data/redis:/data
     networks:
       - net_unified
     healthcheck:
@@ -56,6 +59,8 @@ services:
     container_name: openbrain-unified-server
     volumes:
       - ./unified:/app
+      - "${OBSIDIAN_PERSONAL_VAULT}:/obsidian/Documents:ro"
+      - "${OBSIDIAN_WORK_VAULT}:/obsidian/Work:ro"
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - OLLAMA_URL=http://host.docker.internal:11434
@@ -83,23 +88,11 @@ services:
       retries: 3
       start_period: 20s
 
-  # Ollama działa lokalnie na macOS - używamy host.docker.internal
-  # Aby uruchomić lokalną Ollamę: ollama serve
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: openbrain-unified-ollama
-  #   volumes:
-  #     - openbrain_ollama_data:/root/.ollama
-  #   networks:
-  #     - net_unified
-  #   restart: unless-stopped
-
   mcp-http:
     build:
       context: ./unified
       dockerfile: mcp-gateway/Dockerfile
     container_name: openbrain-mcp-http
-    profiles: ["public"]
     environment:
       - BRAIN_URL=http://unified-server:80
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
@@ -118,6 +111,8 @@ services:
   ngrok:
     image: ngrok/ngrok:latest
     container_name: openbrain-unified-ngrok
+    # Opt-in only: `docker compose --profile public up ngrok`.
+    # Wystawia gateway publicznie bez auth — nigdy nie odpalaj przez zwykłe `up`.
     profiles: ["public"]
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
@@ -125,8 +120,6 @@ services:
       - "http"
       - "http://mcp-http:7011"
       - "--url=${NGROK_DOMAIN}"
-
-
     networks:
       - net_unified
     depends_on:
@@ -139,7 +132,3 @@ networks:
     driver: bridge
   net_shared_monitoring:
     external: true
-volumes:
-  openbrain_postgres_data:
-  openbrain_redis_data:
-  openbrain_ollama_data:

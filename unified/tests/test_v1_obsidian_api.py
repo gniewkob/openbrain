@@ -461,7 +461,7 @@ def test_v1_obsidian_update_note_success():
         with patch(_ADAPTER_PATH, return_value=mock_adapter):
             r = client.post(
                 "/api/v1/obsidian/update-note",
-                params={
+                json={
                     "vault": "my-vault",
                     "path": "Notes/test.md",
                     "content": "updated",
@@ -481,15 +481,13 @@ def test_v1_obsidian_update_note_with_tags():
         mock_adapter.update_note = AsyncMock(return_value=note)
 
         with patch(_ADAPTER_PATH, return_value=mock_adapter):
-            # list params need separate key=value pairs to encode as repeated query params
             r = client.post(
                 "/api/v1/obsidian/update-note",
-                params=[
-                    ("vault", "my-vault"),
-                    ("path", "Notes/test.md"),
-                    ("tags", "tag1"),
-                    ("tags", "tag2"),
-                ],
+                json={
+                    "vault": "my-vault",
+                    "path": "Notes/test.md",
+                    "tags": ["tag1", "tag2"],
+                },
             )
         assert r.status_code == 200
         mock_adapter.update_note.assert_called_once()
@@ -506,9 +504,52 @@ def test_v1_obsidian_update_note_error():
         with patch(_ADAPTER_PATH, return_value=mock_adapter):
             r = client.post(
                 "/api/v1/obsidian/update-note",
-                params={"vault": "my-vault", "path": "Notes/missing.md"},
+                json={"vault": "my-vault", "path": "Notes/missing.md"},
             )
         assert r.status_code == 503
+    finally:
+        _restore(app)
+
+
+def test_v1_obsidian_update_note_legacy_query_params():
+    """Backward compat: pre-body clients used query params."""
+    client, app = _client()
+    try:
+        note = _note()
+        mock_adapter = MagicMock()
+        mock_adapter.update_note = AsyncMock(return_value=note)
+
+        with patch(_ADAPTER_PATH, return_value=mock_adapter):
+            r = client.post(
+                "/api/v1/obsidian/update-note",
+                params={
+                    "vault": "my-vault",
+                    "path": "Notes/legacy.md",
+                    "content": "from-query",
+                    "append": "true",
+                },
+            )
+        assert r.status_code == 200
+        mock_adapter.update_note.assert_called_once()
+        call_kwargs = mock_adapter.update_note.call_args.kwargs
+        assert call_kwargs["path"] == "Notes/legacy.md"
+        assert call_kwargs["content"] == "from-query"
+        assert call_kwargs["append"] is True
+    finally:
+        _restore(app)
+
+
+def test_v1_obsidian_update_note_legacy_requires_path():
+    """Without body and without path query param → 422."""
+    client, app = _client()
+    try:
+        mock_adapter = MagicMock()
+        mock_adapter.update_note = AsyncMock(return_value=_note())
+        with patch(_ADAPTER_PATH, return_value=mock_adapter):
+            r = client.post(
+                "/api/v1/obsidian/update-note", params={"vault": "my-vault"}
+            )
+        assert r.status_code == 422
     finally:
         _restore(app)
 

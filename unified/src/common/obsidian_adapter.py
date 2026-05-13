@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -56,9 +57,19 @@ def _load_schema_types():
 _VAULT_PATHS_CACHE: dict[str, str] = {}
 _VAULT_PATHS_LOCK = asyncio.Lock()
 
+_logger = logging.getLogger(__name__)
+
 _LOG_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2} ")
 _INSTALLER_WARNING = "Your Obsidian installer is out of date."
 _VALID_DOMAINS = {"corporate", "build", "personal"}
+_MAX_ENTITY_TYPE_LEN = 64
+_MAX_TITLE_LEN = 256
+_MAX_CONTENT_LEN = 20_000
+_MAX_OWNER_LEN = 128
+_MAX_TAG_LEN = 64
+_MAX_TAGS = 32
+_MAX_MATCH_KEY_LEN = 256
+_MAX_PATH_LEN = 1024
 
 
 class ObsidianCliError(RuntimeError):
@@ -245,6 +256,38 @@ def _derive_title(path: str, frontmatter: dict[str, Any], body: str) -> str:
     return PurePosixPath(path).stem
 
 
+def _clip_text(value: Any, limit: int, *, field: str | None = None) -> str:
+    """Clip a string-coercible value to `limit` chars.
+
+    Emits a warning when the input exceeds the limit so silent truncation is
+    visible in logs. `field` is included in the log to identify the source.
+    """
+    text = "" if value is None else str(value)
+    if len(text) > limit:
+        _logger.warning(
+            "obsidian.clip_text truncated %s: original=%d, limit=%d",
+            field or "<unknown>",
+            len(text),
+            limit,
+        )
+        return text[:limit]
+    return text
+
+
+def _dedupe_and_clip_tags(tags: list[Any]) -> list[str]:
+    deduped_tags: list[str] = []
+    seen: set[str] = set()
+    for raw_tag in tags:
+        clipped = _clip_text(raw_tag, _MAX_TAG_LEN).strip()
+        if not clipped or clipped in seen:
+            continue
+        seen.add(clipped)
+        deduped_tags.append(clipped)
+        if len(deduped_tags) >= _MAX_TAGS:
+            break
+    return deduped_tags
+
+
 def note_to_write_payload(
     note: ObsidianNote,
     default_domain: str,
@@ -263,22 +306,23 @@ def note_to_write_payload(
     owner = str(frontmatter.get("owner") or default_owner)
     tags = list(default_tags or [])
     tags.extend(note.tags)
-    deduped_tags: list[str] = []
-    seen: set[str] = set()
-    for tag in tags:
-        if tag and tag not in seen:
-            seen.add(tag)
-            deduped_tags.append(tag)
+    deduped_tags = _dedupe_and_clip_tags(tags)
+    note_path = _clip_text(note.path, _MAX_PATH_LEN, field="path")
+    match_key = _clip_text(
+        f"obsidian:{note.vault}:{note.path}", _MAX_MATCH_KEY_LEN, field="match_key"
+    )
     return {
-        "match_key": f"obsidian:{note.vault}:{note.path}",
+        "match_key": match_key,
         "domain": domain,
-        "entity_type": entity_type,
-        "title": note.title,
-        "content": note.content,
-        "owner": owner,
+        "entity_type": _clip_text(
+            entity_type, _MAX_ENTITY_TYPE_LEN, field="entity_type"
+        ),
+        "title": _clip_text(note.title, _MAX_TITLE_LEN, field="title"),
+        "content": _clip_text(note.content, _MAX_CONTENT_LEN, field="content"),
+        "owner": _clip_text(owner, _MAX_OWNER_LEN, field="owner"),
         "tags": deduped_tags,
-        "obsidian_ref": note.path,
-        "source": {"type": "sync", "system": "obsidian", "reference": note.path},
+        "obsidian_ref": note_path,
+        "source": {"type": "sync", "system": "obsidian", "reference": note_path},
         "sensitivity": "internal",
     }
 
@@ -303,23 +347,22 @@ def note_to_memory_write_record(
     owner = str(frontmatter.get("owner") or default_owner)
     tags = list(default_tags or [])
     tags.extend(note.tags)
-    deduped_tags: list[str] = []
-    seen: set[str] = set()
-    for tag in tags:
-        if tag and tag not in seen:
-            seen.add(tag)
-            deduped_tags.append(tag)
+    deduped_tags = _dedupe_and_clip_tags(tags)
+    note_path = _clip_text(note.path, _MAX_PATH_LEN, field="path")
+    match_key = _clip_text(
+        f"obsidian:{note.vault}:{note.path}", _MAX_MATCH_KEY_LEN, field="match_key"
+    )
 
     return MemoryWriteRecord(
-        match_key=f"obsidian:{note.vault}:{note.path}",
+        match_key=match_key,
         domain=domain,  # type: ignore[arg-type]
-        entity_type=entity_type,
-        title=note.title,
-        content=note.content,
-        owner=owner,
+        entity_type=_clip_text(entity_type, _MAX_ENTITY_TYPE_LEN, field="entity_type"),
+        title=_clip_text(note.title, _MAX_TITLE_LEN, field="title"),
+        content=_clip_text(note.content, _MAX_CONTENT_LEN, field="content"),
+        owner=_clip_text(owner, _MAX_OWNER_LEN, field="owner"),
         tags=deduped_tags,
-        source=SourceMetadata(type="sync", system="obsidian", reference=note.path),
-        obsidian_ref=note.path,
+        source=SourceMetadata(type="sync", system="obsidian", reference=note_path),
+        obsidian_ref=note_path,
     )
 
 

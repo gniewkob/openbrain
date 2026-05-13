@@ -90,7 +90,10 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
     async def test_brain_obsidian_vaults_uses_local_adapter(self) -> None:
         gateway = load_gateway_main()
 
-        with patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False), patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls:
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls,
+        ):
             adapter = AsyncMock()
             adapter.list_vaults.return_value = ["Documents"]
             adapter_cls.return_value = adapter
@@ -103,7 +106,10 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
     async def test_brain_obsidian_read_note_uses_local_adapter(self) -> None:
         gateway = load_gateway_main()
 
-        with patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False), patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls:
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls,
+        ):
             adapter = AsyncMock()
             adapter.read_note.return_value = Mock(
                 vault="Documents",
@@ -116,7 +122,9 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
             )
             adapter_cls.return_value = adapter
 
-            result = await gateway.brain_obsidian_read_note(path="Inbox/Test.md", vault="Documents")
+            result = await gateway.brain_obsidian_read_note(
+                path="Inbox/Test.md", vault="Documents"
+            )
 
         adapter.read_note.assert_awaited_once_with("Documents", "Inbox/Test.md")
         self.assertEqual(result["path"], "Inbox/Test.md")
@@ -125,9 +133,16 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         gateway = load_gateway_main()
         response = Mock()
         response.is_error = False
-        response.json.return_value = {"summary": {"received": 1}, "results": [{"status": "created"}]}
+        response.json.return_value = {
+            "summary": {"received": 1},
+            "results": [{"status": "created"}],
+        }
 
-        with patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False), patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls, patch("_gateway_src.main._client") as mock_client:
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls,
+            patch("_gateway_src.main._client") as mock_client,
+        ):
             adapter = AsyncMock()
             adapter.list_files.return_value = ["Inbox/Test.md"]
             adapter.read_note.return_value = Mock(
@@ -147,12 +162,178 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
             client.post.return_value = response
             mock_client.return_value = client
 
-            result = await gateway.brain_obsidian_sync(vault="Documents", folder="Inbox", limit=1)
+            result = await gateway.brain_obsidian_sync(
+                vault="Documents", folder="Inbox", limit=1
+            )
 
-        adapter.list_files.assert_awaited_once_with("Documents", folder="Inbox", limit=1)
+        adapter.list_files.assert_awaited_once_with(
+            "Documents", folder="Inbox", limit=1
+        )
         adapter.read_note.assert_awaited_once_with("Documents", "Inbox/Test.md")
         client.post.assert_awaited_once()
         self.assertEqual(result["scanned"], 1)
+
+    async def test_brain_obsidian_sync_falls_back_to_per_record_on_422(self) -> None:
+        gateway = load_gateway_main()
+        batch_422 = Mock()
+        batch_422.is_error = True
+        batch_422.status_code = 422
+        batch_422.json.return_value = {"detail": "validation"}
+
+        single_ok_1 = Mock()
+        single_ok_1.is_error = False
+        single_ok_1.status_code = 200
+        single_ok_1.json.return_value = {
+            "summary": {"created": 1},
+            "results": [{"input_index": 0, "status": "created"}],
+        }
+
+        single_ok_2 = Mock()
+        single_ok_2.is_error = False
+        single_ok_2.status_code = 200
+        single_ok_2.json.return_value = {
+            "summary": {"created": 1},
+            "results": [{"input_index": 0, "status": "created"}],
+        }
+
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls,
+            patch("_gateway_src.main._client") as mock_client,
+        ):
+            adapter = AsyncMock()
+            adapter.list_files.return_value = ["Inbox/A.md", "Inbox/B.md"]
+            adapter.read_note.side_effect = [
+                Mock(
+                    vault="Documents",
+                    path="Inbox/A.md",
+                    title="A",
+                    content="Body A",
+                    frontmatter={},
+                    tags=["openbrain"],
+                    file_hash="a",
+                ),
+                Mock(
+                    vault="Documents",
+                    path="Inbox/B.md",
+                    title="B",
+                    content="Body B",
+                    frontmatter={},
+                    tags=["openbrain"],
+                    file_hash="b",
+                ),
+            ]
+            adapter_cls.return_value = adapter
+
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.side_effect = [batch_422, single_ok_1, single_ok_2]
+            mock_client.return_value = client
+
+            result = await gateway.brain_obsidian_sync(
+                vault="Documents", folder="Inbox", limit=2
+            )
+
+        self.assertEqual(client.post.await_count, 3)
+        self.assertEqual(result["summary"].get("created"), 2)
+        self.assertEqual(len(result["results"]), 2)
+
+    async def test_brain_obsidian_sync_retries_on_429(self) -> None:
+        gateway = load_gateway_main()
+        rate_limited = Mock()
+        rate_limited.is_error = True
+        rate_limited.status_code = 429
+        rate_limited.json.return_value = {"detail": "rate_limited"}
+
+        ok = Mock()
+        ok.is_error = False
+        ok.status_code = 200
+        ok.json.return_value = {
+            "summary": {"created": 1},
+            "results": [{"input_index": 0, "status": "created"}],
+        }
+
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls,
+            patch("_gateway_src.main._client") as mock_client,
+        ):
+            adapter = AsyncMock()
+            adapter.list_files.return_value = ["Inbox/Test.md"]
+            adapter.read_note.return_value = Mock(
+                vault="Documents",
+                path="Inbox/Test.md",
+                title="Test",
+                content="Body",
+                frontmatter={},
+                tags=["openbrain"],
+                file_hash="abc",
+            )
+            adapter_cls.return_value = adapter
+
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.side_effect = [rate_limited, ok]
+            mock_client.return_value = client
+
+            result = await gateway.brain_obsidian_sync(
+                vault="Documents", folder="Inbox", limit=1
+            )
+
+        self.assertEqual(client.post.await_count, 2)
+        self.assertEqual(result["summary"].get("created"), 1)
+
+    async def test_brain_obsidian_sync_continues_when_single_note_read_fails(
+        self,
+    ) -> None:
+        gateway = load_gateway_main()
+        ok = Mock()
+        ok.is_error = False
+        ok.status_code = 200
+        ok.json.return_value = {
+            "summary": {"created": 1},
+            "results": [{"input_index": 0, "status": "created"}],
+        }
+
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls,
+            patch("_gateway_src.main._client") as mock_client,
+        ):
+            adapter = AsyncMock()
+            adapter.list_files.return_value = ["Inbox/A.md", "Inbox/B.md"]
+            adapter.read_note.side_effect = [
+                RuntimeError("cannot read note"),
+                Mock(
+                    vault="Documents",
+                    path="Inbox/B.md",
+                    title="B",
+                    content="Body B",
+                    frontmatter={},
+                    tags=["openbrain"],
+                    file_hash="b",
+                ),
+            ]
+            adapter_cls.return_value = adapter
+
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = ok
+            mock_client.return_value = client
+
+            result = await gateway.brain_obsidian_sync(
+                vault="Documents", folder="Inbox", limit=2
+            )
+
+        self.assertEqual(client.post.await_count, 1)
+        self.assertEqual(result["summary"].get("failed"), 1)
+        self.assertEqual(len(result["results"]), 2)
+        failed_items = [item for item in result["results"] if item["status"] == "failed"]
+        self.assertEqual(len(failed_items), 1)
+        self.assertEqual(failed_items[0]["errors"], ["note_read_failed"])
 
     async def test_brain_obsidian_write_note_calls_backend_endpoint(self) -> None:
         gateway = load_gateway_main()
@@ -263,7 +444,9 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result["collection_name"], "Architecture")
 
-    async def test_brain_obsidian_bidirectional_sync_calls_backend_endpoint(self) -> None:
+    async def test_brain_obsidian_bidirectional_sync_calls_backend_endpoint(
+        self,
+    ) -> None:
         gateway = load_gateway_main()
         response = Mock()
         response.is_error = False
@@ -352,6 +535,42 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result["updated"], True)
 
+    async def test_brain_obsidian_update_note_sends_null_tags_when_omitted(
+        self,
+    ) -> None:
+        gateway = load_gateway_main()
+        response = Mock()
+        response.is_error = False
+        response.json.return_value = {"updated": True}
+
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main._client") as mock_client,
+        ):
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.return_value = response
+            mock_client.return_value = client
+
+            await gateway.brain_obsidian_update_note(
+                vault="Documents",
+                path="Inbox/Test.md",
+                content="More",
+                append=False,
+            )
+
+        client.post.assert_awaited_once_with(
+            "/api/v1/obsidian/update-note",
+            json={
+                "vault": "Documents",
+                "path": "Inbox/Test.md",
+                "content": "More",
+                "append": False,
+                "tags": None,
+            },
+        )
+
     async def test_brain_capabilities_hides_obsidian_tools_when_disabled(self) -> None:
         gateway = load_gateway_main()
 
@@ -362,16 +581,22 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["obsidian"]["status"], "disabled")
         self.assertEqual(result["obsidian"]["tools"], [])
         self.assertEqual(result["health"]["components"]["obsidian"], "disabled")
-        self.assertEqual(result["obsidian"]["reason"], result["obsidian_local"]["reason"])
+        self.assertEqual(
+            result["obsidian"]["reason"], result["obsidian_local"]["reason"]
+        )
         self.assertIn("ENABLE_LOCAL_OBSIDIAN_TOOLS=1", result["obsidian"]["reason"])
         self.assertIn("trusted local stdio gateway", result["obsidian"]["reason"])
         self.assertNotIn("obsidian_vaults", result["tier_2_advanced"]["tools"])
         self.assertEqual(result["obsidian_local"]["tools"], [])
 
-    async def test_brain_capabilities_includes_obsidian_tools_when_enabled(self) -> None:
+    async def test_brain_capabilities_includes_obsidian_tools_when_enabled(
+        self,
+    ) -> None:
         gateway = load_gateway_main()
 
-        with patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False):
+        with patch.dict(
+            "os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False
+        ):
             result = await gateway.brain_capabilities()
 
         self.assertEqual(result["obsidian"]["mode"], "local")
@@ -403,7 +628,9 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
-            patch("_gateway_src.main._local_obsidian_tools_registered", return_value=False),
+            patch(
+                "_gateway_src.main._local_obsidian_tools_registered", return_value=False
+            ),
             patch(
                 "_gateway_src.main._get_backend_status",
                 AsyncMock(
@@ -424,7 +651,9 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["obsidian_local"]["status"], "disabled")
         self.assertEqual(result["obsidian_local"]["tools"], [])
 
-    async def test_brain_capabilities_marks_reachable_backend_as_degraded_when_readyz_is_503(self) -> None:
+    async def test_brain_capabilities_marks_reachable_backend_as_degraded_when_readyz_is_503(
+        self,
+    ) -> None:
         gateway = load_gateway_main()
 
         client = AsyncMock()
@@ -446,7 +675,9 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["health"]["overall"], "degraded")
         self.assertEqual(result["health"]["components"]["db"], "degraded")
 
-    async def test_brain_capabilities_uses_api_v1_readyz_when_root_readyz_fails(self) -> None:
+    async def test_brain_capabilities_uses_api_v1_readyz_when_root_readyz_fails(
+        self,
+    ) -> None:
         gateway = load_gateway_main()
 
         readyz_client = AsyncMock()
@@ -474,7 +705,9 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["backend"]["primary_path"], "/api/v1/readyz")
         self.assertEqual(result["health"]["overall"], "healthy")
 
-    async def test_brain_capabilities_falls_back_to_healthz_before_reporting_outage(self) -> None:
+    async def test_brain_capabilities_falls_back_to_healthz_before_reporting_outage(
+        self,
+    ) -> None:
         gateway = load_gateway_main()
 
         readyz_client = AsyncMock()
@@ -504,7 +737,9 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/readyz probe failed", result["backend"]["reason"])
         self.assertEqual(result["health"]["overall"], "degraded")
 
-    async def test_brain_capabilities_uses_api_health_fallback_when_probes_fail(self) -> None:
+    async def test_brain_capabilities_uses_api_health_fallback_when_probes_fail(
+        self,
+    ) -> None:
         gateway = load_gateway_main()
 
         readyz_client = AsyncMock()

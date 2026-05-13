@@ -38,3 +38,6 @@ monitoring/bridge-*.log
 monitoring/host-full-canary*.log
 monitoring/host-full-canary.prom
 *.bak.*
+
+# Bind-mount dane kontenerów (postgres, redis)
+data/

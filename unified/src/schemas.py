@@ -322,6 +322,16 @@ class ObsidianWriteRequest(BaseModel):
     overwrite: bool = False
 
 
+class ObsidianUpdateRequest(BaseModel):
+    """Request to update an existing note in Obsidian vault."""
+
+    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
+    path: PathStr
+    content: Optional[ContentStr] = None
+    append: bool = False
+    tags: Optional[list[TagStr]] = Field(default=None, max_length=MAX_TAGS)
+
+
 class ObsidianWriteResponse(BaseModel):
     """Response from writing a note to Obsidian."""
 

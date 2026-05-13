@@ -35,6 +35,7 @@ import asyncio
 import logging
 import math
 import os
+import random
 import re
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -161,6 +162,354 @@ _LIMITS = load_runtime_limits()
 MAX_SEARCH_TOP_K: int = _LIMITS["max_search_top_k"]
 MAX_LIST_LIMIT: int = _LIMITS["max_list_limit"]
 MAX_SYNC_LIMIT: int = _LIMITS["max_sync_limit"]
+MAX_BULK_ITEMS: int = _LIMITS["max_bulk_items"]
+
+
+def _normalize_obsidian_read_concurrency(value: str | None) -> int:
+    raw = (value or "").strip()
+    if not raw:
+        return 8
+    try:
+        parsed = int(raw)
+    except ValueError as exc:
+        raise ValueError("OBSIDIAN_READ_CONCURRENCY must be an integer") from exc
+    if not 1 <= parsed <= 32:
+        raise ValueError("OBSIDIAN_READ_CONCURRENCY must be in range 1..32")
+    return parsed
+
+
+MAX_OBSIDIAN_READ_CONCURRENCY = _normalize_obsidian_read_concurrency(
+    os.environ.get("OBSIDIAN_READ_CONCURRENCY")
+)
+
+
+def _normalize_obsidian_write_concurrency(value: str | None) -> int:
+    raw = (value or "").strip()
+    if not raw:
+        # Matches .env.example default; bumped from 1 to enable mild parallelism
+        # for multi-chunk syncs while staying conservative for the backend.
+        return 2
+    try:
+        parsed = int(raw)
+    except ValueError as exc:
+        raise ValueError("OBSIDIAN_WRITE_CONCURRENCY must be an integer") from exc
+    if not 1 <= parsed <= 8:
+        raise ValueError("OBSIDIAN_WRITE_CONCURRENCY must be in range 1..8")
+    return parsed
+
+
+MAX_OBSIDIAN_WRITE_CONCURRENCY = _normalize_obsidian_write_concurrency(
+    os.environ.get("OBSIDIAN_WRITE_CONCURRENCY")
+)
+DEFAULT_CORPORATE_OWNER = (
+    os.environ.get("OBSIDIAN_CORPORATE_DEFAULT_OWNER", "obsidian-sync").strip()
+    or "obsidian-sync"
+)
+_DATA_URI_RE = re.compile(r"data:[^\s,]+;base64,[A-Za-z0-9+/=\s]+", re.IGNORECASE)
+
+# Known backend error signatures. Best-effort: the backend should expose
+# stable `error.code` values long-term so we can drop the string matching.
+_OBSIDIAN_OWNER_MARKER = "owner is required for corporate domain"
+_OBSIDIAN_EMBED_MARKER = "/api/embed"
+_OBSIDIAN_SECRET_MARKERS = ("secret_detected", "plaintext secret detected")
+
+
+def _obsidian_extract_error_detail(response: httpx.Response) -> str:
+    """Return a best-effort string description of an error response body."""
+    try:
+        payload = response.json()
+    except Exception:
+        return response.text or ""
+    if isinstance(payload, dict):
+        err = payload.get("error")
+        if isinstance(err, dict):
+            message = err.get("message")
+            if isinstance(message, str):
+                return message
+        detail = payload.get("detail")
+        if isinstance(detail, str):
+            return detail
+    return str(payload)
+
+
+def _obsidian_extract_status_error(response: httpx.Response) -> str:
+    if response.status_code == 429:
+        return "rate_limited"
+    if response.status_code == 422:
+        return "validation_error"
+    return f"http_{response.status_code}"
+
+
+def _obsidian_classify_error(
+    detail_lowered: str, status_code: int | None = None
+) -> str:
+    """Classify a backend error into a known remediation kind."""
+    if any(marker in detail_lowered for marker in _OBSIDIAN_SECRET_MARKERS):
+        return "secret_detected"
+    if _OBSIDIAN_OWNER_MARKER in detail_lowered:
+        return "owner_required_corporate"
+    if _OBSIDIAN_EMBED_MARKER in detail_lowered and (
+        status_code is None or status_code == 400 or "400 bad request" in detail_lowered
+    ):
+        return "embed_400"
+    return "other"
+
+
+def _clean_content_for_embedding(text: str, limit: int) -> str:
+    cleaned = _DATA_URI_RE.sub("[removed-data-uri]", text or "")
+    return cleaned[:limit]
+
+
+class _ObsidianSyncRunner:
+    """Encapsulates state and remediation logic for brain_obsidian_sync.
+
+    Pulled out of the tool function so helpers are testable and not rebuilt
+    on every call. Holds mutable aggregates (summary, stats, results) so
+    callers can read them after `run` completes.
+    """
+
+    _RETRY_ATTEMPTS = 5
+    _EMBED_CONTENT_LIMITS = (4000, 1500)
+
+    def __init__(self, client: httpx.AsyncClient) -> None:
+        self._client = client
+        self.summary_totals: dict[str, int] = {}
+        self.aggregated_results: list[dict[str, Any]] = []
+        self.sync_stats: dict[str, int] = {
+            "note_read_failed": 0,
+            "write_retry_429": 0,
+            "write_fallback_422_batches": 0,
+            "write_nonrecoverable_batches": 0,
+            "owner_autofix_retries": 0,
+            "embed_retry_reduced_content": 0,
+            "secret_quarantined": 0,
+        }
+
+    # --- bookkeeping -------------------------------------------------------
+
+    def init_summary(self, received: int) -> None:
+        self.summary_totals = {"received": received, "failed": 0}
+
+    def accumulate_summary(self, summary: dict[str, Any]) -> None:
+        for key, value in summary.items():
+            if key == "received":
+                continue
+            if isinstance(value, int):
+                self.summary_totals[key] = self.summary_totals.get(key, 0) + value
+
+    def append_result_items(
+        self, items: list[dict[str, Any]], input_index_map: list[int]
+    ) -> None:
+        for item in items:
+            normalized = dict(item)
+            idx = normalized.get("input_index")
+            if isinstance(idx, int) and 0 <= idx < len(input_index_map):
+                normalized["input_index"] = input_index_map[idx]
+            self.aggregated_results.append(normalized)
+
+    def record_note_read_failure(self, input_index: int) -> None:
+        self.summary_totals["failed"] = self.summary_totals.get("failed", 0) + 1
+        self.sync_stats["note_read_failed"] += 1
+        self.aggregated_results.append(
+            {
+                "input_index": input_index,
+                "status": "failed",
+                "errors": ["note_read_failed"],
+                "warnings": [],
+            }
+        )
+
+    def record_skipped(self, input_index: int, warning: str) -> None:
+        self.accumulate_summary({"skipped": 1})
+        self.aggregated_results.append(
+            {
+                "input_index": input_index,
+                "status": "skipped",
+                "errors": [],
+                "warnings": [warning],
+            }
+        )
+
+    def record_failed(self, input_index: int, error: str) -> None:
+        self.aggregated_results.append(
+            {
+                "input_index": input_index,
+                "status": "failed",
+                "errors": [error],
+                "warnings": [],
+            }
+        )
+
+    # --- HTTP --------------------------------------------------------------
+
+    async def post_write_many(
+        self, batch_records: list[dict[str, Any]]
+    ) -> httpx.Response:
+        """POST /write_many with exponential backoff + jitter on 429."""
+        payload = {"records": batch_records, "write_mode": "upsert"}
+        response: httpx.Response | None = None
+        for attempt in range(self._RETRY_ATTEMPTS):
+            response = await _request_or_raise(
+                self._client,
+                "POST",
+                memory_absolute_path("write_many"),
+                json=payload,
+                allow_statuses={400, 422, 429},
+            )
+            if response.status_code != 429:
+                return response
+            self.sync_stats["write_retry_429"] += 1
+            # Exp backoff with jitter: 0.25s, 0.5s, 1s, 2s, 4s ± 25%
+            base = 0.25 * (2**attempt)
+            await asyncio.sleep(base * (1.0 + random.uniform(-0.25, 0.25)))
+        assert response is not None  # _RETRY_ATTEMPTS >= 1
+        return response
+
+    # --- remediation -------------------------------------------------------
+
+    async def apply_remediation(
+        self,
+        record: dict[str, Any],
+        input_index: int,
+        kind: str,
+        *,
+        allow_owner_fix: bool = True,
+    ) -> bool:
+        """Try a known recovery path. Returns True if handled (success or quarantined)."""
+        if kind == "secret_detected":
+            self.sync_stats["secret_quarantined"] += 1
+            self.record_skipped(input_index, "secret_quarantined")
+            return True
+
+        if kind == "embed_400":
+            content = str(record.get("content", ""))
+            for limit in self._EMBED_CONTENT_LIMITS:
+                reduced = dict(record)
+                reduced["content"] = _clean_content_for_embedding(content, limit)
+                self.sync_stats["embed_retry_reduced_content"] += 1
+                resp = await self.post_write_many([reduced])
+                if resp.status_code == 200:
+                    data = resp.json()
+                    self.accumulate_summary(data.get("summary", {}))
+                    self.append_result_items(data.get("results", []), [input_index])
+                    return True
+            # All attempts exhausted: quarantine.
+            self.record_skipped(input_index, "embed_quarantined")
+            return True
+
+        if kind == "owner_required_corporate" and allow_owner_fix:
+            fixed = dict(record)
+            fixed["owner"] = DEFAULT_CORPORATE_OWNER
+            self.sync_stats["owner_autofix_retries"] += 1
+            resp = await self.post_write_many([fixed])
+            if resp.status_code == 200:
+                data = resp.json()
+                self.accumulate_summary(data.get("summary", {}))
+                self.append_result_items(data.get("results", []), [input_index])
+                return True
+            # Owner fix didn't resolve; reclassify and try next-layer remediation
+            # without recursing back into another owner fix.
+            new_detail = _obsidian_extract_error_detail(resp).lower()
+            new_kind = _obsidian_classify_error(new_detail, resp.status_code)
+            if new_kind in ("embed_400", "secret_detected"):
+                return await self.apply_remediation(
+                    fixed, input_index, new_kind, allow_owner_fix=False
+                )
+            return False
+
+        return False
+
+    # --- chunk processing --------------------------------------------------
+
+    async def process_chunk(
+        self,
+        batch_records: list[dict[str, Any]],
+        batch_input_indices: list[int],
+    ) -> None:
+        response = await self.post_write_many(batch_records)
+
+        if response.status_code == 200:
+            await self._handle_200_response(
+                response, batch_records, batch_input_indices
+            )
+            return
+
+        # Batch validation failure: salvage record-by-record.
+        if response.status_code == 422 and len(batch_records) > 1:
+            self.sync_stats["write_fallback_422_batches"] += 1
+            for local_index, record in enumerate(batch_records):
+                original_idx = batch_input_indices[local_index]
+                single_response = await self.post_write_many([record])
+                if single_response.status_code == 200:
+                    data = single_response.json()
+                    self.accumulate_summary(data.get("summary", {}))
+                    self.append_result_items(data.get("results", []), [original_idx])
+                    continue
+                if await self._remediate_from_response(
+                    record, original_idx, single_response
+                ):
+                    continue
+                self.accumulate_summary({"errors": 1})
+                self.record_failed(
+                    original_idx, _obsidian_extract_status_error(single_response)
+                )
+            return
+
+        # Non-recoverable for the whole chunk; try remediation per record.
+        self.sync_stats["write_nonrecoverable_batches"] += 1
+        self.accumulate_summary({"errors": len(batch_records)})
+        err = _obsidian_extract_status_error(response)
+        for local_index, original_idx in enumerate(batch_input_indices):
+            if await self._remediate_from_response(
+                batch_records[local_index], original_idx, response
+            ):
+                continue
+            self.record_failed(original_idx, err)
+
+    async def _remediate_from_response(
+        self,
+        record: dict[str, Any],
+        input_index: int,
+        response: httpx.Response,
+    ) -> bool:
+        detail = _obsidian_extract_error_detail(response).lower()
+        kind = _obsidian_classify_error(detail, response.status_code)
+        if kind == "other":
+            return False
+        return await self.apply_remediation(record, input_index, kind)
+
+    async def _handle_200_response(
+        self,
+        response: httpx.Response,
+        batch_records: list[dict[str, Any]],
+        batch_input_indices: list[int],
+    ) -> None:
+        """Backend may return 200 with per-item `status: failed`. For single-record
+        chunks, try remediation on the failed item before accepting the failure."""
+        result = response.json()
+        items = result.get("results", [])
+        if (
+            len(batch_records) == 1
+            and len(items) == 1
+            and isinstance(items[0], dict)
+            and items[0].get("status") == "failed"
+        ):
+            error_text = str(items[0].get("error", "")).lower()
+            kind = _obsidian_classify_error(error_text)
+            if kind != "other":
+                if await self.apply_remediation(
+                    batch_records[0], batch_input_indices[0], kind
+                ):
+                    return
+            # Fall through to accept the per-item failure as-is.
+
+        self.accumulate_summary(result.get("summary", {}))
+        self.append_result_items(items, batch_input_indices)
+
+    def merge_sync_stats(self) -> None:
+        """Fold internal counters into the final summary."""
+        self.accumulate_summary(self.sync_stats)
+
 
 _CAPS = load_capabilities_manifest()
 _CAP_META = load_capabilities_metadata()
@@ -886,37 +1235,81 @@ async def brain_obsidian_sync(
             if paths
             else await adapter.list_files(vault, folder=folder, limit=limit)
         )
-        notes = await asyncio.gather(
-            *(adapter.read_note(vault, path) for path in resolved_paths)
+        read_concurrency = min(
+            MAX_OBSIDIAN_READ_CONCURRENCY, max(1, len(resolved_paths))
+        )
+        read_semaphore = asyncio.Semaphore(read_concurrency)
+
+        async def _read_note_guarded(note_path: str) -> Any:
+            async with read_semaphore:
+                return await adapter.read_note(vault, note_path)
+
+        note_results = await asyncio.gather(
+            *(_read_note_guarded(path) for path in resolved_paths),
+            return_exceptions=True,
         )
     except ObsidianCliError as e:
         raise ValueError(str(e))
 
-    payload = {
-        "records": [
-            note_to_write_payload(
-                note,
-                default_domain=domain,
-                default_entity_type=entity_type,
-                default_owner=owner,
-                default_tags=tags or [],
-            )
-            for note in notes
-        ],
-        "write_mode": "upsert",
-    }
     async with _client() as c:
-        r = await _request_or_raise(
-            c, "POST", memory_absolute_path("write_many"), json=payload
-        )
-        result = r.json()
-        return {
-            "vault": vault,
-            "resolved_paths": resolved_paths,
-            "scanned": len(resolved_paths),
-            "summary": result.get("summary", {}),
-            "results": result.get("results", []),
-        }
+        runner = _ObsidianSyncRunner(c)
+        runner.init_summary(len(resolved_paths))
+
+        records: list[dict[str, Any]] = []
+        record_input_indices: list[int] = []
+        for input_index, note_result in enumerate(note_results):
+            if isinstance(note_result, Exception):
+                runner.record_note_read_failure(input_index)
+                continue
+            records.append(
+                note_to_write_payload(
+                    note_result,
+                    default_domain=domain,
+                    default_entity_type=entity_type,
+                    default_owner=owner,
+                    default_tags=tags or [],
+                )
+            )
+            record_input_indices.append(input_index)
+
+        chunk_specs: list[tuple[list[dict[str, Any]], list[int]]] = []
+        for start in range(0, len(records), MAX_BULK_ITEMS):
+            chunk_specs.append(
+                (
+                    records[start : start + MAX_BULK_ITEMS],
+                    record_input_indices[start : start + MAX_BULK_ITEMS],
+                )
+            )
+
+        if MAX_OBSIDIAN_WRITE_CONCURRENCY <= 1 or len(chunk_specs) <= 1:
+            for batch_records, batch_input_indices in chunk_specs:
+                await runner.process_chunk(batch_records, batch_input_indices)
+        else:
+            write_semaphore = asyncio.Semaphore(MAX_OBSIDIAN_WRITE_CONCURRENCY)
+
+            async def _run_chunk_guarded(
+                batch_records: list[dict[str, Any]],
+                batch_input_indices: list[int],
+            ) -> None:
+                async with write_semaphore:
+                    await runner.process_chunk(batch_records, batch_input_indices)
+
+            await asyncio.gather(
+                *(
+                    _run_chunk_guarded(batch_records, batch_input_indices)
+                    for batch_records, batch_input_indices in chunk_specs
+                )
+            )
+
+        runner.merge_sync_stats()
+
+    return {
+        "vault": vault,
+        "resolved_paths": resolved_paths,
+        "scanned": len(resolved_paths),
+        "summary": runner.summary_totals,
+        "results": runner.aggregated_results,
+    }
 
 
 @mcp.tool()
