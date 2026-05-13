@@ -491,6 +491,48 @@ def test_v1_obsidian_update_note_with_tags():
             )
         assert r.status_code == 200
         mock_adapter.update_note.assert_called_once()
+        # tags=["tag1","tag2"] → frontmatter set
+        assert mock_adapter.update_note.call_args.kwargs["frontmatter"] == {
+            "tags": ["tag1", "tag2"]
+        }
+    finally:
+        _restore(app)
+
+
+def test_v1_obsidian_update_note_tags_none_preserves_frontmatter():
+    """tags=None (omitted) means: don't touch frontmatter at all."""
+    client, app = _client()
+    try:
+        note = _note()
+        mock_adapter = MagicMock()
+        mock_adapter.update_note = AsyncMock(return_value=note)
+
+        with patch(_ADAPTER_PATH, return_value=mock_adapter):
+            r = client.post(
+                "/api/v1/obsidian/update-note",
+                json={"vault": "my-vault", "path": "Notes/test.md", "content": "x"},
+            )
+        assert r.status_code == 200
+        assert mock_adapter.update_note.call_args.kwargs["frontmatter"] is None
+    finally:
+        _restore(app)
+
+
+def test_v1_obsidian_update_note_tags_empty_list_clears():
+    """tags=[] means: explicitly clear tags."""
+    client, app = _client()
+    try:
+        note = _note()
+        mock_adapter = MagicMock()
+        mock_adapter.update_note = AsyncMock(return_value=note)
+
+        with patch(_ADAPTER_PATH, return_value=mock_adapter):
+            r = client.post(
+                "/api/v1/obsidian/update-note",
+                json={"vault": "my-vault", "path": "Notes/test.md", "tags": []},
+            )
+        assert r.status_code == 200
+        assert mock_adapter.update_note.call_args.kwargs["frontmatter"] == {"tags": []}
     finally:
         _restore(app)
 

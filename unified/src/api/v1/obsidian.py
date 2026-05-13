@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -480,12 +480,12 @@ async def v1_obsidian_resolve_conflict(
 
 @router.post("/update-note")
 async def v1_obsidian_update_note(
-    body: ObsidianUpdateRequest | None = Body(None),
-    vault: str | None = Query(None),
-    path: str | None = Query(None),
-    content: str | None = Query(None),
-    append: bool | None = Query(None),
-    tags: list[str] | None = Query(None),
+    body: ObsidianUpdateRequest | None = None,
+    vault: Annotated[str | None, Query()] = None,
+    path: Annotated[str | None, Query()] = None,
+    content: Annotated[str | None, Query()] = None,
+    append: Annotated[bool | None, Query()] = None,
+    tags: Annotated[list[str] | None, Query()] = None,
     _user: dict[str, Any] = Depends(require_auth),
 ) -> ObsidianWriteResponse:
     """Update an existing note in Obsidian.

@@ -41,3 +41,6 @@ monitoring/host-full-canary.prom
 
 # Bind-mount dane kontenerów (postgres, redis)
 data/
+
+# Obsidian sync runtime state (created by tests / sync engine)
+.openbrain/

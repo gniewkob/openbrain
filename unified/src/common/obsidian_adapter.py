@@ -256,29 +256,40 @@ def _derive_title(path: str, frontmatter: dict[str, Any], body: str) -> str:
     return PurePosixPath(path).stem
 
 
-def _clip_text(value: Any, limit: int, *, field: str | None = None) -> str:
-    """Clip a string-coercible value to `limit` chars.
+def _clip_text(value: str | None, limit: int, *, field: str | None = None) -> str:
+    """Clip a string value to `limit` chars.
 
     Emits a warning when the input exceeds the limit so silent truncation is
     visible in logs. `field` is included in the log to identify the source.
+    Accepts only str or None — passing other types is a bug (caller should
+    coerce first).
     """
-    text = "" if value is None else str(value)
-    if len(text) > limit:
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        _logger.warning(
+            "obsidian.clip_text got non-str for %s: %r (type=%s) — coercing",
+            field or "<unknown>",
+            value,
+            type(value).__name__,
+        )
+        value = str(value)
+    if len(value) > limit:
         _logger.warning(
             "obsidian.clip_text truncated %s: original=%d, limit=%d",
             field or "<unknown>",
-            len(text),
+            len(value),
             limit,
         )
-        return text[:limit]
-    return text
+        return value[:limit]
+    return value
 
 
 def _dedupe_and_clip_tags(tags: list[Any]) -> list[str]:
     deduped_tags: list[str] = []
     seen: set[str] = set()
     for raw_tag in tags:
-        clipped = _clip_text(raw_tag, _MAX_TAG_LEN).strip()
+        clipped = _clip_text(raw_tag, _MAX_TAG_LEN, field="tag").strip()
         if not clipped or clipped in seen:
             continue
         seen.add(clipped)

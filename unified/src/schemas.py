@@ -20,6 +20,7 @@ MAX_ENTITY_TYPE_LEN = 64
 MAX_TITLE_LEN = 256
 MAX_CONTENT_LEN = 20_000
 MAX_OWNER_LEN = 128
+MAX_VAULT_LEN = 128
 MAX_TENANT_ID_LEN = 128
 MAX_TAG_LEN = 64
 MAX_TAGS = 32
@@ -266,14 +267,14 @@ class MemoryGetContextRequest(BaseModel):
 class ObsidianReadRequest(BaseModel):
     """Request to read a single note from an Obsidian vault."""
 
-    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
+    vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     path: PathStr
 
 
 class ObsidianNoteResponse(BaseModel):
     """Response containing the content and metadata of a read Obsidian note."""
 
-    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)]
+    vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)]
     path: PathStr
     title: TitleStr
     content: ContentStr
@@ -285,7 +286,7 @@ class ObsidianNoteResponse(BaseModel):
 class ObsidianSyncRequest(BaseModel):
     """Request to import Obsidian notes into OpenBrain as memories."""
 
-    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
+    vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     paths: list[PathStr] = Field(default_factory=list, max_length=MAX_SYNC_LIMIT)
     folder: Optional[PathStr] = None
     limit: int = Field(default=50, ge=1, le=MAX_SYNC_LIMIT)
@@ -298,7 +299,7 @@ class ObsidianSyncRequest(BaseModel):
 class ObsidianSyncResponse(BaseModel):
     """Response summarizing the result of an Obsidian-to-OpenBrain sync operation."""
 
-    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)]
+    vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)]
     resolved_paths: list[PathStr] = Field(
         default_factory=list, max_length=MAX_SYNC_LIMIT
     )
@@ -315,7 +316,7 @@ class ObsidianSyncResponse(BaseModel):
 class ObsidianWriteRequest(BaseModel):
     """Request to write a note to Obsidian vault."""
 
-    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
+    vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     path: PathStr
     content: ContentStr
     frontmatter: dict[str, Any] = Field(default_factory=dict)
@@ -325,7 +326,7 @@ class ObsidianWriteRequest(BaseModel):
 class ObsidianUpdateRequest(BaseModel):
     """Request to update an existing note in Obsidian vault."""
 
-    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
+    vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     path: PathStr
     content: Optional[ContentStr] = None
     append: bool = False
@@ -348,7 +349,7 @@ class ObsidianWriteResponse(BaseModel):
 class ObsidianExportRequest(BaseModel):
     """Request to export memories to Obsidian notes."""
 
-    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
+    vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     folder: PathStr = "OpenBrain Export"
     memory_ids: Optional[list[str]] = Field(default=None, max_length=MAX_EXPORT_IDS)
     query: Optional[QueryStr] = None
@@ -381,7 +382,7 @@ class ObsidianCollectionRequest(BaseModel):
 
     query: QueryStr
     collection_name: TitleStr
-    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Documents"
+    vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     folder: PathStr = "Collections"
     domain: Optional[Literal["corporate", "build", "personal"]] = None
     max_items: int = Field(default=50, ge=1, le=MAX_SYNC_LIMIT)
@@ -408,7 +409,7 @@ class ObsidianCollectionResponse(BaseModel):
 class ObsidianBidirectionalSyncRequest(BaseModel):
     """Request for bidirectional sync."""
 
-    vault: Annotated[str, Field(max_length=MAX_OWNER_LEN)] = "Memory"
+    vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Memory"
     strategy: Literal["last_write_wins", "domain_based", "manual_review"] = (
         "domain_based"
     )
