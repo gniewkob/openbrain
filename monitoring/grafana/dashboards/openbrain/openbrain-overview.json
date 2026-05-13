@@ -38,7 +38,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -82,7 +82,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -155,7 +155,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -199,7 +199,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -255,7 +255,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -311,7 +311,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -371,7 +371,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -434,7 +434,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -477,7 +477,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -528,7 +528,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -561,7 +561,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -599,7 +599,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -682,7 +682,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -739,7 +739,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -817,7 +817,7 @@
       "title": "Sync Outcomes (1h increase)",
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -874,7 +874,7 @@
       "title": "Sync Checks Rate (5m)",
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -902,7 +902,7 @@
       "title": "Sync Missing Ratio (1h)",
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "gridPos": {
         "h": 4,
@@ -964,7 +964,7 @@
       "title": "Sync Checks (Total)",
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "gridPos": {
         "h": 4,
@@ -1018,7 +1018,7 @@
       "title": "Sync Missing (Total)",
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "gridPos": {
         "h": 4,

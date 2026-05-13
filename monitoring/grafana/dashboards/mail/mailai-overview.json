@@ -12,7 +12,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -92,7 +92,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -149,7 +149,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -214,7 +214,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -279,7 +279,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -344,7 +344,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -412,7 +412,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -480,7 +480,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -537,7 +537,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -589,7 +589,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -644,7 +644,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -699,7 +699,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -755,7 +755,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -801,7 +801,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "openbrain-prometheus"
+        "uid": "shared-prometheus"
       },
       "fieldConfig": {
         "defaults": {
