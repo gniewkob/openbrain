@@ -273,3 +273,44 @@ docs-check:
 ---
 
 *Plan przygotowany. Oczekuje na decyzję o realizacji.*
+
+---
+
+## BACKLOG OTWARTY — 2026-05-13
+
+Pozycje wynikłe z review obsidian-sync + zmian infrastrukturalnych (commity `5ae17fa`..`7cbb1c7`). Posortowane wg pilności.
+
+### P1 — czas-presja
+- [ ] **Bump akcji GitHub na Node 24** w `.github/workflows/`. Aktualnie `actions/checkout@v4`, `actions/setup-python@v5`, `astral-sh/setup-uv@v4` biegają na Node.js 20 (deprecated). Force-flip na Node 24 od **2026-06-02**. Po tej dacie CI może zacząć się dziwnie zachowywać.
+  - Action items: `checkout@v4` → `@v5`, `setup-python@v5` → `@v6`, `setup-uv@v4` → `@v6`
+  - Walidacja: jeden PR, obejrzeć logi 3 workflowów
+
+- [ ] **Migracja named volumes → bind mounts dla istniejącej bazy** (commit `5ae17fa` dodał definicję `./data/postgres`, ale stary wolumen `openbrain_openbrain_postgres_data` wciąż trzyma dane). Procedura w [MIGRATION.md](../../MIGRATION.md) — ok. 5 min downtime'u. Bez tego po pierwszym `docker compose down/up` aplikacja wystartuje z pustą bazą i będzie trzeba ręcznie restore'ować z backupu.
+
+### P2 — architektura / techdebt
+- [ ] **Backend: zwracaj `error.code` w odpowiedziach `/write_many`** zamiast wymagać string-matchu po `error.message` w gateway. Aktualnie gateway klasyfikuje błędy heurystycznie:
+  ```python
+  _OBSIDIAN_OWNER_MARKER = "owner is required for corporate domain"
+  _OBSIDIAN_EMBED_MARKER = "/api/embed"
+  _OBSIDIAN_DLP_BLOCK_MARKERS = ("secret_detected", "plaintext secret detected")
+  ```
+  Refactor backend: strukturalny `{error: {code: "owner_required_corporate", message: "..."}}`. Gateway czyta tylko `code`. Zysk: jeden refactor po stronie backendu nie wywala remediation w gateway.
+
+- [ ] **Cleanup ~110 errors w `ruff check unified/`** — pre-existing, większość to F401 (unused imports) i drobne style. Jeden większy pass na całe `unified/`, później enforce w CI.
+  - Walidacja: `cd unified && ../.venv/bin/ruff check` → All checks passed
+
+### P3 — kosmetyka / testy
+- [ ] **Test dla concurrent chunks w `brain_obsidian_sync`** — nowa logika z `MAX_OBSIDIAN_WRITE_CONCURRENCY > 1` (semaphore + `asyncio.gather` na chunks) nie ma dedykowanego testu. Dziś tylko ścieżka sekwencyjna jest pokryta.
+
+- [ ] **Test dla exp backoff + jitter w `post_write_many`** — aktualnie sprawdzamy tylko że 429 retry działa, nie że delay rośnie wykładniczo ani że jitter jest aplikowany. Można mockować `asyncio.sleep` i `random.uniform`.
+
+- [ ] **Telemetria/counter na truncation w `_clip_text`** — dziś tylko `log.warning`. Warto dorzucić Prometheus/statsd counter, bo ciche truncation produkcyjne łatwo przeoczyć w logach.
+
+- [ ] **Sprzeczność w `~/claude-config/CLAUDE.md`** vs faktyczna intencja "OpenBrain always-on" — zaktualizowane lokalnie (2026-05-13), ale jeśli notatka pojawi się gdzieś w `docs/` repo, też trzeba uspójnić.
+
+### P4 — opcjonalne
+- [ ] Wskazówki w skryptach `unified/scripts/*.py` co do uruchamiania (README albo docstring z przykładami) — szczególnie `cleanup_frontmatter_content.py` (dry-run vs --apply) i `generate_openbrain_obsidian_dashboard.py` (wymagane env vary).
+
+- [ ] `pyproject.toml` w `unified/mcp-gateway/` nie pinuje `authlib`/`python-multipart` jako bezpośrednich deps (tylko transitive z FastAPI). Po następnym Dependabot bumpie te wersje znów mogą się odsynchronizować. Rozważenie: explicit pin, albo zaufanie do FastAPI constraint.
+
+---
