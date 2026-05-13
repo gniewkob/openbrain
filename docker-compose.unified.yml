@@ -111,9 +111,10 @@ services:
   ngrok:
     image: ngrok/ngrok:latest
     container_name: openbrain-unified-ngrok
-    # Opt-in only: `docker compose --profile public up ngrok`.
-    # Wystawia gateway publicznie bez auth — nigdy nie odpalaj przez zwykłe `up`.
-    profiles: ["public"]
+    # Always-on by design: OpenBrain MCP musi być dostępny lokalnie ORAZ z zewnątrz
+    # (Claude Desktop / ChatGPT przez SSE). Publiczne wejście to mcp-http (port 7011),
+    # które wymaga uwierzytelnienia przez INTERNAL_API_KEY albo OAuth z Redisa.
+    # Jeśli kiedyś trzeba ngroka czasowo wyłączyć: `docker compose stop ngrok`.
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     command:
