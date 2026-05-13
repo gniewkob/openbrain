@@ -1,6 +1,12 @@
 # Q2 Backlog Execution Plan — 2026-05-13
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **STATUS: ✅ ZAMKNIĘTY 2026-05-13.** Wszystkie 11 zadań zrealizowane jednego dnia
+> (commity `5ae17fa`..`fc7e1a3`). CI 3/3 zielone, 1567 testów przechodzi.
+> Plan zachowany dla audytu — link `monitoring/grafana/provisioning/...` poniżej
+> wskazuje na plik usunięty w S5.1 (intencjonalnie).
+>
+> Plan poniżej zostawiony jako "as authored" — checkboxy ` - [ ]` reprezentują
+> intencję z 2026-05-13, nie aktualny stan.
 
 **Goal:** Domknąć 12-pozycyjny backlog otwarty po review obsidian-sync ([roadmap.md "BACKLOG OTWARTY — 2026-05-13"](../../roadmap.md)).
 
