@@ -211,7 +211,7 @@ _DATA_URI_RE = re.compile(r"data:[^\s,]+;base64,[A-Za-z0-9+/=\s]+", re.IGNORECAS
 # stable `error.code` values long-term so we can drop the string matching.
 _OBSIDIAN_OWNER_MARKER = "owner is required for corporate domain"
 _OBSIDIAN_EMBED_MARKER = "/api/embed"
-_OBSIDIAN_SECRET_MARKERS = ("secret_detected", "plaintext secret detected")
+_OBSIDIAN_DLP_BLOCK_MARKERS = ("secret_detected", "plaintext secret detected")
 
 
 def _obsidian_extract_error_detail(response: httpx.Response) -> str:
@@ -244,7 +244,7 @@ def _obsidian_classify_error(
     detail_lowered: str, status_code: int | None = None
 ) -> str:
     """Classify a backend error into a known remediation kind."""
-    if any(marker in detail_lowered for marker in _OBSIDIAN_SECRET_MARKERS):
+    if any(marker in detail_lowered for marker in _OBSIDIAN_DLP_BLOCK_MARKERS):
         return "secret_detected"
     if _OBSIDIAN_OWNER_MARKER in detail_lowered:
         return "owner_required_corporate"
