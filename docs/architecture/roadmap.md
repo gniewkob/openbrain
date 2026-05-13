@@ -276,7 +276,15 @@ docs-check:
 
 ---
 
-## BACKLOG OTWARTY — 2026-05-13
+## BACKLOG OTWARTY — 2026-05-13 → ✅ ZAMKNIĘTY 2026-05-13
+
+Wszystkie 11 pozycji zrealizowane w pojedynczej sesji (commity `5ae17fa`..`529f4e2`).
+Plan wdrożenia: [docs/architecture/superpowers/plans/2026-05-13-q2-backlog-execution.md](superpowers/plans/2026-05-13-q2-backlog-execution.md).
+Wynik: CI 3/3 zielone, 1567 testów przechodzi.
+
+Poniżej zachowany dla audytu — wszystkie checkboxy mentalnie ✓.
+
+---
 
 Pozycje wynikłe z review obsidian-sync + zmian infrastrukturalnych (commity `5ae17fa`..`7cbb1c7`). Posortowane wg pilności.
 
