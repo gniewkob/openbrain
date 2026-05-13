@@ -59,6 +59,25 @@ _VAULT_PATHS_LOCK = asyncio.Lock()
 
 _logger = logging.getLogger(__name__)
 
+
+def _incr_truncation_counter() -> None:
+    """Best-effort Prometheus counter bump on truncation events.
+
+    Telemetry lives in the backend package; the gateway also imports this
+    module but has no telemetry. Swallow the import error in that case so
+    the adapter stays portable across both processes.
+    """
+    try:
+        from ..telemetry import incr_metric  # type: ignore[import-not-found]
+    except Exception:
+        return
+    try:
+        incr_metric("obsidian_clip_truncation_total")
+    except Exception:
+        # Counter backend errors must never break sync.
+        pass
+
+
 _LOG_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2} ")
 _INSTALLER_WARNING = "Your Obsidian installer is out of date."
 _VALID_DOMAINS = {"corporate", "build", "personal"}
@@ -281,6 +300,7 @@ def _clip_text(value: str | None, limit: int, *, field: str | None = None) -> st
             len(value),
             limit,
         )
+        _incr_truncation_counter()
         return value[:limit]
     return value
 

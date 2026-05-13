@@ -297,3 +297,38 @@ def test_note_to_memory_write_record_invalid_domain_falls_back():
 
     record = note_to_memory_write_record(note, "build", "Note")
     assert record.domain == "build"
+
+
+# ---------------------------------------------------------------------------
+# _clip_text — truncation logs warning AND increments telemetry counter
+# ---------------------------------------------------------------------------
+
+
+def test_clip_text_increments_counter_on_truncation():
+    """When value exceeds limit, _clip_text bumps obsidian_clip_truncation_total."""
+    from src.common import obsidian_adapter
+    from src.telemetry import registry
+
+    registry.reset()
+    before = registry.snapshot().get("obsidian_clip_truncation_total", 0)
+
+    result = obsidian_adapter._clip_text("x" * 100, 10, field="content")
+
+    after = registry.snapshot().get("obsidian_clip_truncation_total", 0)
+    assert result == "x" * 10
+    assert after == before + 1
+
+
+def test_clip_text_no_counter_when_within_limit():
+    """When value fits in limit, no counter bump."""
+    from src.common import obsidian_adapter
+    from src.telemetry import registry
+
+    registry.reset()
+    before = registry.snapshot().get("obsidian_clip_truncation_total", 0)
+
+    result = obsidian_adapter._clip_text("short", 100, field="content")
+
+    after = registry.snapshot().get("obsidian_clip_truncation_total", 0)
+    assert result == "short"
+    assert after == before

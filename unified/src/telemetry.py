@@ -51,6 +51,7 @@ KNOWN_COUNTERS: tuple[str, ...] = (
     "http_requests_total_502",
     "http_requests_total_503",
     "telemetry_counter_backend_fallback_total",
+    "obsidian_clip_truncation_total",
 )
 
 # Standard Prometheus buckets for request latency (in seconds)

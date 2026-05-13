@@ -331,9 +331,169 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.post.await_count, 1)
         self.assertEqual(result["summary"].get("failed"), 1)
         self.assertEqual(len(result["results"]), 2)
-        failed_items = [item for item in result["results"] if item["status"] == "failed"]
+        failed_items = [
+            item for item in result["results"] if item["status"] == "failed"
+        ]
         self.assertEqual(len(failed_items), 1)
         self.assertEqual(failed_items[0]["errors"], ["note_read_failed"])
+
+    async def test_brain_obsidian_sync_parallel_chunks(self) -> None:
+        """When MAX_OBSIDIAN_WRITE_CONCURRENCY > 1 and there are multiple chunks,
+        process_chunk runs them concurrently via asyncio.gather + semaphore.
+
+        Verified by deadlock-free coordination: chunk A awaits event_b before
+        replying; chunk B sets event_b. Sequential execution would deadlock
+        because chunk B would never start.
+        """
+        import asyncio
+
+        gateway = load_gateway_main()
+
+        event_b = asyncio.Event()
+
+        # Build 2 notes so we get 2 chunks (MAX_BULK_ITEMS will be patched to 1)
+        async def post_with_coordination(path: str, json: dict, **kwargs):
+            records = json["records"]
+            # Heuristic: distinguish A from B by note path in record
+            ref = records[0].get("source", {}).get("reference", "")
+            if "Inbox/A.md" in ref:
+                # Chunk A waits for B to start
+                await asyncio.wait_for(event_b.wait(), timeout=2.0)
+            else:
+                # Chunk B signals A and returns immediately
+                event_b.set()
+            resp = Mock()
+            resp.is_error = False
+            resp.status_code = 200
+            resp.json.return_value = {
+                "summary": {"created": 1},
+                "results": [{"input_index": 0, "status": "created"}],
+            }
+            return resp
+
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main.MAX_OBSIDIAN_WRITE_CONCURRENCY", 2),
+            patch("_gateway_src.main.MAX_BULK_ITEMS", 1),
+            patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls,
+            patch("_gateway_src.main._client") as mock_client,
+        ):
+            adapter = AsyncMock()
+            adapter.list_files.return_value = ["Inbox/A.md", "Inbox/B.md"]
+            adapter.read_note.side_effect = [
+                Mock(
+                    vault="Documents",
+                    path="Inbox/A.md",
+                    title="A",
+                    content="a",
+                    frontmatter={},
+                    tags=["openbrain"],
+                    file_hash="a",
+                ),
+                Mock(
+                    vault="Documents",
+                    path="Inbox/B.md",
+                    title="B",
+                    content="b",
+                    frontmatter={},
+                    tags=["openbrain"],
+                    file_hash="b",
+                ),
+            ]
+            adapter_cls.return_value = adapter
+
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            client.post.side_effect = post_with_coordination
+            mock_client.return_value = client
+
+            # Without parallel chunks this would deadlock on event_b.wait(2.0)
+            result = await asyncio.wait_for(
+                gateway.brain_obsidian_sync(vault="Documents", folder="Inbox", limit=2),
+                timeout=5.0,
+            )
+
+        self.assertEqual(client.post.await_count, 2)
+        self.assertEqual(result["summary"].get("created"), 2)
+
+    async def test_brain_obsidian_sync_429_exponential_backoff(self) -> None:
+        """post_write_many sleeps with exponential backoff (base*2^attempt) on
+        repeated 429 responses, and applies jitter via random.uniform."""
+        import asyncio
+
+        gateway = load_gateway_main()
+
+        rate_limited = Mock()
+        rate_limited.is_error = True
+        rate_limited.status_code = 429
+        rate_limited.json.return_value = {"detail": "rate_limited"}
+        ok = Mock()
+        ok.is_error = False
+        ok.status_code = 200
+        ok.json.return_value = {
+            "summary": {"created": 1},
+            "results": [{"input_index": 0, "status": "created"}],
+        }
+
+        sleep_calls: list[float] = []
+        jitter_calls: list[tuple[float, float]] = []
+
+        async def fake_sleep(delay):
+            sleep_calls.append(delay)
+
+        def fake_uniform(a, b):
+            jitter_calls.append((a, b))
+            return 0.0  # no jitter for deterministic asserts
+
+        with (
+            patch.dict("os.environ", {"ENABLE_LOCAL_OBSIDIAN_TOOLS": "1"}, clear=False),
+            patch("_gateway_src.main.asyncio.sleep", fake_sleep),
+            patch("_gateway_src.main.random.uniform", fake_uniform),
+            patch("_gateway_src.main.ObsidianCliAdapter") as adapter_cls,
+            patch("_gateway_src.main._client") as mock_client,
+        ):
+            adapter = AsyncMock()
+            adapter.list_files.return_value = ["Inbox/T.md"]
+            adapter.read_note.return_value = Mock(
+                vault="Documents",
+                path="Inbox/T.md",
+                title="T",
+                content="c",
+                frontmatter={},
+                tags=["openbrain"],
+                file_hash="h",
+            )
+            adapter_cls.return_value = adapter
+
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            client.__aexit__.return_value = False
+            # 4× 429, then 200 — 4 sleeps with exp backoff
+            client.post.side_effect = [
+                rate_limited,
+                rate_limited,
+                rate_limited,
+                rate_limited,
+                ok,
+            ]
+            mock_client.return_value = client
+
+            result = await gateway.brain_obsidian_sync(
+                vault="Documents", folder="Inbox", limit=1
+            )
+
+        # Should have slept 4 times: 0.25 * 2^0, 2^1, 2^2, 2^3 = 0.25, 0.5, 1.0, 2.0
+        self.assertEqual(len(sleep_calls), 4)
+        # With fake_uniform=0.0 the delay is base*(1.0+0) = base
+        expected = [0.25 * (2**i) for i in range(4)]
+        for actual, exp in zip(sleep_calls, expected):
+            self.assertAlmostEqual(actual, exp, places=4)
+        # Jitter range is ±25%
+        for a, b in jitter_calls:
+            self.assertAlmostEqual(a, -0.25, places=4)
+            self.assertAlmostEqual(b, 0.25, places=4)
+        self.assertEqual(result["summary"].get("created"), 1)
 
     async def test_brain_obsidian_write_note_calls_backend_endpoint(self) -> None:
         gateway = load_gateway_main()
