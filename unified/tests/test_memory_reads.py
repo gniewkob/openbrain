@@ -350,3 +350,43 @@ async def test_get_memory_returns_out_when_found():
 
     mock_to_out.assert_called_once_with(mock_mem)
     assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# get_hidden_test_data_counts — SQL predicate recognizes BOTH placements
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_hidden_test_data_predicate_covers_top_and_nested_placements():
+    """The compiled WHERE clause must reference both
+    `metadata.test_data` (top-level) AND `metadata.custom_fields.test_data`
+    (nested under the V1 API write payload's custom_fields).
+    """
+    from sqlalchemy.dialects import postgresql
+
+    from src.memory_reads import get_hidden_test_data_counts
+
+    captured: list[str] = []
+
+    async def _capture(stmt):
+        # Compile to a Postgres SQL string we can inspect
+        captured.append(
+            str(stmt.compile(dialect=postgresql.dialect(),
+                              compile_kwargs={"literal_binds": True}))
+        )
+        result = MagicMock()
+        result.scalar.return_value = 0
+        return result
+
+    session = _make_session()
+    session.execute = _capture
+
+    counts = await get_hidden_test_data_counts(session)
+
+    assert counts["hidden_test_data_total"] == 0
+    assert captured, "expected at least one SQL statement to be compiled"
+    # Every WHERE must include both predicates
+    for sql in captured:
+        assert "'test_data'" in sql, sql
+        assert "'custom_fields'" in sql, sql

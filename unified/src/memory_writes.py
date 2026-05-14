@@ -1064,9 +1064,16 @@ async def cleanup_build_test_data(
     Default mode is dry-run. Execution mode deletes only candidate records that pass
     existing hard-delete policy checks.
     """
-    is_test_data = (
+    # Recognize both top-level and nested-under-custom_fields placements
+    # (see get_hidden_test_data_counts for the canonical predicate).
+    test_data_top = (
         func.coalesce(Memory.metadata_["test_data"].astext, "false") == "true"
     )
+    test_data_nested = (
+        func.coalesce(Memory.metadata_["custom_fields"]["test_data"].astext, "false")
+        == "true"
+    )
+    is_test_data = test_data_top | test_data_nested
     candidates_stmt = (
         select(Memory.id)
         .where(

@@ -387,10 +387,22 @@ async def get_memory_domain_status_counts(
 
 
 async def get_hidden_test_data_counts(session: AsyncSession) -> dict[str, int]:
-    """Return counts for records flagged as test data in metadata."""
-    is_test_data = (
+    """Return counts for records flagged as test data in metadata.
+
+    Recognizes BOTH placements of the flag:
+      - top-level: `metadata.test_data = true` (legacy / internal writes)
+      - nested:    `metadata.custom_fields.test_data = true` (API write payload
+        — see `_build_metadata` which puts `rec.custom_fields` under
+        `metadata.custom_fields`)
+    """
+    test_data_top = (
         func.coalesce(Memory.metadata_["test_data"].astext, "false") == "true"
     )
+    test_data_nested = (
+        func.coalesce(Memory.metadata_["custom_fields"]["test_data"].astext, "false")
+        == "true"
+    )
+    is_test_data = test_data_top | test_data_nested
 
     total_result = await session.execute(
         select(func.count(Memory.id)).where(is_test_data)
