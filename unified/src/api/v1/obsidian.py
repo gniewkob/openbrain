@@ -432,16 +432,19 @@ async def v1_obsidian_conflicts(
         select(Memory)
         .where(Memory.metadata_["obsidian_conflict_pending"] != None)  # noqa: E711
         .where(Memory.status == "active")
-        .order_by(Memory.updated_at.desc())
     )
+    if vault:
+        stmt = stmt.where(
+            Memory.metadata_["obsidian_conflict_pending"]["vault"].as_string() == vault
+        )
+    stmt = stmt.order_by(Memory.updated_at.desc())
+
     result = await session.execute(stmt)
     memories = result.scalars().all()
 
     conflicts = []
     for mem in memories:
         cf = mem.metadata_.get("obsidian_conflict_pending", {})
-        if vault and cf.get("vault") != vault:
-            continue
         conflicts.append(
             ObsidianConflict(
                 memory_id=mem.id,
