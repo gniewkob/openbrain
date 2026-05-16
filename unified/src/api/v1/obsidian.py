@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...auth import require_auth
 from ...common.obsidian_adapter import ObsidianCliAdapter, ObsidianCliError
 from ...db import get_session
-from ...memory_reads import get_memory, search_memories
+from ...memory_reads import get_memories_by_ids, get_memory, search_memories
 from ...memory_writes import handle_memory_write_many
 from ...obsidian_cli import note_to_memory_write_record
 from ...obsidian_sync import (
@@ -206,10 +206,10 @@ async def v1_obsidian_export(
 
     memories: list[MemoryOut] = []
     if req.memory_ids:
-        for mid in req.memory_ids:
-            mem = await get_memory(session, mid)
-            if mem:
-                memories.append(mem)
+        unsorted_memories = await get_memories_by_ids(session, req.memory_ids)
+        # Preserve the requested order and filter out None
+        memory_map = {m.id: m for m in unsorted_memories}
+        memories = [memory_map[mid] for mid in req.memory_ids if mid in memory_map]
     elif req.query:
         search_results = await search_memories(
             session,

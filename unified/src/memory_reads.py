@@ -47,6 +47,17 @@ async def get_memory(session: AsyncSession, memory_id: str) -> MemoryOut | None:
     return _to_out(memory) if memory else None
 
 
+async def get_memories_by_ids(
+    session: AsyncSession, memory_ids: list[str]
+) -> list[MemoryOut]:
+    """Get multiple memories by IDs in a single query."""
+    if not memory_ids:
+        return []
+    stmt = select(Memory).where(Memory.id.in_(memory_ids))
+    result = await session.execute(stmt)
+    return [_to_out(memory) for memory in result.scalars().all()]
+
+
 async def get_memory_as_record(
     session: AsyncSession, memory_id: str
 ) -> tuple[MemoryRecord | None, MemoryOut | None]:
