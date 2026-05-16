@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import pytest_asyncio
 
 from src.obsidian_sync import (
     BidirectionalSyncEngine,
@@ -234,7 +235,7 @@ class TestDetectChangesEmptyState:
 class TestDetectChangesWithTrackedState:
     """Tests for detect_changes with existing tracked state."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def engine(self, tmp_path):
         """Create engine with temp storage and tracked state."""
         tracker = ObsidianChangeTracker(storage_path=str(tmp_path / "sync.json"))
