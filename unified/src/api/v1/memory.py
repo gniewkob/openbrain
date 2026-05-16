@@ -22,6 +22,7 @@ from ...memory_reads import (
     get_memory_as_record,
     export_memories,
     get_memory,
+    get_memories_batch,
     list_maintenance_reports,
     get_maintenance_report,
     sync_check,
@@ -257,13 +258,18 @@ async def v1_export(
 ) -> Any:
     """Export memories in JSON/JSONL format."""
     require_admin(_user)
+    # Batch retrieve memories for validation to avoid N+1 queries.
+    memories = await get_memories_batch(session, req.ids)
+    memory_map = {m.id: m for m in memories}
+
     for memory_id in req.ids:
-        mem = await get_memory(session, memory_id)
-        if mem is None:
+        mem_out = memory_map.get(memory_id)
+        if mem_out is None:
             raise HTTPException(status_code=404, detail="Memory not found")
+
         try:
-            enforce_domain_access(_user, mem.domain, "read")
-            enforce_memory_access(_user, mem)
+            enforce_domain_access(_user, mem_out.domain, "read")
+            enforce_memory_access(_user, mem_out)
         except HTTPException as exc:
             raise hide_memory_access_denied(exc) from exc
 

@@ -67,6 +67,24 @@ async def get_memory(session: AsyncSession, memory_id: str) -> MemoryOut | None:
     return _to_out(memory) if memory else None
 
 
+async def get_memories_batch(
+    session: AsyncSession, ids: list[str]
+) -> list[MemoryOut]:
+    """
+    Get multiple memories by IDs in a single query and convert to output schema.
+
+    Args:
+        session: Database session
+        ids: List of memory IDs
+
+    Returns:
+        List of Memory output records
+    """
+    stmt = select(Memory).where(Memory.id.in_(ids))
+    result = await session.execute(stmt)
+    return [_to_out(m) for m in result.scalars().all()]
+
+
 async def get_memory_as_record(
     session: AsyncSession, memory_id: str
 ) -> tuple[MemoryRecord | None, MemoryOut | None]:
