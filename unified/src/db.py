@@ -18,7 +18,7 @@ _D_P = "postgres"
 # patched env vars (get_config() is lru_cached and survives module reloads).
 DB_URL: str = os.environ.get(
     "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified",
+    "postgresql+asyncpg://postgres@db:5432/openbrain_unified",
 )
 
 
@@ -28,7 +28,12 @@ def _uses_dev_database_credentials(db_url: str) -> bool:
         parsed = urlsplit(sanitized)
     except Exception:
         return False
-    return parsed.username == _D_U and parsed.password == _D_P
+    # Also reject if password is empty/missing while using dev username.
+    # Default postgres installations may allow local peer/ident auth, but
+    # in a containerized/public context, we should enforce a real password.
+    is_dev_user = parsed.username == _D_U
+    is_dev_password = parsed.password == _D_P or not parsed.password
+    return is_dev_user and is_dev_password
 
 
 def validate_database_configuration() -> None:
