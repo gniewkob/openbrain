@@ -23,8 +23,7 @@ target_metadata = Base.metadata
 
 # Local development defaults are intentionally plain strings.
 _D_U = "postgres"
-_D_P = "postgres"
-DEFAULT_DB_URL = f"postgresql+asyncpg://{_D_U}:{_D_P}@localhost:5432/openbrain_unified"
+DEFAULT_DB_URL = f"postgresql+asyncpg://{_D_U}@localhost:5432/openbrain_unified"
 DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DB_URL)
 
 

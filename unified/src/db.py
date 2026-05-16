@@ -11,24 +11,27 @@ from sqlalchemy.orm import declarative_base
 
 # Unified Database URL
 # Local development defaults are intentionally plain strings.
-_D_U = "postgres"
-_D_P = "postgres"
 
 # Read directly from env at module load time so that test reloads pick up
 # patched env vars (get_config() is lru_cached and survives module reloads).
 DB_URL: str = os.environ.get(
     "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified",
+    "postgresql+asyncpg://postgres@db:5432/openbrain_unified",
 )
 
 
 def _uses_dev_database_credentials(db_url: str) -> bool:
+    """
+    Check if the database URL uses default development credentials.
+    Insecure 'postgres:postgres' is always flagged, even if not used as default.
+    """
     try:
         sanitized = db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
         parsed = urlsplit(sanitized)
     except Exception:
         return False
-    return parsed.username == _D_U and parsed.password == _D_P
+    # Flag if explicitly using the insecure 'postgres:postgres' combination
+    return parsed.username == "postgres" and parsed.password == "postgres"
 
 
 def validate_database_configuration() -> None:
