@@ -224,7 +224,7 @@ class ObsidianChangeTracker:
                 log.warning("Could not load sync state: %s", e)
                 self._state = {}
 
-    def _save_state(self) -> None:
+    async def _save_state(self) -> None:
         """Save sync state to disk."""
         import os
 
@@ -232,8 +232,21 @@ class ObsidianChangeTracker:
         os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
 
         data = {key: state.to_dict() for key, state in self._state.items()}
-        with open(self.storage_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, default=str)
+        content = json.dumps(data, indent=2, default=str)
+
+        try:
+            import aiofiles
+
+            async with aiofiles.open(self.storage_path, "w", encoding="utf-8") as f:
+                await f.write(content)
+        except ImportError:
+            # Fallback to sync write in thread pool
+            from pathlib import Path
+
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: Path(self.storage_path).write_text(content, encoding="utf-8"),
+            )
 
     def _make_key(self, vault: str, path: str) -> str:
         """Create unique key for a vault+path combination."""
@@ -244,19 +257,19 @@ class ObsidianChangeTracker:
         key = self._make_key(vault, path)
         return self._state.get(key)
 
-    def update_state(self, state: SyncState) -> None:
+    async def update_state(self, state: SyncState) -> None:
         """Update sync state for an item."""
         key = self._make_key(state.vault, state.obsidian_path)
         state.last_sync_at = datetime.now(timezone.utc)
         self._state[key] = state
-        self._save_state()
+        await self._save_state()
 
-    def remove_state(self, vault: str, path: str) -> None:
+    async def remove_state(self, vault: str, path: str) -> None:
         """Remove state for deleted items."""
         key = self._make_key(vault, path)
         if key in self._state:
             del self._state[key]
-            self._save_state()
+            await self._save_state()
 
     def get_all_states(self) -> list[SyncState]:
         """Get all tracked states."""
@@ -526,7 +539,7 @@ class BidirectionalSyncEngine:
             )
 
             # Determine change type and create change record
-            change = self._determine_change(
+            change = await self._determine_change(
                 state, memory, obsidian_exists, memory_changed, obsidian_changed
             )
 
@@ -550,7 +563,7 @@ class BidirectionalSyncEngine:
 
         return changes
 
-    def _determine_change(
+    async def _determine_change(
         self,
         state: SyncState,
         memory: "MemoryOut | None",
@@ -574,7 +587,7 @@ class BidirectionalSyncEngine:
         # Both deleted
         if not memory and not obsidian_exists:
             change = _create_sync_change(state, ChangeType.DELETED, "both")
-            self.tracker.remove_state(state.vault, state.obsidian_path)
+            await self.tracker.remove_state(state.vault, state.obsidian_path)
             return change
 
         # Conflict: both changed
@@ -663,7 +676,7 @@ class BidirectionalSyncEngine:
                 actor="obsidian-sync",
             )
             if result.record:
-                self.tracker.update_state(
+                await self.tracker.update_state(
                     SyncState(
                         memory_id=result.record.id,
                         obsidian_path=note.path,
@@ -729,7 +742,7 @@ class BidirectionalSyncEngine:
                     change.vault,
                     change.obsidian_path,
                 )
-                self.tracker.update_state(
+                await self.tracker.update_state(
                     SyncState(
                         memory_id=updated.id,
                         obsidian_path=note.path,
@@ -785,7 +798,7 @@ class BidirectionalSyncEngine:
                 frontmatter=frontmatter,
                 overwrite=False,
             )
-            self.tracker.update_state(
+            await self.tracker.update_state(
                 SyncState(
                     memory_id=change.memory_id,
                     obsidian_path=note.path,
@@ -845,7 +858,7 @@ class BidirectionalSyncEngine:
                 frontmatter=frontmatter,
                 overwrite=True,
             )
-            self.tracker.update_state(
+            await self.tracker.update_state(
                 SyncState(
                     memory_id=change.memory_id,
                     obsidian_path=note.path,
@@ -922,7 +935,7 @@ class BidirectionalSyncEngine:
                     str(e),
                 )
 
-        self.tracker.remove_state(change.vault, change.obsidian_path)
+        await self.tracker.remove_state(change.vault, change.obsidian_path)
 
     async def apply_sync(
         self,
