@@ -239,10 +239,12 @@ async def v1_obsidian_export(
 
     log = structlog.get_logger()
     adapter = ObsidianCliAdapter()
-    exported: list[Any] = []
+    exported: list[ObsidianExportItem] = []
     errors: list[dict[str, str]] = []
 
-    for memory in memories:
+    async def export_one(
+        memory: MemoryOut,
+    ) -> tuple[ObsidianExportItem | None, dict[str, str] | None]:
         try:
             # Generate note path
             safe_title = sanitize_filename(memory.title or memory.id)
@@ -262,17 +264,27 @@ async def v1_obsidian_export(
                 frontmatter=frontmatter,
                 overwrite=True,
             )
-            exported.append(
+            return (
                 ObsidianExportItem(
                     memory_id=memory.id,
                     path=note.path,
                     title=note.title,
                     created=not exists,
-                )
+                ),
+                None,
             )
         except Exception as e:
             log.warning("export_memory_failed", memory_id=memory.id, error=str(e))
-            errors.append({"memory_id": memory.id, "error": str(e)})
+            return None, {"memory_id": memory.id, "error": str(e)}
+
+    # Process all exports concurrently
+    results = await asyncio.gather(*(export_one(m) for m in memories))
+
+    for exp, err in results:
+        if exp:
+            exported.append(exp)
+        if err:
+            errors.append(err)
 
     return ObsidianExportResponse(
         vault=req.vault,
