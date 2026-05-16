@@ -1,11 +1,22 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from unittest.mock import patch
 import unittest
 
-from capabilities_manifest import _validate_manifest, load_capabilities_manifest
+# Add src to sys.path to allow both 'from capabilities_manifest' and 'from src.capabilities_manifest'
+# depending on how the test runner is configured.
+repo_root = Path(__file__).resolve().parents[2]
+src_path = str(repo_root / "unified" / "src")
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+try:
+    from capabilities_manifest import _validate_manifest, load_capabilities_manifest
+except ImportError:
+    from src.capabilities_manifest import _validate_manifest, load_capabilities_manifest
 
 
 class TestCapabilitiesManifest(unittest.TestCase):
