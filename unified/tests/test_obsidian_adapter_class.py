@@ -418,18 +418,12 @@ class TestWriteNote:
             # CLI fallback (CLI returns empty content, treated as a valid note).
             # Fix: also mock _run to raise ObsidianCliError for the first read.
             ObsidianCliError = _adapter_mod.ObsidianCliError
-            call_count = 0
 
-            original_read = type(adapter).read_note
-
-            async def read_note_side_effect(self, vault, path):
-                nonlocal call_count
-                call_count += 1
-                if call_count == 1:
-                    raise ObsidianCliError("File not found")
-                return await original_read(self, vault, path)
-
-            with patch.object(type(adapter), "read_note", new=read_note_side_effect):
+            # Mock _run to raise ObsidianCliError for the first read to simulate
+            # Obsidian not finding a file initially (CLI fallback).
+            with patch.object(
+                adapter, "_run", side_effect=[ObsidianCliError("File not found")]
+            ):
                 result = await adapter.write_note(
                     "myvault", "new.md", "# New content", overwrite=False
                 )
