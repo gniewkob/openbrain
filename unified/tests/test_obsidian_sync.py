@@ -28,7 +28,8 @@ class TestObsidianChangeTracker:
         assert tracker.get_all_states() == []
         assert tracker.get_stats()["total_tracked"] == 0
 
-    def test_update_and_get_state(self, tmp_path):
+    @pytest.mark.asyncio
+    async def test_update_and_get_state(self, tmp_path):
         """Test updating and retrieving state."""
         storage_path = tmp_path / "sync_state.json"
         tracker = ObsidianChangeTracker(storage_path=str(storage_path))
@@ -42,14 +43,15 @@ class TestObsidianChangeTracker:
             obsidian_modified_at=datetime.now(timezone.utc),
         )
 
-        tracker.update_state(state)
+        await tracker.update_state(state)
 
         retrieved = tracker.get_state("Documents", "test.md")
         assert retrieved is not None
         assert retrieved.memory_id == "mem-1"
         assert retrieved.obsidian_path == "test.md"
 
-    def test_remove_state(self, tmp_path):
+    @pytest.mark.asyncio
+    async def test_remove_state(self, tmp_path):
         """Test removing state."""
         storage_path = tmp_path / "sync_state.json"
         tracker = ObsidianChangeTracker(storage_path=str(storage_path))
@@ -63,13 +65,14 @@ class TestObsidianChangeTracker:
             obsidian_modified_at=datetime.now(timezone.utc),
         )
 
-        tracker.update_state(state)
+        await tracker.update_state(state)
         assert tracker.get_state("Documents", "test.md") is not None
 
-        tracker.remove_state("Documents", "test.md")
+        await tracker.remove_state("Documents", "test.md")
         assert tracker.get_state("Documents", "test.md") is None
 
-    def test_persistence(self, tmp_path):
+    @pytest.mark.asyncio
+    async def test_persistence(self, tmp_path):
         """Test that state is persisted to disk."""
         storage_path = tmp_path / "sync_state.json"
 
@@ -83,7 +86,7 @@ class TestObsidianChangeTracker:
             memory_updated_at=datetime.now(timezone.utc),
             obsidian_modified_at=datetime.now(timezone.utc),
         )
-        tracker1.update_state(state)
+        await tracker1.update_state(state)
 
         # Create new tracker instance with same storage
         tracker2 = ObsidianChangeTracker(storage_path=str(storage_path))
@@ -232,7 +235,7 @@ class TestDetectChangesWithTrackedState:
     """Tests for detect_changes with existing tracked state."""
 
     @pytest.fixture
-    def engine(self, tmp_path):
+    async def engine(self, tmp_path):
         """Create engine with temp storage and tracked state."""
         tracker = ObsidianChangeTracker(storage_path=str(tmp_path / "sync.json"))
 
@@ -247,7 +250,7 @@ class TestDetectChangesWithTrackedState:
             memory_updated_at=datetime.now(timezone.utc),
             obsidian_modified_at=datetime.now(timezone.utc),
         )
-        tracker.update_state(state)
+        await tracker.update_state(state)
 
         return BidirectionalSyncEngine(tracker=tracker)
 
