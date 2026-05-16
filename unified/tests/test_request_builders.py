@@ -59,7 +59,12 @@ def test_build_find_search_payload() -> None:
         limit=7,
         filters={"domain": "build"},
     )
-    assert payload == {"query": "auth", "filters": {"domain": "build"}, "limit": 7, "offset": 0}
+    assert payload == {
+        "query": "auth",
+        "filters": {"domain": "build"},
+        "limit": 7,
+        "offset": 0,
+    }
 
 
 def test_build_sync_check_payload() -> None:
