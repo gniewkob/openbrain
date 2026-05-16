@@ -93,7 +93,7 @@ async def test_apply_sync_created_openbrain_updates_tracker():
             "src.services.converter.memory_to_note_content", return_value="# content"
         ):
             with patch("src.services.converter.memory_to_frontmatter", return_value={}):
-                with patch.object(engine.tracker, "update_state") as mock_update_state:
+                with patch.object(engine.tracker, "update_state", AsyncMock()) as mock_update_state:
                     await engine.apply_sync(mock_session, mock_adapter, change)
 
     mock_update_state.assert_called_once()
@@ -167,7 +167,7 @@ async def test_apply_sync_updated_openbrain_wins_updates_tracker():
                 with patch(
                     "src.services.converter.memory_to_frontmatter", return_value={}
                 ):
-                    with patch.object(engine.tracker, "update_state") as mock_state:
+                    with patch.object(engine.tracker, "update_state", AsyncMock()) as mock_state:
                         await engine.apply_sync(mock_session, mock_adapter, change)
 
     mock_state.assert_called_once()

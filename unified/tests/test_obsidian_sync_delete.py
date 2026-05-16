@@ -66,7 +66,7 @@ async def test_apply_sync_deleted_removes_tracker_state():
     mock_adapter.delete_note = AsyncMock()
     change = _make_delete_change(source="openbrain")
 
-    with patch.object(engine.tracker, "remove_state") as mock_remove:
+    with patch.object(engine.tracker, "remove_state", AsyncMock()) as mock_remove:
         await engine.apply_sync(mock_session, mock_adapter, change)
 
     mock_remove.assert_called_once_with("TestVault", "Memory/deleted-note.md")
@@ -102,7 +102,7 @@ async def test_apply_sync_deleted_obsidian_note_fail_is_non_fatal():
     mock_adapter.delete_note = AsyncMock(side_effect=Exception("vault not found"))
     change = _make_delete_change(source="openbrain")
 
-    with patch.object(engine.tracker, "remove_state"):
+    with patch.object(engine.tracker, "remove_state", AsyncMock()):
         result = await engine.apply_sync(mock_session, mock_adapter, change)
 
     assert result is True
