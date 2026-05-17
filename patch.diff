@@ -1,0 +1,13 @@
+--- unified/mcp-gateway/src/main.py
++++ unified/mcp-gateway/src/main.py
+@@ -409,6 +409,10 @@
+             # without recursing back into another owner fix.
+             new_detail = _obsidian_extract_error_detail(resp).lower()
+             new_kind = _obsidian_classify_error(new_detail, resp.status_code)
++            _gateway_logger.info(
++                "Owner autofix did not resolve issue for index %d. Extracted new kind: %s",
++                input_index, new_kind
++            )
+             if new_kind in ("embed_400", "secret_detected"):
+                 return await self.apply_remediation(
+                     fixed, input_index, new_kind, allow_owner_fix=False
