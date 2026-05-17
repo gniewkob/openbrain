@@ -9,11 +9,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+import structlog
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Memory
 from ..schemas import MemoryCreate, MemoryUpdate
+
+
+logger = structlog.get_logger(__name__)
 
 
 class MemoryRepository(ABC):
@@ -392,4 +396,7 @@ class InMemoryMemoryRepository(MemoryRepository):
                     num = int(memory.id.split("_")[1])
                     self._id_counter = max(self._id_counter, num)
                 except (IndexError, ValueError):
-                    pass
+                    logger.warning(
+                        "Invalid memory ID format for seeding counter",
+                        memory_id=memory.id,
+                    )
