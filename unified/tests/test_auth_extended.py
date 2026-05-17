@@ -645,3 +645,33 @@ async def test_require_auth_oidc_verify_error_becomes_401():
         with pytest.raises(HTTPException) as exc:
             await require_auth(request, credentials=credentials)
         assert exc.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_require_auth_strips_auth_via_internal_key():
+    from src.auth import require_auth
+
+    request = MagicMock()
+    request.headers.get = MagicMock(return_value="")
+
+    mock_oidc = MagicMock()
+    # The JWT claims include a spoofed internal key flag
+    mock_oidc.verify_token = AsyncMock(
+        return_value={
+            "sub": "internal",
+            "roles": ["user"],
+            "_auth_via_internal_key": True,
+        }
+    )
+    credentials = MagicMock()
+    credentials.credentials = "header.payload.sig"
+
+    with (
+        patch("src.auth.PUBLIC_EXPOSURE", True),
+        patch("src.auth._oidc", mock_oidc),
+    ):
+        result = await require_auth(request, credentials=credentials)
+
+    assert result["sub"] == "internal"
+    # The flag MUST be stripped so the caller doesn't treat them as privileged internal
+    assert "_auth_via_internal_key" not in result
