@@ -265,7 +265,7 @@ def _export_payload(ids, fmt="json"):
 def test_v1_export_404_when_memory_missing():
     client, app = _client()
     try:
-        with patch("src.api.v1.memory.get_memory", AsyncMock(return_value=None)):
+        with patch("src.api.v1.memory.get_memories_batch", AsyncMock(return_value=[])):
             r = client.post(
                 "/api/v1/memory/export", json=_export_payload(["missing-id"])
             )
@@ -278,10 +278,14 @@ def test_v1_export_json_format():
     client, app = _client()
     try:
         mock_mem = MagicMock()
+        mock_mem.id = "m1"
         mock_mem.domain = "build"
 
         with (
-            patch("src.api.v1.memory.get_memory", AsyncMock(return_value=mock_mem)),
+            patch(
+                "src.api.v1.memory.get_memories_batch",
+                AsyncMock(return_value=[mock_mem]),
+            ),
             patch("src.api.v1.memory.enforce_domain_access"),
             patch("src.api.v1.memory.enforce_memory_access"),
             patch(
@@ -302,10 +306,14 @@ def test_v1_export_jsonl_format():
     client, app = _client()
     try:
         mock_mem = MagicMock()
+        mock_mem.id = "m1"
         mock_mem.domain = "build"
 
         with (
-            patch("src.api.v1.memory.get_memory", AsyncMock(return_value=mock_mem)),
+            patch(
+                "src.api.v1.memory.get_memories_batch",
+                AsyncMock(return_value=[mock_mem]),
+            ),
             patch("src.api.v1.memory.enforce_domain_access"),
             patch("src.api.v1.memory.enforce_memory_access"),
             patch(
@@ -328,10 +336,14 @@ def test_v1_export_access_denied_becomes_404():
     client, app = _client()
     try:
         mock_mem = MagicMock()
+        mock_mem.id = "m1"
         mock_mem.domain = "build"
 
         with (
-            patch("src.api.v1.memory.get_memory", AsyncMock(return_value=mock_mem)),
+            patch(
+                "src.api.v1.memory.get_memories_batch",
+                AsyncMock(return_value=[mock_mem]),
+            ),
             patch(
                 "src.api.v1.memory.enforce_domain_access",
                 side_effect=FHTTPException(status_code=403, detail="denied"),

@@ -411,24 +411,12 @@ class TestWriteNote:
         vault_dir.mkdir()
 
         adapter = _make_adapter()
-        # First read_note raises (file missing, CLI not found), second succeeds (file now exists)
+        # First read_note fails existence check because CLI fallback raises (simulated),
+        # then it writes to disk, and the second read_note succeeds via filesystem.
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
-            # _run is patched by conftest → returns "" → read_note won't find file in
-            # CLI fallback (CLI returns empty content, treated as a valid note).
-            # Fix: also mock _run to raise ObsidianCliError for the first read.
             ObsidianCliError = _adapter_mod.ObsidianCliError
-            call_count = 0
-
-            original_read = type(adapter).read_note
-
-            async def read_note_side_effect(self, vault, path):
-                nonlocal call_count
-                call_count += 1
-                if call_count == 1:
-                    raise ObsidianCliError("File not found")
-                return await original_read(self, vault, path)
-
-            with patch.object(type(adapter), "read_note", new=read_note_side_effect):
+            # Mock _run to raise error so that CLI fallback in read_note fails
+            with patch.object(adapter, "_run", side_effect=ObsidianCliError("File not found")):
                 result = await adapter.write_note(
                     "myvault", "new.md", "# New content", overwrite=False
                 )

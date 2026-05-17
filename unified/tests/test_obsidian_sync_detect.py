@@ -97,3 +97,100 @@ async def test_detect_changes_read_note_exception_treated_as_unchanged():
         c for c in changes if c.source == "obsidian" and c.memory_id == "mem-1"
     ]
     assert obsidian_updated == []
+
+def test_detect_new_obsidian_files_empty():
+    """If there are no files in Obsidian, no changes should be detected."""
+    from src.obsidian_sync import _detect_new_obsidian_files
+
+    changes = _detect_new_obsidian_files(
+        obsidian_files=set(),
+        tracked_paths=set(),
+        memory_map={},
+        vault="TestVault",
+    )
+    assert changes == []
+
+
+def test_detect_new_obsidian_files_all_new():
+    """All files not tracked and not in memory map should be reported as CREATED."""
+    from src.obsidian_sync import ChangeType, _detect_new_obsidian_files
+
+    obsidian_files = {"new_note_1.md", "new_note_2.md"}
+
+    changes = _detect_new_obsidian_files(
+        obsidian_files=obsidian_files,
+        tracked_paths=set(),
+        memory_map={},
+        vault="TestVault",
+    )
+
+    assert len(changes) == 2
+    for change in changes:
+        assert change.change_type == ChangeType.CREATED
+        assert change.source == "obsidian"
+        assert change.vault == "TestVault"
+        assert change.obsidian_path in obsidian_files
+
+
+def test_detect_new_obsidian_files_already_tracked():
+    """Files that are already tracked should not be reported."""
+    from src.obsidian_sync import ChangeType, _detect_new_obsidian_files
+
+    obsidian_files = {"tracked_note.md", "new_note.md"}
+    tracked_paths = {"tracked_note.md"}
+
+    changes = _detect_new_obsidian_files(
+        obsidian_files=obsidian_files,
+        tracked_paths=tracked_paths,
+        memory_map={},
+        vault="TestVault",
+    )
+
+    assert len(changes) == 1
+    assert changes[0].obsidian_path == "new_note.md"
+    assert changes[0].change_type == ChangeType.CREATED
+
+
+def test_detect_new_obsidian_files_in_memory_map():
+    """Files already mapped in memory map should not be reported."""
+    from src.obsidian_sync import ChangeType, _detect_new_obsidian_files
+
+    obsidian_files = {"mapped_note.md", "new_note.md"}
+    # Just need key to exist in dict
+    memory_map = {"mapped_note.md": MagicMock()}
+
+    changes = _detect_new_obsidian_files(
+        obsidian_files=obsidian_files,
+        tracked_paths=set(),
+        memory_map=memory_map,
+        vault="TestVault",
+    )
+
+    assert len(changes) == 1
+    assert changes[0].obsidian_path == "new_note.md"
+    assert changes[0].change_type == ChangeType.CREATED
+
+
+def test_detect_new_obsidian_files_mixed():
+    """Mixed scenario with new, tracked, and mapped files."""
+    from src.obsidian_sync import ChangeType, _detect_new_obsidian_files
+
+    obsidian_files = {
+        "new_note.md",
+        "tracked_note.md",
+        "mapped_note.md",
+        "both_note.md"
+    }
+    tracked_paths = {"tracked_note.md", "both_note.md"}
+    memory_map = {"mapped_note.md": MagicMock(), "both_note.md": MagicMock()}
+
+    changes = _detect_new_obsidian_files(
+        obsidian_files=obsidian_files,
+        tracked_paths=tracked_paths,
+        memory_map=memory_map,
+        vault="TestVault",
+    )
+
+    assert len(changes) == 1
+    assert changes[0].obsidian_path == "new_note.md"
+    assert changes[0].change_type == ChangeType.CREATED

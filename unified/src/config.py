@@ -22,7 +22,7 @@ class DatabaseConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="", case_sensitive=False)
 
     url: str = Field(
-        default="postgresql+asyncpg://postgres:postgres@localhost:5432/openbrain_unified",
+        default="postgresql+asyncpg://postgres@localhost:5432/openbrain_unified",
         alias="DATABASE_URL",
     )
     pool_size: int = Field(default=5, alias="DB_POOL_SIZE")
