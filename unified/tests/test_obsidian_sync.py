@@ -96,6 +96,37 @@ class TestObsidianChangeTracker:
         assert retrieved is not None
         assert retrieved.memory_id == "mem-1"
 
+    @pytest.mark.asyncio
+    async def test_save_state_fallback_missing_aiofiles(self, tmp_path):
+        """Test that _save_state falls back to synchronous write when aiofiles is missing."""
+        import sys
+
+        storage_path = tmp_path / "sync_state.json"
+        tracker = ObsidianChangeTracker(storage_path=str(storage_path))
+
+        state = SyncState(
+            memory_id="mem-1",
+            obsidian_path="test.md",
+            vault="Documents",
+            content_hash="abc123",
+            memory_updated_at=datetime.now(timezone.utc),
+            obsidian_modified_at=datetime.now(timezone.utc),
+        )
+
+        # We manually add state since update_state saves automatically
+        tracker._state[tracker._make_key("Documents", "test.md")] = state
+
+        # Patch sys.modules so 'import aiofiles' raises ImportError
+        with patch.dict("sys.modules", {"aiofiles": None}):
+            await tracker._save_state()
+
+        # Verify persistence via fallback logic
+        tracker2 = ObsidianChangeTracker(storage_path=str(storage_path))
+        retrieved = tracker2.get_state("Documents", "test.md")
+
+        assert retrieved is not None
+        assert retrieved.memory_id == "mem-1"
+
 
 class TestBidirectionalSyncEngineInit:
     """Tests for BidirectionalSyncEngine initialization."""
