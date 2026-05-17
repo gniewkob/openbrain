@@ -112,6 +112,7 @@ def test_render_prometheus_cumulative_histogram() -> None:
 
 def test_render_prometheus_histogram_output_with_custom_buckets() -> None:
     from src.telemetry import registry, Histogram
+
     reset_metrics()
 
     # Manually register a histogram with custom buckets using the registry
