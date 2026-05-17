@@ -494,7 +494,12 @@ class ObsidianCliAdapter:
                             if limit and len(paths) >= limit:
                                 break
                     return paths
-                except Exception:
+                except Exception as e:
+                    _logger.warning(
+                        "Direct filesystem listing failed for vault %r, falling back to CLI: %s",
+                        vault,
+                        e,
+                    )
                     # Fallback to CLI on error
                     pass
 
@@ -562,7 +567,13 @@ class ObsidianCliAdapter:
                         tags=tags,
                         file_hash=_compute_hash(raw_content),
                     )
-                except Exception:
+                except Exception as e:
+                    _logger.warning(
+                        "Direct filesystem read failed for note %r in vault %r, falling back to CLI: %s",
+                        path,
+                        vault,
+                        e,
+                    )
                     # Fallback to CLI on error
                     pass
 
