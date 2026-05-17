@@ -242,6 +242,7 @@ class ObsidianChangeTracker:
         except ImportError:
             # Fallback to sync write in thread pool
             from pathlib import Path
+
             await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: Path(self.storage_path).write_text(content, encoding="utf-8"),
