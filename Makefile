@@ -52,6 +52,7 @@ test-unified: check-unified-venv
 		unified.tests.test_sync_check \
 		unified.tests.test_update_memory \
 		unified.tests.test_transport_parity \
+		unified.tests.test_config \
 		unified.tests.test_audit_fixes
 
 test-gateway: check-gateway-venv
