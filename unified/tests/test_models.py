@@ -2,7 +2,7 @@
 
 import unittest
 import hashlib
-from unified.src.models import compute_hash
+from src.models import compute_hash
 
 
 class TestModels(unittest.TestCase):
