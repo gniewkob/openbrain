@@ -10,8 +10,9 @@ import os
 from datetime import datetime
 from typing import Any
 
+from collections import defaultdict
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .crud_common import (
@@ -855,50 +856,56 @@ async def _process_duplicates(
     )
     dup_groups = (await session.execute(dup_groups_stmt)).all()
 
-    for content_hash, entity_type, domain in dup_groups:
-        members_stmt = (
-            select(Memory)
-            .where(
-                Memory.content_hash == content_hash,
-                Memory.entity_type == entity_type,
-                Memory.domain == domain,
-                Memory.status == "active",
-            )
-            .order_by(Memory.created_at.asc())
+    if dup_groups:
+        members_stmt = select(Memory).where(
+            tuple_(Memory.content_hash, Memory.entity_type, Memory.domain).in_(
+                dup_groups
+            ),
+            Memory.status == "active",
         )
-        members = (await session.execute(members_stmt)).scalars().all()
-        canonical = members[0]
-        for duplicate in members[1:]:
-            dedup_count += 1
-            actions.append(
-                MaintenanceAction(
-                    action="dedup",
-                    memory_id=duplicate.id,
-                    detail=f"Exact duplicate of {canonical.id}",
-                )
+        all_members = (await session.execute(members_stmt)).scalars().all()
+
+        groups = defaultdict(list)
+        for member in all_members:
+            groups[(member.content_hash, member.entity_type, member.domain)].append(
+                member
             )
-            if not dry_run:
-                if _requires_append_only(duplicate.domain, duplicate.entity_type):
-                    duplicate.status = STATUS_DUPLICATE
-                    duplicate.metadata_ = {
-                        **(duplicate.metadata_ or {}),
-                        "duplicate_of": canonical.id,
-                        "remediated_at": datetime.now().isoformat(),
-                    }
-                    actions.append(
-                        MaintenanceAction(
-                            action="dedup_remediate",
-                            memory_id=duplicate.id,
-                            detail=(
-                                f"Exact duplicate of {canonical.id} "
-                                f"marked as duplicate via "
-                                f"governance-safe remediation (append-only)"
-                            ),
-                        )
+
+        for group_members in groups.values():
+            group_members.sort(key=lambda m: m.created_at)
+
+            canonical = group_members[0]
+            for duplicate in group_members[1:]:
+                dedup_count += 1
+                actions.append(
+                    MaintenanceAction(
+                        action="dedup",
+                        memory_id=duplicate.id,
+                        detail=f"Exact duplicate of {canonical.id}",
                     )
-                else:
-                    duplicate.status = STATUS_SUPERSEDED
-                    duplicate.superseded_by = canonical.id
+                )
+                if not dry_run:
+                    if _requires_append_only(duplicate.domain, duplicate.entity_type):
+                        duplicate.status = STATUS_DUPLICATE
+                        duplicate.metadata_ = {
+                            **(duplicate.metadata_ or {}),
+                            "duplicate_of": canonical.id,
+                            "remediated_at": datetime.now().isoformat(),
+                        }
+                        actions.append(
+                            MaintenanceAction(
+                                action="dedup_remediate",
+                                memory_id=duplicate.id,
+                                detail=(
+                                    f"Exact duplicate of {canonical.id} "
+                                    f"marked as duplicate via "
+                                    f"governance-safe remediation (append-only)"
+                                ),
+                            )
+                        )
+                    else:
+                        duplicate.status = STATUS_SUPERSEDED
+                        duplicate.superseded_by = canonical.id
 
     return actions, dedup_count
 
