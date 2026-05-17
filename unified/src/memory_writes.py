@@ -24,6 +24,7 @@ from .crud_common import (
     _to_out,
     _to_record,
 )
+from .db import AsyncSessionLocal
 from .embed import get_embedding, EMBED_MAX_CHARS
 from .memory_reads import get_memory, get_memory_raw
 from .models import AuditLog, DomainEnum, Memory
@@ -518,59 +519,73 @@ async def handle_memory_write_many(
     await _prefetch_embeddings(request.records)
     existing_id_map = await _batch_lookup_match_keys(session, request.records)
 
-    async def _process_records(commit_each: bool) -> None:
-        for index, record in enumerate(request.records):
-            try:
-                existing_id = (
-                    existing_id_map.get(record.match_key) if record.match_key else None
-                )
-                res = await handle_memory_write(
-                    session,
-                    MemoryWriteRequest(record=record, write_mode=request.write_mode),
-                    actor=actor,
-                    _commit=commit_each,
-                )
-                _err = res.errors[0] if res.errors else None
-                results.append(
-                    BatchResultItem(
-                        input_index=index,
-                        status=res.status,
-                        record_id=res.record.id if res.record else None,
-                        previous_record_id=existing_id
-                        if res.status in {"updated", "versioned", "skipped"}
-                        else None,
-                        match_key=record.match_key,
-                        warnings=res.warnings,
-                        error=_err,
-                        error_code=_classify_error_code(_err),
-                    )
-                )
-                summary[res.status] = summary.get(res.status, 0) + 1
-            except Exception as exc:
-                log.warning(
-                    "batch_record_failed",
-                    input_index=index,
-                    match_key=record.match_key,
-                    error=str(exc),
-                )
-                _exc_msg = str(exc)
-                results.append(
-                    BatchResultItem(
-                        input_index=index,
-                        status="failed",
-                        match_key=record.match_key,
-                        error=_exc_msg,
-                        error_code=_classify_error_code(_exc_msg),
-                    )
-                )
-                summary["failed"] += 1
-                if atomic:
-                    raise
-                await session.rollback()
+    async def _process_single(
+        index: int, record: Any, use_session: AsyncSession, commit_each: bool
+    ) -> BatchResultItem:
+        try:
+            existing_id = (
+                existing_id_map.get(record.match_key) if record.match_key else None
+            )
+            res = await handle_memory_write(
+                use_session,
+                MemoryWriteRequest(record=record, write_mode=request.write_mode),
+                actor=actor,
+                _commit=commit_each,
+            )
+            _err = res.errors[0] if res.errors else None
+            return BatchResultItem(
+                input_index=index,
+                status=res.status,
+                record_id=res.record.id if res.record else None,
+                previous_record_id=existing_id
+                if res.status in {"updated", "versioned", "skipped"}
+                else None,
+                match_key=record.match_key,
+                warnings=res.warnings,
+                error=_err,
+                error_code=_classify_error_code(_err),
+            )
+        except Exception as exc:
+            log.warning(
+                "batch_record_failed",
+                input_index=index,
+                match_key=record.match_key,
+                error=str(exc),
+            )
+            _exc_msg = str(exc)
+
+            if not atomic:
+                await use_session.rollback()
+
+            return BatchResultItem(
+                input_index=index,
+                status="failed",
+                match_key=record.match_key,
+                error=_exc_msg,
+                error_code=_classify_error_code(_exc_msg),
+            )
+
+    async def _process_single_isolated(index: int, record: Any) -> BatchResultItem:
+        async with AsyncSessionLocal() as isolated_session:
+            return await _process_single(
+                index, record, isolated_session, commit_each=True
+            )
 
     if atomic:
+        # For atomic, we must use the single injected session. Concurrent execution
+        # on a single SQLAlchemy session is not supported, so we execute sequentially.
+        for index, record in enumerate(request.records):
+            item = await _process_single(index, record, session, commit_each=False)
+            results.append(item)
+            summary[item.status] = summary.get(item.status, 0) + 1
+            if item.status == "failed":
+                # Original code raised immediately on failure to trigger rollback
+                await session.rollback()
+                return MemoryWriteManyResponse(
+                    status="failed", summary=summary, results=results
+                )
+
         try:
-            await _process_records(commit_each=False)
             await session.commit()
         except Exception as exc:
             log.error("batch_atomic_operation_failed", error=str(exc))
@@ -579,7 +594,18 @@ async def handle_memory_write_many(
                 status="failed", summary=summary, results=results
             )
     else:
-        await _process_records(commit_each=True)
+        # Non-atomic operations can be executed concurrently using independent sessions
+        tasks = [
+            _process_single_isolated(index, record)
+            for index, record in enumerate(request.records)
+        ]
+
+        # Gathering isolated tasks safely parallelizes db access.
+        batch_results = await asyncio.gather(*tasks)
+
+        for item in batch_results:
+            results.append(item)
+            summary[item.status] = summary.get(item.status, 0) + 1
 
     overall = _compute_overall_status(summary, len(request.records))
     return MemoryWriteManyResponse(status=overall, summary=summary, results=results)  # type: ignore[arg-type]
