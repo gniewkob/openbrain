@@ -372,8 +372,11 @@ async def test_hidden_test_data_predicate_covers_top_and_nested_placements():
     async def _capture(stmt):
         # Compile to a Postgres SQL string we can inspect
         captured.append(
-            str(stmt.compile(dialect=postgresql.dialect(),
-                              compile_kwargs={"literal_binds": True}))
+            str(
+                stmt.compile(
+                    dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+                )
+            )
         )
         result = MagicMock()
         result.scalar.return_value = 0
