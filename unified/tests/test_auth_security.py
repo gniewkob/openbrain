@@ -189,6 +189,28 @@ class RateLimitTests(unittest.TestCase):
             # 10.0.0.1 is now at limit, 10.0.0.2 should still work
             check_internal_key_rate_limit("10.0.0.2")  # must not raise
 
+    def test_redis_failure_falls_back_to_memory_limiter(self) -> None:
+        """When Redis raises an unexpected exception, rate limiting falls back to memory silently."""
+        from src.auth import check_internal_key_rate_limit
+        from unittest.mock import MagicMock
+
+        mock_redis = MagicMock()
+        test_ip = "192.0.2.99"
+
+        with patch("src.auth._get_redis_client", return_value=mock_redis):
+            with patch("src.auth._rate_limit_redis", side_effect=Exception("Redis connection error")):
+                with patch("src.auth._rate_limit_memory") as mock_mem_limit:
+                    # Execute rate limit check - it should catch the exception and fall back
+                    check_internal_key_rate_limit(test_ip)
+
+                    # Verify fallback was called
+                    mock_mem_limit.assert_called_once()
+                    args, kwargs = mock_mem_limit.call_args
+                    self.assertEqual(args[0], test_ip)
+                    # Limit should be greater than 0
+                    self.assertTrue(isinstance(args[1], int))
+                    self.assertGreater(args[1], 0)
+
     def test_stale_ips_evicted_when_store_exceeds_cap(self) -> None:
         """When _rate_limit_store exceeds _MAX_RATE_LIMIT_IPS, stale entries are removed."""
         import collections
