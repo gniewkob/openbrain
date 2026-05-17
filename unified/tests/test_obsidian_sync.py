@@ -474,12 +474,12 @@ class TestLoadStateError:
         assert tracker.get_all_states() == []
 
 
+from src.obsidian_sync import _check_memory_changed
+
 class TestCheckMemoryChanged:
     """Tests for _check_memory_changed module-level function."""
 
     def test_returns_true_when_updated_at_is_newer(self):
-        from src.obsidian_sync import _check_memory_changed
-
         past = datetime(2026, 1, 1, tzinfo=timezone.utc)
         future = datetime(2026, 6, 1, tzinfo=timezone.utc)
 
@@ -497,6 +497,72 @@ class TestCheckMemoryChanged:
 
         result = _check_memory_changed(state, memory, lambda c: "same_hash")
         assert result is True
+
+    def test_returns_false_when_memory_is_none(self):
+        state = SyncState(
+            memory_id="m1",
+            obsidian_path="n.md",
+            vault="v",
+            content_hash="hash1",
+            memory_updated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            obsidian_modified_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+
+        result = _check_memory_changed(state, None, lambda c: "hash1")
+        assert result is False
+
+    def test_returns_true_when_hash_differs(self):
+        state = SyncState(
+            memory_id="m1",
+            obsidian_path="n.md",
+            vault="v",
+            content_hash="old_hash",
+            memory_updated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            obsidian_modified_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+        memory = MagicMock()
+        memory.content = "new content"
+        memory.updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+        result = _check_memory_changed(state, memory, lambda c: "new_hash")
+        assert result is True
+
+    def test_returns_false_when_hash_matches_and_updated_at_is_older(self):
+        past = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        older_past = datetime(2025, 1, 1, tzinfo=timezone.utc)
+
+        state = SyncState(
+            memory_id="m1",
+            obsidian_path="n.md",
+            vault="v",
+            content_hash="same_hash",
+            memory_updated_at=past,
+            obsidian_modified_at=past,
+        )
+        memory = MagicMock()
+        memory.content = "content"
+        memory.updated_at = older_past
+
+        result = _check_memory_changed(state, memory, lambda c: "same_hash")
+        assert result is False
+
+    def test_returns_false_when_hash_matches_and_updated_at_is_none(self):
+        past = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+        state = SyncState(
+            memory_id="m1",
+            obsidian_path="n.md",
+            vault="v",
+            content_hash="same_hash",
+            memory_updated_at=past,
+            obsidian_modified_at=past,
+        )
+        memory = MagicMock()
+        memory.content = "content"
+        memory.updated_at = None
+
+        result = _check_memory_changed(state, memory, lambda c: "same_hash")
+        assert result is False
 
 
 class TestResolveConflictStrategies:
