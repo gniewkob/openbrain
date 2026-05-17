@@ -249,7 +249,6 @@ class TestWriteTruncationWarning:
             "will be indexed for vector search" in w for w in response.warnings
         ), f"Expected truncation warning in response.warnings, got: {response.warnings}"
 
-
 class TestClassifyBulkResults:
     """Test classification of bulk write results."""
 

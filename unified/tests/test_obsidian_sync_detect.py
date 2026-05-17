@@ -98,7 +98,6 @@ async def test_detect_changes_read_note_exception_treated_as_unchanged():
     ]
     assert obsidian_updated == []
 
-
 def test_detect_new_obsidian_files_empty():
     """If there are no files in Obsidian, no changes should be detected."""
     from src.obsidian_sync import _detect_new_obsidian_files
@@ -180,7 +179,7 @@ def test_detect_new_obsidian_files_mixed():
         "new_note.md",
         "tracked_note.md",
         "mapped_note.md",
-        "both_note.md",
+        "both_note.md"
     }
     tracked_paths = {"tracked_note.md", "both_note.md"}
     memory_map = {"mapped_note.md": MagicMock(), "both_note.md": MagicMock()}
