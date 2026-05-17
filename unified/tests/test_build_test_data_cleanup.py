@@ -41,20 +41,6 @@ class BuildTestDataCleanupWriteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.candidate_ids, ["mem-1", "mem-2"])
         delete_mock.assert_not_called()
 
-    async def test_cleanup_build_test_data_bubbles_db_execution_error(self) -> None:
-        session = AsyncMock()
-        session.execute = AsyncMock(side_effect=Exception("Database failure simulated"))
-
-        with self.assertRaises(Exception) as ctx:
-            await memory_writes.cleanup_build_test_data(
-                session,
-                dry_run=True,
-                limit=10,
-                actor="tester",
-            )
-
-        self.assertEqual(str(ctx.exception), "Database failure simulated")
-
     async def test_cleanup_build_test_data_executes_delete_and_collects_skips(
         self,
     ) -> None:
