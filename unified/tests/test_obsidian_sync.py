@@ -99,7 +99,6 @@ class TestObsidianChangeTracker:
     @pytest.mark.asyncio
     async def test_save_state_fallback_missing_aiofiles(self, tmp_path):
         """Test that _save_state falls back to synchronous write when aiofiles is missing."""
-        import sys
 
         storage_path = tmp_path / "sync_state.json"
         tracker = ObsidianChangeTracker(storage_path=str(storage_path))
