@@ -77,7 +77,9 @@ class _TimeoutClient:
         return False
 
     async def request(self, method: str, path: str, **kwargs):
-        raise httpx.TimeoutException("timeout exception", request=httpx.Request(method, path))
+        raise httpx.TimeoutException(
+            "timeout exception", request=httpx.Request(method, path)
+        )
 
 
 class McpTransportTests(unittest.IsolatedAsyncioTestCase):
