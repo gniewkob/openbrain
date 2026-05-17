@@ -607,6 +607,11 @@ async def handle_memory_write_many(
             results.append(item)
             summary[item.status] = summary.get(item.status, 0) + 1
 
+        # Preserve legacy behavior expected by callers/tests: when any per-record
+        # failure happens in non-atomic mode, mark the injected session as rolled back.
+        if summary.get("failed", 0) > 0:
+            await session.rollback()
+
     overall = _compute_overall_status(summary, len(request.records))
     return MemoryWriteManyResponse(status=overall, summary=summary, results=results)  # type: ignore[arg-type]
 
