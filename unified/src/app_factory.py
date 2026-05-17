@@ -88,7 +88,7 @@ def create_app(*, public_base_url: str = "", lifespan: Lifespan[FastAPI]) -> Fas
 
     # Add rate limiting
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Configure CORS — explicit allowed headers, never wildcard
     allowed_origins: list[str] = []

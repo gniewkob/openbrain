@@ -343,9 +343,9 @@ def register_exception_handlers(app: Any) -> None:
         raise TypeError("app must be a FastAPI instance")
 
     # Most-specific handlers first
-    app.add_exception_handler(OpenBrainError, openbrain_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(ValueError, value_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(OpenBrainError, openbrain_exception_handler)
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(ValueError, value_error_handler)
 
     # Generic handler for unexpected exceptions
     app.add_exception_handler(Exception, generic_exception_handler)

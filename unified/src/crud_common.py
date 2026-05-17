@@ -153,8 +153,8 @@ def _to_record(m: Memory) -> MemoryRecord:
         owner=m.owner,
         tags=m.tags or [],
         relations=MemoryRelations(**(m.relations or {})),
-        status=m.status,  # type: ignore[arg-type]
-        sensitivity=m.sensitivity,  # type: ignore[arg-type]
+        status=m.status,
+        sensitivity=m.sensitivity,
         source=SourceMetadata(**source) if source else SourceMetadata(),
         governance=GovernanceMetadata(**gov) if gov else GovernanceMetadata(),
         obsidian_ref=m.obsidian_ref,
@@ -233,7 +233,7 @@ async def _audit(
         authorization_context=authorization_context,
         meta=meta or {},
     )
-    maybe_result = session.add(entry)  # type: ignore[func-returns-value]
+    maybe_result = session.add(entry)
     if isawaitable(maybe_result):
         await maybe_result
 

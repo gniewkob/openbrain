@@ -582,7 +582,7 @@ async def handle_memory_write_many(
         await _process_records(commit_each=True)
 
     overall = _compute_overall_status(summary, len(request.records))
-    return MemoryWriteManyResponse(status=overall, summary=summary, results=results)  # type: ignore[arg-type]
+    return MemoryWriteManyResponse(status=overall, summary=summary, results=results)
 
 
 async def store_memory(
@@ -611,7 +611,7 @@ async def store_memory(
         tags=data.tags,
         match_key=data.match_key,
         obsidian_ref=data.obsidian_ref,
-        sensitivity=data.sensitivity,  # type: ignore[arg-type]
+        sensitivity=data.sensitivity,
         custom_fields=data.custom_fields,
     )
     write_func = handle_memory_write
@@ -640,7 +640,7 @@ async def store_memories_bulk(
             tags=item.tags,
             match_key=item.match_key,
             obsidian_ref=item.obsidian_ref,
-            sensitivity=item.sensitivity,  # type: ignore[arg-type]
+            sensitivity=item.sensitivity,
             custom_fields=item.custom_fields,
             relations=MemoryRelations(**(item.relations or {})),
         )
@@ -687,7 +687,7 @@ def _build_update_write_record(memory: Memory, data: MemoryUpdate) -> MemoryWrit
         obsidian_ref=data.obsidian_ref
         if data.obsidian_ref is not None
         else memory.obsidian_ref,
-        sensitivity=data.sensitivity if data.sensitivity else memory.sensitivity,  # type: ignore[arg-type]
+        sensitivity=data.sensitivity if data.sensitivity else memory.sensitivity,
         custom_fields=data.custom_fields
         if data.custom_fields is not None
         else (metadata.get("custom_fields") or {}),
@@ -797,7 +797,7 @@ async def upsert_memories_bulk(
             tags=item.tags,
             match_key=item.match_key,
             obsidian_ref=item.obsidian_ref,
-            sensitivity=item.sensitivity,  # type: ignore[arg-type]
+            sensitivity=item.sensitivity,
             custom_fields=item.custom_fields,
         )
         for item in items
