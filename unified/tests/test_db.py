@@ -6,15 +6,15 @@ import sys
 import unittest
 from unittest.mock import patch, MagicMock
 
-import unified.src.db as db_module
+import src.db as db_module
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class DbModuleTests(unittest.IsolatedAsyncioTestCase):
     def _reload_db(self):
         # Prevent test interference by reloading the module with patches applied
-        sys.modules.pop("unified.src.db", None)
-        return importlib.import_module("unified.src.db")
+        sys.modules.pop("src.db", None)
+        return importlib.import_module("src.db")
 
     def test_uses_dev_database_credentials_exception(self):
         # Trigger the Exception block in _uses_dev_database_credentials
@@ -37,6 +37,13 @@ class DbModuleTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_db_session(self):
         # Test the async generator function for sessions
         session_gen = db_module.get_db_session()
+
+        # Because we have global autouse fixtures in pytest that mock AsyncSessionLocal
+        # to return a MagicMock (to prevent test hangs), we reload db module inside the
+        # test to get the original unpatched implementation.
+        unpatched_db = self._reload_db()
+
+        session_gen = unpatched_db.get_db_session()
 
         # Async generators require using __anext__
         session = await session_gen.__anext__()
