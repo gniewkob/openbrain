@@ -92,6 +92,62 @@ class DatabaseSecurityTests(unittest.TestCase):
             ):
                 self._reload_db()
 
+    def test_direct_validate_public_mode_rejects_dev_defaults(self) -> None:
+        from src import db
+
+        dev_url = "postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified"
+        with (
+            patch.dict(os.environ, {"PUBLIC_MODE": "true"}, clear=False),
+            patch("src.db.DB_URL", dev_url),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError, "forbids dev default PostgreSQL credentials"
+            ):
+                db.validate_database_configuration()
+
+    def test_direct_validate_public_base_url_rejects_dev_defaults(self) -> None:
+        from src import db
+
+        dev_url = "postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified"
+        with (
+            patch.dict(
+                os.environ,
+                {"PUBLIC_BASE_URL": "https://example.com", "PUBLIC_MODE": "false"},
+                clear=False,
+            ),
+            patch("src.db.DB_URL", dev_url),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError, "forbids dev default PostgreSQL credentials"
+            ):
+                db.validate_database_configuration()
+
+    def test_direct_validate_allows_non_public_mode(self) -> None:
+        from src import db
+
+        dev_url = "postgresql+asyncpg://postgres:postgres@db:5432/openbrain_unified"
+        with (
+            patch.dict(
+                os.environ, {"PUBLIC_MODE": "false", "PUBLIC_BASE_URL": ""}, clear=False
+            ),
+            patch("src.db.DB_URL", dev_url),
+        ):
+            # Should not raise
+            db.validate_database_configuration()
+
+    def test_direct_validate_public_mode_allows_strong_credentials(self) -> None:
+        from src import db
+
+        strong_url = (
+            "postgresql+asyncpg://postgres:strong-secret@db:5432/openbrain_unified"
+        )
+        with (
+            patch.dict(os.environ, {"PUBLIC_MODE": "true"}, clear=False),
+            patch("src.db.DB_URL", strong_url),
+        ):
+            # Should not raise
+            db.validate_database_configuration()
+
 
 if __name__ == "__main__":
     unittest.main()
