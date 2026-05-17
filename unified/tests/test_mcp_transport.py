@@ -206,7 +206,9 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         ):
             async with mcp_transport._client() as c2:
                 self.assertEqual(c2.kwargs["base_url"], "http://127.0.0.1:7020")
-            log_warning.assert_called_once()
+            log_warning.assert_called_once_with(
+                "mcp_client_close_failed", error="close failed"
+            )
 
         mcp_transport._http_client = None
         mcp_transport._http_client_config_key = None

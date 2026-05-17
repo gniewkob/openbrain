@@ -186,7 +186,7 @@ class _SharedClient:
             old_key = _http_client_config_key
             try:
                 await _http_client.aclose()
-            except Exception as exc:  # pragma: no cover - defensive logging path
+            except Exception as exc:
                 log.warning("mcp_client_close_failed", error=str(exc))
             log.info(
                 "mcp_client_refreshed_due_to_config_drift",
