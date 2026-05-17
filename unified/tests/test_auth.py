@@ -8,6 +8,25 @@ import pytest
 class TestPublicModeDetection:
     """Test public mode detection logic."""
 
+    def test_is_public_mode_helper(self):
+        """Test that is_public_mode correctly delegates to get_config().auth.public_mode."""
+        from unittest.mock import patch
+        from src.config import is_public_mode
+
+        with patch("src.config.get_config") as mock_get_config:
+            # Test True
+            mock_get_config.return_value.auth.public_mode = True
+            assert is_public_mode() is True
+            mock_get_config.assert_called_once()
+
+            # Reset mock
+            mock_get_config.reset_mock()
+
+            # Test False
+            mock_get_config.return_value.auth.public_mode = False
+            assert is_public_mode() is False
+            mock_get_config.assert_called_once()
+
     def test_public_mode_from_env(self, monkeypatch):
         """Test that PUBLIC_MODE=true enables public mode (requires INTERNAL_API_KEY + OIDC)."""
         from src import config
