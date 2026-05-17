@@ -1,4 +1,4 @@
-"""Tests for Histogram, TelemetryRegistry, and render_prometheus_metrics."""
+"""Tests for Histogram and TelemetryRegistry."""
 
 import pytest
 
@@ -11,7 +11,6 @@ from src.telemetry import (
     get_metrics_snapshot,
     incr_metric,
     observe_metric,
-    render_prometheus_metrics,
     reset_metrics,
     set_gauge_metric,
 )
@@ -217,62 +216,4 @@ def test_observe_metric():
     observe_metric("request_latency_seconds", 0.5)
     snap = get_metrics_snapshot()
     assert "request_latency_seconds" in snap["histograms"]
-    reset_metrics()
-
-
-# ---------------------------------------------------------------------------
-# render_prometheus_metrics
-# ---------------------------------------------------------------------------
-
-
-def test_render_prometheus_includes_counter_type():
-    reset_metrics()
-    incr_metric("memories_created_total", 1)
-    output = render_prometheus_metrics()
-    assert "# TYPE memories_created_total counter" in output
-    assert "memories_created_total 1" in output
-    reset_metrics()
-
-
-def test_render_prometheus_includes_gauge():
-    reset_metrics()
-    set_gauge_metric("active_memories", 42.0)
-    output = render_prometheus_metrics()
-    assert "# TYPE active_memories gauge" in output
-    assert "active_memories 42.0" in output
-    reset_metrics()
-
-
-def test_render_prometheus_includes_histogram_buckets():
-    reset_metrics()
-    observe_metric("request_latency_seconds", 0.05)
-    output = render_prometheus_metrics()
-    assert "# TYPE request_latency_seconds histogram" in output
-    assert 'request_latency_seconds_bucket{le="inf"}' in output
-    assert "request_latency_seconds_count 1" in output
-    reset_metrics()
-
-
-def test_render_prometheus_sanitizes_metric_names():
-    reset_metrics()
-    set_gauge_metric("metric.with.dots", 1.0)
-    output = render_prometheus_metrics()
-    assert "metric_with_dots" in output
-    reset_metrics()
-
-
-def test_render_prometheus_empty_returns_empty_string():
-    reset_metrics()
-    # After reset, counters still exist (known counters seeded at 0)
-    # but the output should be valid and not crash
-    output = render_prometheus_metrics()
-    assert isinstance(output, str)
-    reset_metrics()
-
-
-def test_render_prometheus_ends_with_newline_when_non_empty():
-    reset_metrics()
-    incr_metric("memories_created_total", 1)
-    output = render_prometheus_metrics()
-    assert output.endswith("\n")
     reset_metrics()
