@@ -538,9 +538,11 @@ def _get_redis_client():
             client = _redis_lib.Redis.from_url(redis_url, socket_timeout=1.0)
             client.ping()
             _redis_client = client
-        except Exception:
-            # Redis unavailable — silently fall back to in-memory limiter.
-            pass
+        except Exception as e:
+            # Redis unavailable — fall back to in-memory limiter.
+            logger.warning(
+                "Redis unavailable for rate limiter, falling back to in-memory: %s", e
+            )
     return _redis_client
 
 
@@ -623,9 +625,11 @@ def check_internal_key_rate_limit(client_ip: str) -> None:
             return
         except HTTPException:
             raise
-        except Exception:
-            # Redis error — fall back to in-memory limiter silently.
-            pass
+        except Exception as e:
+            # Redis error — fall back to in-memory limiter.
+            logger.warning(
+                "Redis error during rate limiting, falling back to in-memory: %s", e
+            )
     _rate_limit_memory(client_ip, limit)
 
 
