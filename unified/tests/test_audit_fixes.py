@@ -533,6 +533,15 @@ class NonAtomicSessionRollbackTest(unittest.IsolatedAsyncioTestCase):
         session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
         session.rollback = AsyncMock()
 
+        isolated_session = AsyncMock()
+        isolated_session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: None
+        )
+        isolated_session.rollback = AsyncMock()
+
+        mock_session_local = MagicMock()
+        mock_session_local.return_value.__aenter__.return_value = isolated_session
+
         call_count = 0
 
         async def _write_side_effect(sess, req, actor, _commit=True):
@@ -550,12 +559,15 @@ class NonAtomicSessionRollbackTest(unittest.IsolatedAsyncioTestCase):
             records=records, write_mode=WriteMode.upsert, atomic=False
         )
 
-        with patch.object(
-            memory_writes, "handle_memory_write", side_effect=_write_side_effect
+        with (
+            patch.object(
+                memory_writes, "handle_memory_write", side_effect=_write_side_effect
+            ),
+            patch.object(memory_writes, "AsyncSessionLocal", mock_session_local),
         ):
             result = await memory_writes.handle_memory_write_many(session, request)
 
-        session.rollback.assert_awaited_once()
+        isolated_session.rollback.assert_awaited_once()
         self.assertEqual(result.status, "partial_success")
 
 
