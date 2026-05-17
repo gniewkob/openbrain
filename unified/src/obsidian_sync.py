@@ -235,7 +235,7 @@ class ObsidianChangeTracker:
         content = json.dumps(data, indent=2, default=str)
 
         try:
-            import aiofiles
+            import aiofiles  # type: ignore[import-untyped]
 
             async with aiofiles.open(self.storage_path, "w", encoding="utf-8") as f:
                 await f.write(content)
