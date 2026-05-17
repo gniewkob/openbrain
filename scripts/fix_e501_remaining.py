@@ -6,7 +6,6 @@ Run this after the main refactoring is complete.
 """
 
 import subprocess
-import sys
 
 
 def get_e501_errors():
