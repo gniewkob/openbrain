@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from unified.src.config import AuthConfig, CORSConfig, DatabaseConfig, MCPConfig
+from src.config import AuthConfig, CORSConfig, DatabaseConfig, MCPConfig
 
 class TestDatabaseConfig:
     def test_validate_url_postgresql(self):
@@ -145,7 +145,7 @@ class TestAuthConfig:
     def test_validate_public_mode_secrets_valid(self):
         config = AuthConfig(
             PUBLIC_MODE="true",
-            INTERNAL_API_KEY="a" * 32,
+            **{"INTERNAL_API_KEY": "a" * 32},
             OIDC_ISSUER_URL="https://example.com"
         )
         assert config.public_mode is True
@@ -157,5 +157,5 @@ class TestAuthConfig:
 
     def test_validate_public_mode_secrets_short_key(self):
         with pytest.raises(ValidationError) as exc_info:
-            AuthConfig(PUBLIC_MODE="true", INTERNAL_API_KEY="short")
+            AuthConfig(PUBLIC_MODE="true", **{"INTERNAL_API_KEY": "short"})
         assert "INTERNAL_API_KEY must be at least 32 characters in public mode" in str(exc_info.value)
