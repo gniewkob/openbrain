@@ -484,7 +484,7 @@ class TestCORSConfig:
 
         cfg = config.get_config()
         origins = cfg.cors.get_origins_list()
-        assert "http://localhost:*" in origins
+        assert origins == []
 
     def test_cors_origins_from_env(self, monkeypatch):
         """Test CORS origins from environment."""

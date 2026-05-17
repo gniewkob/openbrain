@@ -96,10 +96,7 @@ def create_app(*, public_base_url: str = "", lifespan: Lifespan[FastAPI]) -> Fas
 
     if config.auth.public_mode:
         allowed_origins = config.cors.get_origins_list()
-        if not allowed_origins or allowed_origins == [
-            "http://localhost:*",
-            "http://127.0.0.1:*",
-        ]:
+        if not allowed_origins:
             allowed_origins = [public_base_url] if public_base_url else []
     else:
         # Local mode: match any localhost / 127.0.0.1 port via regex

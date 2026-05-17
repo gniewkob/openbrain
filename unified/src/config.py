@@ -121,7 +121,7 @@ class CORSConfig(BaseSettings):
     def get_origins_list(self) -> list[str]:
         """Parse comma-separated origins into list."""
         if not self.allowed_origins:
-            return ["http://localhost:*", "http://127.0.0.1:*"]
+            return []
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
 
