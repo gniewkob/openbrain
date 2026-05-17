@@ -32,7 +32,9 @@ class TestCapabilitiesManifest(unittest.TestCase):
         self.assertEqual(normalized, data)
 
     def test_validate_manifest_not_a_dict(self):
-        with self.assertRaisesRegex(ValueError, "capabilities_manifest must be a JSON object"):
+        with self.assertRaisesRegex(
+            ValueError, "capabilities_manifest must be a JSON object"
+        ):
             _validate_manifest(["not", "a", "dict"])
 
     def test_validate_manifest_missing_key(self):
@@ -43,7 +45,10 @@ class TestCapabilitiesManifest(unittest.TestCase):
             "http_obsidian_tools": ["obsidian_vaults"],
             "local_obsidian_tools": ["obsidian_vaults"],
         }
-        with self.assertRaisesRegex(ValueError, "capabilities_manifest.advanced_tools must be a non-empty string list"):
+        with self.assertRaisesRegex(
+            ValueError,
+            "capabilities_manifest.advanced_tools must be a non-empty string list",
+        ):
             _validate_manifest(data)
 
     def test_validate_manifest_not_a_list(self):
@@ -54,7 +59,10 @@ class TestCapabilitiesManifest(unittest.TestCase):
             "http_obsidian_tools": ["obsidian_vaults"],
             "local_obsidian_tools": ["obsidian_vaults"],
         }
-        with self.assertRaisesRegex(ValueError, "capabilities_manifest.core_tools must be a non-empty string list"):
+        with self.assertRaisesRegex(
+            ValueError,
+            "capabilities_manifest.core_tools must be a non-empty string list",
+        ):
             _validate_manifest(data)
 
     def test_validate_manifest_list_with_non_strings(self):
@@ -65,7 +73,10 @@ class TestCapabilitiesManifest(unittest.TestCase):
             "http_obsidian_tools": ["obsidian_vaults"],
             "local_obsidian_tools": ["obsidian_vaults"],
         }
-        with self.assertRaisesRegex(ValueError, "capabilities_manifest.core_tools must be a non-empty string list"):
+        with self.assertRaisesRegex(
+            ValueError,
+            "capabilities_manifest.core_tools must be a non-empty string list",
+        ):
             _validate_manifest(data)
 
     def test_validate_manifest_list_with_empty_strings(self):
@@ -76,11 +87,17 @@ class TestCapabilitiesManifest(unittest.TestCase):
             "http_obsidian_tools": ["obsidian_vaults"],
             "local_obsidian_tools": ["obsidian_vaults"],
         }
-        with self.assertRaisesRegex(ValueError, "capabilities_manifest.core_tools must be a non-empty string list"):
+        with self.assertRaisesRegex(
+            ValueError,
+            "capabilities_manifest.core_tools must be a non-empty string list",
+        ):
             _validate_manifest(data)
 
         data["core_tools"] = ["search", "  "]
-        with self.assertRaisesRegex(ValueError, "capabilities_manifest.core_tools must be a non-empty string list"):
+        with self.assertRaisesRegex(
+            ValueError,
+            "capabilities_manifest.core_tools must be a non-empty string list",
+        ):
             _validate_manifest(data)
 
     def test_validate_manifest_list_with_duplicates(self):
@@ -91,7 +108,9 @@ class TestCapabilitiesManifest(unittest.TestCase):
             "http_obsidian_tools": ["obsidian_vaults"],
             "local_obsidian_tools": ["obsidian_vaults"],
         }
-        with self.assertRaisesRegex(ValueError, "capabilities_manifest.core_tools must not contain duplicates"):
+        with self.assertRaisesRegex(
+            ValueError, "capabilities_manifest.core_tools must not contain duplicates"
+        ):
             _validate_manifest(data)
 
     def test_load_capabilities_manifest(self):
