@@ -319,7 +319,7 @@ def test_v1_obsidian_export_with_memory_ids():
 
         with (
             patch(_ADAPTER_PATH, return_value=mock_adapter),
-            patch("src.api.v1.obsidian.get_memory", AsyncMock(return_value=mem)),
+            patch("src.api.v1.obsidian.get_memories_batch", AsyncMock(return_value=[mem])),
         ):
             r = client.post(
                 "/api/v1/obsidian/export",
@@ -407,7 +407,7 @@ def test_v1_obsidian_export_write_error_captured():
 
         with (
             patch(_ADAPTER_PATH, return_value=mock_adapter),
-            patch("src.api.v1.obsidian.get_memory", AsyncMock(return_value=mem)),
+            patch("src.api.v1.obsidian.get_memories_batch", AsyncMock(return_value=[mem])),
         ):
             r = client.post(
                 "/api/v1/obsidian/export",
