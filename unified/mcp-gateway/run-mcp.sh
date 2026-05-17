@@ -9,7 +9,7 @@ if [ -f "../../.env" ]; then
   set +a
 fi
 
-# Fix PYTHONPATH: add unified/src directly to avoid 'src' naming conflict
+# Configure PYTHONPATH: add unified/src directly to avoid 'src' naming conflict
 export PYTHONPATH=$(pwd)/../src:$PYTHONPATH
 
 # Run the MCP server
