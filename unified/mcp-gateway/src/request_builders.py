@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from typing import Any
 
 from .contract_loader import load_contract
@@ -36,30 +38,32 @@ def _load_request_contracts() -> dict[str, Any]:
 _CONTRACTS = _load_request_contracts()
 
 
-def build_list_filters(
-    *,
-    domain: str | None = None,
-    entity_type: str | None = None,
-    status: str | None = None,
-    sensitivity: str | None = None,
-    owner: str | None = None,
-    tenant_id: str | None = None,
-    include_test_data: bool | None = None,
-) -> dict[str, Any]:
+@dataclass
+class ListFiltersConfig:
+    domain: str | None = None
+    entity_type: str | None = None
+    status: str | None = None
+    sensitivity: str | None = None
+    owner: str | None = None
+    tenant_id: str | None = None
+    include_test_data: bool | None = None
+
+
+def build_list_filters(config: ListFiltersConfig) -> dict[str, Any]:
     filters: dict[str, Any] = {}
-    if domain:
-        filters["domain"] = domain
-    if entity_type:
-        filters["entity_type"] = entity_type
-    if status:
-        filters["status"] = status
-    if sensitivity:
-        filters["sensitivity"] = sensitivity
-    if owner:
-        filters["owner"] = owner
-    if tenant_id:
-        filters["tenant_id"] = tenant_id
-    if include_test_data is True:
+    if config.domain:
+        filters["domain"] = config.domain
+    if config.entity_type:
+        filters["entity_type"] = config.entity_type
+    if config.status:
+        filters["status"] = config.status
+    if config.sensitivity:
+        filters["sensitivity"] = config.sensitivity
+    if config.owner:
+        filters["owner"] = config.owner
+    if config.tenant_id:
+        filters["tenant_id"] = config.tenant_id
+    if config.include_test_data is True:
         filters["include_test_data"] = True
     return filters
 

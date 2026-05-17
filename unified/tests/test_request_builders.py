@@ -4,6 +4,7 @@ from src.request_builders import (
     build_find_search_payload,
     build_find_list_payload,
     build_list_filters,
+    ListFiltersConfig,
     build_sync_check_payload,
     canonical_updated_by,
     normalize_updated_by,
@@ -12,13 +13,15 @@ from src.request_builders import (
 
 def test_build_list_filters_ignores_empty_values() -> None:
     filters = build_list_filters(
-        domain="build",
-        entity_type=None,
-        status="",
-        sensitivity="internal",
-        owner=None,
-        tenant_id="tenant-a",
-        include_test_data=False,
+        ListFiltersConfig(
+            domain="build",
+            entity_type=None,
+            status="",
+            sensitivity="internal",
+            owner=None,
+            tenant_id="tenant-a",
+            include_test_data=False,
+        )
     )
     assert filters == {
         "domain": "build",
@@ -28,7 +31,9 @@ def test_build_list_filters_ignores_empty_values() -> None:
 
 
 def test_build_list_filters_can_include_test_data_flag() -> None:
-    filters = build_list_filters(domain="build", include_test_data=True)
+    filters = build_list_filters(
+        ListFiltersConfig(domain="build", include_test_data=True)
+    )
     assert filters == {"domain": "build", "include_test_data": True}
 
 

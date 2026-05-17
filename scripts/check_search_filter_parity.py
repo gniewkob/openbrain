@@ -28,7 +28,7 @@ def _extract_build_list_filter_keywords(source: str, fn_name: str) -> list[str]:
         for sub in ast.walk(node):
             if not isinstance(sub, ast.Call):
                 continue
-            if not isinstance(sub.func, ast.Name) or sub.func.id != "build_list_filters":
+            if not isinstance(sub.func, ast.Name) or sub.func.id != "ListFiltersConfig":
                 continue
             return sorted(kw.arg for kw in sub.keywords if kw.arg is not None)
     raise ValueError(f"{fn_name} not found")
@@ -50,9 +50,13 @@ def _check_search_filter_parity(transport_src: str, gateway_src: str) -> list[st
     missing_transport = sorted(required - set(transport_keywords))
     missing_gateway = sorted(required - set(gateway_keywords))
     if missing_transport:
-        errors.append(f"transport brain_search missing required filters: {missing_transport}")
+        errors.append(
+            f"transport brain_search missing required filters: {missing_transport}"
+        )
     if missing_gateway:
-        errors.append(f"gateway brain_search missing required filters: {missing_gateway}")
+        errors.append(
+            f"gateway brain_search missing required filters: {missing_gateway}"
+        )
     return errors
 
 

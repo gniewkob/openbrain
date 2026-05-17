@@ -27,7 +27,7 @@ def test_list_filter_parity_detects_missing_tenant_filter() -> None:
     module = _load_list_filter_parity_module()
     transport_src = """
 async def brain_list():
-    filters = build_list_filters(
+    filters = build_list_filters(ListFiltersConfig(
         domain=domain,
         entity_type=entity_type,
         status=status,
@@ -36,16 +36,18 @@ async def brain_list():
         tenant_id=tenant_id,
         include_test_data=include_test_data,
     )
+    )
 """
     gateway_src = """
 async def brain_list():
-    filters = build_list_filters(
+    filters = build_list_filters(ListFiltersConfig(
         domain=domain,
         entity_type=entity_type,
         status=status,
         sensitivity=sensitivity,
         owner=owner,
         include_test_data=include_test_data,
+    )
     )
 """
     errors = module._check_list_filter_parity(transport_src, gateway_src)

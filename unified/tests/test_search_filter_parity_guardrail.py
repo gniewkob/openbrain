@@ -27,21 +27,23 @@ def test_search_filter_parity_detects_missing_owner_filter() -> None:
     module = _load_search_filter_parity_module()
     transport_src = """
 async def brain_search():
-    filters = build_list_filters(
+    filters = build_list_filters(ListFiltersConfig(
         domain=domain,
         entity_type=entity_type,
         owner=owner,
         sensitivity=sensitivity,
         include_test_data=include_test_data,
     )
+    )
 """
     gateway_src = """
 async def brain_search():
-    filters = build_list_filters(
+    filters = build_list_filters(ListFiltersConfig(
         domain=domain,
         entity_type=entity_type,
         sensitivity=sensitivity,
         include_test_data=include_test_data,
+    )
     )
 """
     errors = module._check_search_filter_parity(transport_src, gateway_src)

@@ -29,6 +29,7 @@ from .request_builders import (
     build_find_list_payload,
     build_find_search_payload,
     build_list_filters,
+    ListFiltersConfig,
     build_sync_check_payload,
     canonical_updated_by,
     normalize_updated_by,
@@ -424,11 +425,13 @@ async def brain_search(
     if not 0 <= offset <= 10_000:
         raise ValueError(f"offset must be 0–10000, got {offset}")
     filters = build_list_filters(
-        domain=domain,
-        entity_type=entity_type,
-        sensitivity=sensitivity,
-        owner=owner,
-        include_test_data=include_test_data,
+        ListFiltersConfig(
+            domain=domain,
+            entity_type=entity_type,
+            sensitivity=sensitivity,
+            owner=owner,
+            include_test_data=include_test_data,
+        )
     )
     payload = build_find_search_payload(
         query=query, limit=top_k, filters=filters, offset=offset
@@ -562,13 +565,15 @@ async def brain_list(
     if not 0 <= offset <= 10_000:
         raise ValueError(f"offset must be 0–10000, got {offset}")
     filters = build_list_filters(
-        domain=domain,
-        entity_type=entity_type,
-        status=status,
-        sensitivity=sensitivity,
-        owner=owner,
-        tenant_id=tenant_id,
-        include_test_data=include_test_data,
+        ListFiltersConfig(
+            domain=domain,
+            entity_type=entity_type,
+            status=status,
+            sensitivity=sensitivity,
+            owner=owner,
+            tenant_id=tenant_id,
+            include_test_data=include_test_data,
+        )
     )
     payload = build_find_list_payload(limit=limit, filters=filters, offset=offset)
     hits = await _safe_req("POST", memory_path("find"), json=payload)

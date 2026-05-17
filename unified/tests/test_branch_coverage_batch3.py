@@ -63,17 +63,17 @@ def test_validate_request_contracts_bad_sort_raises():
 
 def test_build_list_filters_entity_type_branch():
     """entity_type provided → filters["entity_type"] set (line 55)."""
-    from src.request_builders import build_list_filters
+    from src.request_builders import build_list_filters, ListFiltersConfig
 
-    result = build_list_filters(entity_type="Note")
+    result = build_list_filters(ListFiltersConfig(entity_type="Note"))
     assert result["entity_type"] == "Note"
 
 
 def test_build_list_filters_status_branch():
     """status provided → filters["status"] set (line 57)."""
-    from src.request_builders import build_list_filters
+    from src.request_builders import build_list_filters, ListFiltersConfig
 
-    result = build_list_filters(status="active")
+    result = build_list_filters(ListFiltersConfig(status="active"))
     assert result["status"] == "active"
 
 
