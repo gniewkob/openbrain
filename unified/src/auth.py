@@ -534,12 +534,21 @@ def _get_redis_client():
             return None
         try:
             import redis as _redis_lib
+        except ImportError as e:
+            logger.debug(
+                f"Redis library not installed, falling back to in-memory limiter: {e}"
+            )
+            return None
 
+        try:
             client = _redis_lib.Redis.from_url(redis_url, socket_timeout=1.0)
             client.ping()
             _redis_client = client
-        except Exception:
+        except (ValueError, _redis_lib.exceptions.RedisError) as e:
             # Redis unavailable — silently fall back to in-memory limiter.
+            logger.debug(
+                f"Redis connection failed, falling back to in-memory limiter: {e}"
+            )
             pass
     return _redis_client
 
