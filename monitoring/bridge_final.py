@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, http.server, logging, os, sys, urllib.error, urllib.request
+import argparse, http.server, logging, os, sys, urllib.request
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [bridge] %(levelname)s %(message)s', stream=sys.stdout)

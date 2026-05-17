@@ -14,7 +14,7 @@ from ...auth import require_auth
 from ...models import Memory
 from ...common.obsidian_adapter import ObsidianCliAdapter, ObsidianCliError
 from ...db import get_session
-from ...memory_reads import get_memory, search_memories
+from ...memory_reads import get_memories_batch, search_memories
 from ...obsidian_cli import note_to_memory_write_record
 from ...obsidian_sync import (
     BidirectionalSyncEngine,
@@ -216,10 +216,10 @@ async def v1_obsidian_export(
     # Get memories to export
     memories: list[MemoryOut] = []
     if req.memory_ids:
-        for mid in req.memory_ids:
-            mem = await get_memory(session, mid)
-            if mem:
-                memories.append(mem)
+        unsorted_memories = await get_memories_batch(session, req.memory_ids)
+        # Preserve the requested order and filter out None
+        memory_map = {m.id: m for m in unsorted_memories}
+        memories = [memory_map[mid] for mid in req.memory_ids if mid in memory_map]
     elif req.query:
         search_results = await search_memories(
             session,
@@ -432,16 +432,19 @@ async def v1_obsidian_conflicts(
         select(Memory)
         .where(Memory.metadata_["obsidian_conflict_pending"] != None)  # noqa: E711
         .where(Memory.status == "active")
-        .order_by(Memory.updated_at.desc())
     )
+    if vault:
+        stmt = stmt.where(
+            Memory.metadata_["obsidian_conflict_pending"]["vault"].as_string() == vault
+        )
+    stmt = stmt.order_by(Memory.updated_at.desc())
+
     result = await session.execute(stmt)
     memories = result.scalars().all()
 
     conflicts = []
     for mem in memories:
         cf = mem.metadata_.get("obsidian_conflict_pending", {})
-        if vault and cf.get("vault") != vault:
-            continue
         conflicts.append(
             ObsidianConflict(
                 memory_id=mem.id,
