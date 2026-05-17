@@ -534,13 +534,19 @@ def _get_redis_client():
             return None
         try:
             import redis as _redis_lib
+        except ImportError:
+            # Redis library not installed, fall back to in-memory.
+            return None
 
+        try:
             client = _redis_lib.Redis.from_url(redis_url, socket_timeout=1.0)
             client.ping()
             _redis_client = client
-        except Exception:
-            # Redis unavailable — silently fall back to in-memory limiter.
-            pass
+        except (_redis_lib.RedisError, ValueError) as e:
+            # Redis unavailable or invalid URL — log warning and fall back to in-memory limiter.
+            logger.warning(
+                "Redis initialization failed, falling back to in-memory limiter: %s", e
+            )
     return _redis_client
 
 
@@ -619,13 +625,17 @@ def check_internal_key_rate_limit(client_ip: str) -> None:
     redis = _get_redis_client()
     if redis is not None:
         try:
+            import redis as _redis_lib
+
             _rate_limit_redis(redis, client_ip, limit)
             return
         except HTTPException:
             raise
-        except Exception:
-            # Redis error — fall back to in-memory limiter silently.
-            pass
+        except _redis_lib.RedisError as e:
+            # Redis error — log warning and fall back to in-memory limiter.
+            logger.warning(
+                "Redis rate limiter failed, falling back to in-memory: %s", e
+            )
     _rate_limit_memory(client_ip, limit)
 
 
