@@ -19,7 +19,6 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
 # ---------------------------------------------------------------------------
 # combined.py — OIDC bearer token success (lines 85-88)
 # ---------------------------------------------------------------------------
@@ -212,8 +211,13 @@ def test_check_internal_key_rate_limit_falls_back_on_redis_exception():
     original = auth_mod._redis_client
     mock_redis = MagicMock()
     auth_mod._redis_client = mock_redis
+    import redis
+
     try:
-        with patch("src.auth._rate_limit_redis", side_effect=Exception("redis error")):
+        with patch(
+            "src.auth._rate_limit_redis",
+            side_effect=redis.exceptions.RedisError("redis error"),
+        ):
             with patch("src.auth._rate_limit_memory"):
                 # Should not raise — falls back silently
                 check_internal_key_rate_limit("127.0.0.1")

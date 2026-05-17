@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -44,9 +43,14 @@ def test_get_redis_client_returns_none_when_redis_unavailable():
     import src.auth as auth_mod
 
     auth_mod._redis_client = None
+    import redis
+
     with (
         patch.dict("os.environ", {"REDIS_URL": "redis://localhost:9999"}),
-        patch("redis.Redis.from_url", side_effect=Exception("connection refused")),
+        patch(
+            "redis.Redis.from_url",
+            side_effect=redis.exceptions.RedisError("connection refused"),
+        ),
     ):
         result = auth_mod._get_redis_client()
     assert result is None
@@ -197,8 +201,12 @@ def test_check_rate_limit_falls_back_to_memory_when_redis_fails():
     mock_client = MagicMock()
     auth_mod._redis_client = mock_client
     auth_mod._rate_limit_store.clear()
+    import redis
 
-    with patch("src.auth._rate_limit_redis", side_effect=Exception("redis error")):
+    with patch(
+        "src.auth._rate_limit_redis",
+        side_effect=redis.exceptions.RedisError("redis error"),
+    ):
         with patch("src.auth._rate_limit_memory") as mock_mem_rl:
             auth_mod.check_internal_key_rate_limit("2.2.2.2")
             mock_mem_rl.assert_called_once()
