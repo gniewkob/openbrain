@@ -14,6 +14,18 @@ class _FakeLogger:
 
 
 class McpTransportUtilsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_make_tool_guard_success(self) -> None:
+        logger = _FakeLogger()
+        guard = utils.make_tool_guard(logger)
+
+        @guard
+        async def successful(x: int) -> int:
+            return x * 2
+
+        result = await successful(21)
+        self.assertEqual(result, 42)
+        self.assertEqual(len(logger.events), 0)
+
     async def test_make_tool_guard_rewraps_exceptions(self) -> None:
         logger = _FakeLogger()
         guard = utils.make_tool_guard(logger)
