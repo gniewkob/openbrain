@@ -537,6 +537,7 @@ class TestConfigCaching:
         # Should be the same object due to lru_cache
         assert cfg1 is cfg2
 
+
 class TestGetSubject:
     """Test get_subject function."""
 
