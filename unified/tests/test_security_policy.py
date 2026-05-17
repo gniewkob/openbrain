@@ -416,3 +416,30 @@ def test_hide_500_unchanged():
     exc = HTTPException(status_code=500, detail="Server error")
     result = hide_memory_access_denied(exc)
     assert result.status_code == 500
+
+def test_enforce_domain_access_case_insensitive_passes():
+    ps = _enforce_patches(privileged=False, domain_scope={"build"}, registry_scope=None)
+    with ps[0], ps[1], ps[2], ps[3], ps[4], ps[5], ps[6], ps[7], ps[8]:
+        enforce_domain_access({}, "BUILD", "read")  # BUILD should match "build"
+
+def test_enforce_domain_access_error_message_capitalizes_action():
+    ps = _enforce_patches(privileged=False, domain_scope={"corporate"}, registry_scope=None)
+    with ps[0], ps[1], ps[2], ps[3], ps[4], ps[5], ps[6], ps[7], ps[8]:
+        with pytest.raises(HTTPException) as exc:
+            enforce_domain_access({}, "build", "write")
+        assert exc.value.status_code == 403
+        assert exc.value.detail == "Write access denied for domain 'build'"
+
+
+def test_enforce_domain_access_empty_domain_passes_if_in_scope():
+    ps = _enforce_patches(privileged=False, domain_scope={""}, registry_scope=None)
+    with ps[0], ps[1], ps[2], ps[3], ps[4], ps[5], ps[6], ps[7], ps[8]:
+        enforce_domain_access({}, "", "read")  # should not raise
+
+def test_resolve_owner_scoped_with_tenant_different_owner_passes():
+    # If the user is scoped and has a tenant_id, they can theoretically write to another owner
+    # in their tenant (handled elsewhere or allowed here based on policy).
+    patches = _patch_auth(public=True, privileged=False, subject="alice", tenant_id="t1")
+    with patches[0], patches[1], patches[2], patches[3], patches[4]:
+        result = resolve_owner_for_write({}, "bob")
+    assert result == "bob"
