@@ -52,7 +52,8 @@ test-unified: check-unified-venv
 		unified.tests.test_sync_check \
 		unified.tests.test_update_memory \
 		unified.tests.test_transport_parity \
-		unified.tests.test_audit_fixes
+	unified.tests.test_audit_fixes \
+	unified.tests.test_models
 
 test-gateway: check-gateway-venv
 	cd unified/mcp-gateway && PYTHONPATH=.:../.. ./.venv/bin/python -m unittest discover -s tests -v
