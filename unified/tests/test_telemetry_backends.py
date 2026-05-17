@@ -207,6 +207,19 @@ def test_redis_backend_snapshot_skips_non_int_values():
     assert "bad" not in snap
 
 
+def test_redis_backend_snapshot_skips_none_values():
+    from src.telemetry_counters import RedisCounterBackend
+
+    client = _make_redis_client(hgetall_return={"bad": None})
+    with patch("redis.Redis.from_url", return_value=client):
+        backend = RedisCounterBackend(
+            redis_url="redis://localhost:6379", known_counters=KNOWN
+        )
+        snap = backend.snapshot()
+
+    assert "bad" not in snap
+
+
 def test_redis_backend_bulk_load_writes_known():
     from src.telemetry_counters import RedisCounterBackend
 
