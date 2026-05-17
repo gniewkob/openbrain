@@ -66,7 +66,9 @@ async def test_update_memory_from_obsidian_updates_tracker_state():
         mock_updated = MagicMock()
         mock_updated.id = "mem-123"
         mock_update.return_value = mock_updated
-        with patch.object(engine.tracker, "update_state") as mock_update_state:
+        with patch.object(
+            engine.tracker, "update_state", AsyncMock()
+        ) as mock_update_state:
             await engine._update_memory_from_obsidian(
                 mock_session, mock_adapter, change
             )

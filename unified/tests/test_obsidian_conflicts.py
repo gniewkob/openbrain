@@ -70,20 +70,11 @@ async def test_v1_obsidian_conflicts_filters_by_vault():
     from src.api.v1.obsidian import v1_obsidian_conflicts
 
     session = _make_session()
-    mock_mem = MagicMock()
-    mock_mem.id = "mem-456"
-    mock_mem.content = "Another memory"
-    mock_mem.updated_at = MagicMock()
-    mock_mem.metadata_ = {
-        "obsidian_conflict_pending": {
-            "vault": "OtherVault",
-            "obsidian_path": "notes/other.md",
-            "detected_at": "2026-04-19T10:00:00+00:00",
-        }
-    }
 
+    # The filter is now handled by the database layer, so the mock result should simulate
+    # that the db returned 0 results because of the vault filter.
     scalars_result = MagicMock()
-    scalars_result.all.return_value = [mock_mem]
+    scalars_result.all.return_value = []
     execute_result = MagicMock()
     execute_result.scalars.return_value = scalars_result
     session.execute = AsyncMock(return_value=execute_result)

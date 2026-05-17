@@ -230,7 +230,8 @@ def test_check_internal_key_rate_limit_falls_back_on_redis_exception():
 # ---------------------------------------------------------------------------
 
 
-def test_determine_change_conflict_both_changed():
+@pytest.mark.asyncio
+async def test_determine_change_conflict_both_changed():
     """Both memory_changed and obsidian_changed → conflict (line 533)."""
     from src.obsidian_sync import (
         BidirectionalSyncEngine,
@@ -254,7 +255,7 @@ def test_determine_change_conflict_both_changed():
     memory = MagicMock()
 
     # Both changed
-    change = engine._determine_change(
+    change = await engine._determine_change(
         state=state,
         memory=memory,
         obsidian_exists=True,
@@ -272,7 +273,8 @@ def test_determine_change_conflict_both_changed():
 # ---------------------------------------------------------------------------
 
 
-def test_determine_change_only_obsidian_changed():
+@pytest.mark.asyncio
+async def test_determine_change_only_obsidian_changed():
     """Only obsidian_changed → returns UPDATED from obsidian (line 541)."""
     from src.obsidian_sync import (
         BidirectionalSyncEngine,
@@ -295,7 +297,7 @@ def test_determine_change_only_obsidian_changed():
     memory = MagicMock()
 
     # Only obsidian changed
-    change = engine._determine_change(
+    change = await engine._determine_change(
         state=state,
         memory=memory,
         obsidian_exists=True,
