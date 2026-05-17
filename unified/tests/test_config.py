@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from unified.src.config import AppConfig, get_config
+from src.config import AppConfig, get_config
 
 
 class TestConfig(unittest.TestCase):
@@ -57,7 +57,7 @@ class TestConfig(unittest.TestCase):
     @patch.dict(os.environ, {"PUBLIC_MODE": "false", "PUBLIC_BASE_URL": "http://example.com", "INTERNAL_API_KEY": "12345678901234567890123456789012"})
     def test_get_config_reexport_functions(self):
         """Test that backwards-compatibility re-export functions return expected values."""
-        from unified.src.config import (
+        from src.config import (
             get_database_url,
             is_public_mode,
             get_public_base_url,
