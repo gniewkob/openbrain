@@ -44,9 +44,14 @@ def test_get_redis_client_returns_none_when_redis_unavailable():
     import src.auth as auth_mod
 
     auth_mod._redis_client = None
+    import redis
+
     with (
         patch.dict("os.environ", {"REDIS_URL": "redis://localhost:9999"}),
-        patch("redis.Redis.from_url", side_effect=Exception("connection refused")),
+        patch(
+            "redis.Redis.from_url",
+            side_effect=redis.exceptions.ConnectionError("connection refused"),
+        ),
     ):
         result = auth_mod._get_redis_client()
     assert result is None
