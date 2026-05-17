@@ -31,6 +31,23 @@ class DatabaseSecurityTests(unittest.TestCase):
             ):
                 self._reload_db()
 
+    def test_public_mode_rejects_passwordless_dev_database_credentials(self) -> None:
+        # The new default without hardcoded password should also be rejected in PUBLIC_MODE
+        dev_url = "postgresql+asyncpg://postgres@db:5432/openbrain_unified"
+
+        with patch.dict(
+            os.environ,
+            {
+                "PUBLIC_MODE": "true",
+                "DATABASE_URL": dev_url,
+            },
+            clear=False,
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError, "forbids dev default PostgreSQL credentials"
+            ):
+                self._reload_db()
+
     def test_public_mode_allows_non_default_database_credentials(self) -> None:
         with patch.dict(
             os.environ,

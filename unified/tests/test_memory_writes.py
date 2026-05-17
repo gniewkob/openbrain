@@ -248,3 +248,68 @@ class TestWriteTruncationWarning:
         assert any(
             "will be indexed for vector search" in w for w in response.warnings
         ), f"Expected truncation warning in response.warnings, got: {response.warnings}"
+
+
+class TestClassifyBulkResults:
+    """Test classification of bulk write results."""
+
+    def test_classify_all_statuses(self):
+        """Test classifying created, updated, versioned, and skipped statuses."""
+        from src.memory_writes import _classify_bulk_results
+        from src.schemas import BatchResultItem
+
+        results = [
+            BatchResultItem(input_index=0, status="created", record_id="mem1"),
+            BatchResultItem(input_index=1, status="updated", record_id="mem2"),
+            BatchResultItem(input_index=2, status="versioned", record_id="mem3"),
+            BatchResultItem(input_index=3, status="skipped", record_id="mem4"),
+            BatchResultItem(input_index=4, status="failed", record_id="mem5"),
+        ]
+
+        mem1, mem2, mem3 = Mock(), Mock(), Mock()
+        id_to_mem = {
+            "mem1": mem1,
+            "mem2": mem2,
+            "mem3": mem3,
+        }
+
+        inserted, updated, skipped = _classify_bulk_results(results, id_to_mem)
+
+        assert inserted == [mem1]
+        assert updated == [mem2, mem3]
+        assert skipped == ["mem4"]
+
+    def test_classify_missing_memory_in_dict(self):
+        """Test that created/updated are ignored if not in id_to_mem."""
+        from src.memory_writes import _classify_bulk_results
+        from src.schemas import BatchResultItem
+
+        results = [
+            BatchResultItem(input_index=0, status="created", record_id="mem1"),
+            BatchResultItem(input_index=1, status="updated", record_id="mem2"),
+            BatchResultItem(input_index=2, status="skipped", record_id="mem3"),
+        ]
+
+        # id_to_mem is empty, so mem1 and mem2 won't be found
+        id_to_mem = {}
+
+        inserted, updated, skipped = _classify_bulk_results(results, id_to_mem)
+
+        assert inserted == []
+        assert updated == []
+        assert skipped == ["mem3"]
+
+    def test_classify_skipped_without_record_id(self):
+        """Test skipped status when record_id is None."""
+        from src.memory_writes import _classify_bulk_results
+        from src.schemas import BatchResultItem
+
+        results = [
+            BatchResultItem(input_index=0, status="skipped", record_id=None),
+        ]
+
+        inserted, updated, skipped = _classify_bulk_results(results, {})
+
+        assert inserted == []
+        assert updated == []
+        assert skipped == [""]
