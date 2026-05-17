@@ -12,7 +12,7 @@ from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import structlog
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -653,6 +653,7 @@ if ENABLE_HTTP_OBSIDIAN_TOOLS:
 
     class ObsidianSyncConfig(BaseModel):
         """Configuration for Obsidian one-way sync operation."""
+
         vault: str = "Documents"
         paths: list[str] | None = None
         folder: str | None = None

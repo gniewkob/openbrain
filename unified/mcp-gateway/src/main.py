@@ -1218,6 +1218,7 @@ async def brain_obsidian_read_note(path: str, vault: str = "Documents") -> dict:
 
 class ObsidianSyncConfig(BaseModel):
     """Configuration for Obsidian one-way sync operation."""
+
     vault: str = "Documents"
     paths: list[str] | None = None
     folder: str | None = None
@@ -1226,6 +1227,7 @@ class ObsidianSyncConfig(BaseModel):
     entity_type: str = "Architecture"
     owner: str = ""
     tags: list[str] | None = None
+
 
 @mcp.tool()
 async def brain_obsidian_sync(config: ObsidianSyncConfig) -> dict:
@@ -1239,9 +1241,11 @@ async def brain_obsidian_sync(config: ObsidianSyncConfig) -> dict:
     adapter = ObsidianCliAdapter()
     try:
         resolved_paths = (
-            (config.paths or [])[:config.limit]
+            (config.paths or [])[: config.limit]
             if config.paths
-            else await adapter.list_files(config.vault, folder=config.folder, limit=config.limit)
+            else await adapter.list_files(
+                config.vault, folder=config.folder, limit=config.limit
+            )
         )
         read_concurrency = min(
             MAX_OBSIDIAN_READ_CONCURRENCY, max(1, len(resolved_paths))
