@@ -673,6 +673,9 @@ async def require_auth(
         raise HTTPException(status_code=401, detail="Missing Authorization header")
 
     try:
-        return await _oidc.verify_token(credentials.credentials)
+        claims = await _oidc.verify_token(credentials.credentials)
+        # Prevent external JWTs from spoofing internal authentication (C2 fix)
+        claims.pop("_auth_via_internal_key", None)
+        return claims
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e)) from e
