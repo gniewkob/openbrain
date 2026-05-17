@@ -411,7 +411,11 @@ class _ObsidianSyncRunner:
             # without recursing back into another owner fix.
             new_detail = _obsidian_extract_error_detail(resp).lower()
             new_kind = _obsidian_classify_error(new_detail, resp.status_code)
-            if new_kind in ("embed_400", "secret_detected"):
+            if new_kind != "other":
+                _gateway_logger.debug(
+                    "Owner fix failed, applying secondary remediation for kind=%s",
+                    new_kind,
+                )
                 return await self.apply_remediation(
                     fixed, input_index, new_kind, allow_owner_fix=False
                 )
