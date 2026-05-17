@@ -69,6 +69,17 @@ class _ErrorClient:
         raise httpx.ConnectError("connect timeout", request=httpx.Request(method, path))
 
 
+class _TimeoutClient:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def request(self, method: str, path: str, **kwargs):
+        raise httpx.TimeoutException("timeout exception", request=httpx.Request(method, path))
+
+
 class McpTransportTests(unittest.IsolatedAsyncioTestCase):
     async def test_env_bool_uses_default_when_env_missing(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -332,8 +343,29 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_safe_req_normalizes_request_errors(self) -> None:
         with patch.object(mcp_transport, "_client", return_value=_ErrorClient()):
-            with self.assertRaisesRegex(ValueError, "Backend request failed"):
-                await mcp_transport._safe_req("GET", "/api/memories/missing")
+            with patch.object(mcp_transport.log, "error") as log_error:
+                with self.assertRaisesRegex(ValueError, "Backend request failed"):
+                    await mcp_transport._safe_req("GET", "/api/memories/missing")
+
+                log_error.assert_called_once_with(
+                    "mcp_v1_request_error",
+                    method="GET",
+                    path="/api/memories/missing",
+                    error="connect timeout",
+                )
+
+    async def test_safe_req_handles_timeout_exception(self) -> None:
+        with patch.object(mcp_transport, "_client", return_value=_TimeoutClient()):
+            with patch.object(mcp_transport.log, "error") as log_error:
+                with self.assertRaisesRegex(ValueError, "Backend request failed"):
+                    await mcp_transport._safe_req("POST", "/api/memories/timeout")
+
+                log_error.assert_called_once_with(
+                    "mcp_v1_request_error",
+                    method="POST",
+                    path="/api/memories/timeout",
+                    error="timeout exception",
+                )
 
     async def test_safe_req_redacts_content_in_logged_payload(self) -> None:
         response = _FakeResponse(200, payload={"status": "ok"})
