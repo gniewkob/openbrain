@@ -37,6 +37,7 @@ dev = [
     "fastmcp>=2.0",
     "mypy>=1.10",
     "authlib>=1.6.12",
+    "types-aiofiles>=25.1.0.20260508",
 ]
 
 [tool.pytest.ini_options]
