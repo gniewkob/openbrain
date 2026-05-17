@@ -416,7 +416,9 @@ class TestWriteNote:
         with patch.object(adapter, "_get_vault_path", return_value=str(vault_dir)):
             ObsidianCliError = _adapter_mod.ObsidianCliError
             # Mock _run to raise error so that CLI fallback in read_note fails
-            with patch.object(adapter, "_run", side_effect=ObsidianCliError("File not found")):
+            with patch.object(
+                adapter, "_run", side_effect=ObsidianCliError("File not found")
+            ):
                 result = await adapter.write_note(
                     "myvault", "new.md", "# New content", overwrite=False
                 )

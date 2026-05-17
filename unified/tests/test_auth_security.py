@@ -198,7 +198,10 @@ class RateLimitTests(unittest.TestCase):
         test_ip = "192.0.2.99"
 
         with patch("src.auth._get_redis_client", return_value=mock_redis):
-            with patch("src.auth._rate_limit_redis", side_effect=Exception("Redis connection error")):
+            with patch(
+                "src.auth._rate_limit_redis",
+                side_effect=Exception("Redis connection error"),
+            ):
                 with patch("src.auth._rate_limit_memory") as mock_mem_limit:
                     # Execute rate limit check - it should catch the exception and fall back
                     check_internal_key_rate_limit(test_ip)
