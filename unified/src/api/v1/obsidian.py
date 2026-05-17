@@ -14,7 +14,7 @@ from ...auth import require_auth
 from ...models import Memory
 from ...common.obsidian_adapter import ObsidianCliAdapter, ObsidianCliError
 from ...db import get_session
-from ...memory_reads import get_memory, search_memories
+from ...memory_reads import search_memories, get_memory
 from ...obsidian_cli import note_to_memory_write_record
 from ...obsidian_sync import (
     BidirectionalSyncEngine,
