@@ -12,6 +12,7 @@ from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
 import httpx
+from pydantic import BaseModel, Field
 import structlog
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -650,33 +651,35 @@ if ENABLE_HTTP_OBSIDIAN_TOOLS:
             "POST", "/api/v1/obsidian/read-note", json={"vault": vault, "path": path}
         )
 
+    class ObsidianSyncConfig(BaseModel):
+        """Configuration for Obsidian one-way sync operation."""
+        vault: str = "Documents"
+        paths: list[str] | None = None
+        folder: str | None = None
+        limit: int = 50
+        domain: Literal["corporate", "build", "personal"] = "build"
+        entity_type: str = "Architecture"
+        owner: str = ""
+        tags: list[str] | None = None
+
     @mcp.tool()
     @mcp_tool_guard
-    async def brain_obsidian_sync(
-        vault: str = "Documents",
-        paths: list[str] | None = None,
-        folder: str | None = None,
-        limit: int = 50,
-        domain: Literal["corporate", "build", "personal"] = "build",
-        entity_type: str = "Architecture",
-        owner: str = "",
-        tags: list[str] | None = None,
-    ) -> dict[str, Any]:
+    async def brain_obsidian_sync(config: ObsidianSyncConfig) -> dict[str, Any]:
         """
         One-way sync from an Obsidian vault into OpenBrain using deterministic
         match keys. Use paths for explicit notes or folder for a bounded folder sync.
         """
-        if not 1 <= limit <= MAX_SYNC_LIMIT:
-            raise ValueError(f"limit must be 1–{MAX_SYNC_LIMIT}, got {limit}")
+        if not 1 <= config.limit <= MAX_SYNC_LIMIT:
+            raise ValueError(f"limit must be 1–{MAX_SYNC_LIMIT}, got {config.limit}")
         payload = {
-            "vault": vault,
-            "paths": paths or [],
-            "folder": folder,
-            "limit": limit,
-            "domain": domain,
-            "entity_type": entity_type,
-            "owner": owner,
-            "tags": tags or [],
+            "vault": config.vault,
+            "paths": config.paths or [],
+            "folder": config.folder,
+            "limit": config.limit,
+            "domain": config.domain,
+            "entity_type": config.entity_type,
+            "owner": config.owner,
+            "tags": config.tags or [],
         }
         return await _safe_req("POST", "/api/v1/obsidian/sync", json=payload)
 

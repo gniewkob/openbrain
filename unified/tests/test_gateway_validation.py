@@ -110,11 +110,13 @@ class TestBrainListValidation(unittest.TestCase):
 class TestBrainObsidianSyncValidation(unittest.TestCase):
     def test_sync_limit_zero_raises(self):
         with self.assertRaisesRegex(ValueError, "limit"):
-            _run(_gateway.brain_obsidian_sync(limit=0))
+            config = _gateway.ObsidianSyncConfig(limit=0)
+            _run(_gateway.brain_obsidian_sync(config=config))
 
     def test_sync_limit_over_max_raises(self):
         with self.assertRaisesRegex(ValueError, "limit"):
-            _run(_gateway.brain_obsidian_sync(limit=_gateway.MAX_SYNC_LIMIT + 1))
+            config = _gateway.ObsidianSyncConfig(limit=_gateway.MAX_SYNC_LIMIT + 1)
+            _run(_gateway.brain_obsidian_sync(config=config))
 
 
 @_skip_if_no_gateway

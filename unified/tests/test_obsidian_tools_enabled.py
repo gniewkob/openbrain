@@ -81,7 +81,8 @@ async def test_brain_obsidian_sync_calls_safe_req(mcp_with_obsidian_tools):
     with patch.object(
         mod, "_safe_req", AsyncMock(return_value={"synced": 5})
     ) as mock_req:
-        result = await mod.brain_obsidian_sync(vault="V", limit=10)
+        config = mod.ObsidianSyncConfig(vault="V", limit=10)
+        result = await mod.brain_obsidian_sync(config=config)
 
     assert result == {"synced": 5}
     call_kwargs = mock_req.call_args[1]
@@ -95,4 +96,5 @@ async def test_brain_obsidian_sync_invalid_limit_raises(mcp_with_obsidian_tools)
     mod = mcp_with_obsidian_tools
 
     with pytest.raises(ValueError, match="limit must be"):
-        await mod.brain_obsidian_sync(vault="V", limit=0)
+        config = mod.ObsidianSyncConfig(vault="V", limit=0)
+        await mod.brain_obsidian_sync(config=config)

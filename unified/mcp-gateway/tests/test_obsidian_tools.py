@@ -162,9 +162,8 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
             client.post.return_value = response
             mock_client.return_value = client
 
-            result = await gateway.brain_obsidian_sync(
-                vault="Documents", folder="Inbox", limit=1
-            )
+            config = gateway.ObsidianSyncConfig(vault="Documents", folder="Inbox", limit=1)
+            result = await gateway.brain_obsidian_sync(config=config)
 
         adapter.list_files.assert_awaited_once_with(
             "Documents", folder="Inbox", limit=1
@@ -231,9 +230,8 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
             client.post.side_effect = [batch_422, single_ok_1, single_ok_2]
             mock_client.return_value = client
 
-            result = await gateway.brain_obsidian_sync(
-                vault="Documents", folder="Inbox", limit=2
-            )
+            config = gateway.ObsidianSyncConfig(vault="Documents", folder="Inbox", limit=2)
+            result = await gateway.brain_obsidian_sync(config=config)
 
         self.assertEqual(client.post.await_count, 3)
         self.assertEqual(result["summary"].get("created"), 2)
@@ -278,9 +276,8 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
             client.post.side_effect = [rate_limited, ok]
             mock_client.return_value = client
 
-            result = await gateway.brain_obsidian_sync(
-                vault="Documents", folder="Inbox", limit=1
-            )
+            config = gateway.ObsidianSyncConfig(vault="Documents", folder="Inbox", limit=1)
+            result = await gateway.brain_obsidian_sync(config=config)
 
         self.assertEqual(client.post.await_count, 2)
         self.assertEqual(result["summary"].get("created"), 1)
@@ -342,9 +339,8 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
             client.post.side_effect = [failed_with_code, retry_ok]
             mock_client.return_value = client
 
-            result = await gateway.brain_obsidian_sync(
-                vault="Documents", folder="Inbox", limit=1
-            )
+            config = gateway.ObsidianSyncConfig(vault="Documents", folder="Inbox", limit=1)
+            result = await gateway.brain_obsidian_sync(config=config)
 
         # Two posts: original (failed) + remediation retry (succeeded)
         self.assertEqual(client.post.await_count, 2)
@@ -391,9 +387,8 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
             client.post.return_value = ok
             mock_client.return_value = client
 
-            result = await gateway.brain_obsidian_sync(
-                vault="Documents", folder="Inbox", limit=2
-            )
+            config = gateway.ObsidianSyncConfig(vault="Documents", folder="Inbox", limit=2)
+            result = await gateway.brain_obsidian_sync(config=config)
 
         self.assertEqual(client.post.await_count, 1)
         self.assertEqual(result["summary"].get("failed"), 1)
@@ -477,7 +472,7 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
 
             # Without parallel chunks this would deadlock on event_b.wait(2.0)
             result = await asyncio.wait_for(
-                gateway.brain_obsidian_sync(vault="Documents", folder="Inbox", limit=2),
+                gateway.brain_obsidian_sync(config=gateway.ObsidianSyncConfig(vault="Documents", folder="Inbox", limit=2)),
                 timeout=5.0,
             )
 
@@ -545,9 +540,8 @@ class GatewayObsidianToolTests(unittest.IsolatedAsyncioTestCase):
             ]
             mock_client.return_value = client
 
-            result = await gateway.brain_obsidian_sync(
-                vault="Documents", folder="Inbox", limit=1
-            )
+            config = gateway.ObsidianSyncConfig(vault="Documents", folder="Inbox", limit=1)
+            result = await gateway.brain_obsidian_sync(config=config)
 
         # Should have slept 4 times: 0.25 * 2^0, 2^1, 2^2, 2^3 = 0.25, 0.5, 1.0, 2.0
         self.assertEqual(len(sleep_calls), 4)

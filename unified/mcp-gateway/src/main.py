@@ -1216,30 +1216,32 @@ async def brain_obsidian_read_note(path: str, vault: str = "Documents") -> dict:
     }
 
 
+class ObsidianSyncConfig(BaseModel):
+    """Configuration for Obsidian one-way sync operation."""
+    vault: str = "Documents"
+    paths: list[str] | None = None
+    folder: str | None = None
+    limit: int = 50
+    domain: Literal["corporate", "build", "personal"] = "build"
+    entity_type: str = "Architecture"
+    owner: str = ""
+    tags: list[str] | None = None
+
 @mcp.tool()
-async def brain_obsidian_sync(
-    vault: str = "Documents",
-    paths: list[str] | None = None,
-    folder: str | None = None,
-    limit: int = 50,
-    domain: Literal["corporate", "build", "personal"] = "build",
-    entity_type: str = "Architecture",
-    owner: str = "",
-    tags: list[str] | None = None,
-) -> dict:
+async def brain_obsidian_sync(config: ObsidianSyncConfig) -> dict:
     """
     One-way sync from an Obsidian vault into OpenBrain using deterministic match keys.
     Use paths for explicit notes or folder for a bounded folder sync.
     """
-    if not 1 <= limit <= MAX_SYNC_LIMIT:
-        raise ValueError(f"limit must be 1–{MAX_SYNC_LIMIT}, got {limit}")
+    if not 1 <= config.limit <= MAX_SYNC_LIMIT:
+        raise ValueError(f"limit must be 1–{MAX_SYNC_LIMIT}, got {config.limit}")
     _require_obsidian_local_tools_enabled()
     adapter = ObsidianCliAdapter()
     try:
         resolved_paths = (
-            (paths or [])[:limit]
-            if paths
-            else await adapter.list_files(vault, folder=folder, limit=limit)
+            (config.paths or [])[:config.limit]
+            if config.paths
+            else await adapter.list_files(config.vault, folder=config.folder, limit=config.limit)
         )
         read_concurrency = min(
             MAX_OBSIDIAN_READ_CONCURRENCY, max(1, len(resolved_paths))
@@ -1248,7 +1250,7 @@ async def brain_obsidian_sync(
 
         async def _read_note_guarded(note_path: str) -> Any:
             async with read_semaphore:
-                return await adapter.read_note(vault, note_path)
+                return await adapter.read_note(config.vault, note_path)
 
         note_results = await asyncio.gather(
             *(_read_note_guarded(path) for path in resolved_paths),
@@ -1270,10 +1272,10 @@ async def brain_obsidian_sync(
             records.append(
                 note_to_write_payload(
                     note_result,
-                    default_domain=domain,
-                    default_entity_type=entity_type,
-                    default_owner=owner,
-                    default_tags=tags or [],
+                    default_domain=config.domain,
+                    default_entity_type=config.entity_type,
+                    default_owner=config.owner,
+                    default_tags=config.tags or [],
                 )
             )
             record_input_indices.append(input_index)
@@ -1310,7 +1312,7 @@ async def brain_obsidian_sync(
         runner.merge_sync_stats()
 
     return {
-        "vault": vault,
+        "vault": config.vault,
         "resolved_paths": resolved_paths,
         "scanned": len(resolved_paths),
         "summary": runner.summary_totals,

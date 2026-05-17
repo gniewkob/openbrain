@@ -781,7 +781,8 @@ class McpTransportTests(unittest.IsolatedAsyncioTestCase):
         if not hasattr(mcp_transport, "brain_obsidian_sync"):
             self.skipTest("HTTP Obsidian tools disabled in this runtime profile")
         with self.assertRaisesRegex(ValueError, "limit must be 1"):
-            await mcp_transport.brain_obsidian_sync(limit=0)
+            config = mcp_transport.ObsidianSyncConfig(limit=0)
+            await mcp_transport.brain_obsidian_sync(config=config)
 
     async def test_brain_sync_check_posts_json_payload(self) -> None:
         response = _FakeResponse(
