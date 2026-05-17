@@ -536,3 +536,31 @@ class TestConfigCaching:
 
         # Should be the same object due to lru_cache
         assert cfg1 is cfg2
+
+class TestGetSubject:
+    """Test get_subject function logic."""
+
+    def test_get_subject_standard(self):
+        """Test with standard 'sub' string."""
+        from src.auth import get_subject
+
+        assert get_subject({"sub": "user_123"}) == "user_123"
+
+    def test_get_subject_missing(self):
+        """Test with missing 'sub' claim."""
+        from src.auth import get_subject
+
+        assert get_subject({}) == ""
+        assert get_subject({"other": "user_123"}) == ""
+
+    def test_get_subject_whitespace(self):
+        """Test that whitespaces are stripped."""
+        from src.auth import get_subject
+
+        assert get_subject({"sub": "  user_456  "}) == "user_456"
+
+    def test_get_subject_non_string_cast(self):
+        """Test that non-string types are safely cast to string."""
+        from src.auth import get_subject
+
+        assert get_subject({"sub": 123}) == "123"
