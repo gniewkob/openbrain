@@ -125,6 +125,25 @@ def test_load_alert_rule_exprs_supports_multiline_expr_block(tmp_path: Path) -> 
     assert "sync_checks_total" in expr
 
 
+def test_inactivity_alerts_are_scoped_to_healthy_service_and_seven_days() -> None:
+    module = _load_monitoring_contract_module()
+    repo_root = Path(__file__).resolve().parents[2]
+    rules = dict(
+        module.load_alert_rule_exprs(
+            repo_root / "monitoring/prometheus/openbrain-alerts.yml"
+        )
+    )
+
+    assert "openbrain_up == 1" in rules["OpenBrainNoMemoryWrites7d"]
+    assert 'sum(increase(memories_created_total{job="openbrain-unified"}[7d])) == 0' in rules[
+        "OpenBrainNoMemoryWrites7d"
+    ]
+    assert "openbrain_up == 1" in rules["OpenBrainNoSyncActivity7d"]
+    assert 'sum(increase(sync_checks_total{job="openbrain-unified"}[7d])) == 0' in rules[
+        "OpenBrainNoSyncActivity7d"
+    ]
+
+
 def test_validate_monitoring_contract_forbids_vector_zero_in_alert_rule(
     tmp_path: Path,
 ) -> None:

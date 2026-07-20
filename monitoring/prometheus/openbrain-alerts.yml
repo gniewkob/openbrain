@@ -46,6 +46,26 @@ groups:
           summary: "OpenBrain target is down"
           description: "Prometheus cannot scrape openbrain-unified metrics for at least 2 minutes."
 
+      - alert: OpenBrainNoMemoryWrites7d
+        expr: openbrain_up == 1 and sum(increase(memories_created_total{job="openbrain-unified"}[7d])) == 0
+        for: 1h
+        labels:
+          severity: info
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain has received no memory writes for 7 days"
+          description: "The service is healthy but no memories were created in the last 7 days. Confirm that agent write activity is intentionally idle and verify client integrations if it is not."
+
+      - alert: OpenBrainNoSyncActivity7d
+        expr: openbrain_up == 1 and sum(increase(sync_checks_total{job="openbrain-unified"}[7d])) == 0
+        for: 1h
+        labels:
+          severity: info
+          service: openbrain-unified
+        annotations:
+          summary: "OpenBrain has recorded no sync activity for 7 days"
+          description: "The service is healthy but no synchronization checks were recorded in the last 7 days. Confirm that synchronization is intentionally idle and verify scheduled or agent-driven sync integrations if it is not."
+
       - alert: OpenBrainHigh5xxRatio
         expr: openbrain_http_5xx_ratio_5m > 0.05
         for: 10m
