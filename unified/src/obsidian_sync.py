@@ -242,6 +242,7 @@ class ObsidianChangeTracker:
         except ImportError:
             # Fallback to sync write in thread pool
             from pathlib import Path
+
             await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: Path(self.storage_path).write_text(content, encoding="utf-8"),
@@ -519,9 +520,9 @@ class BidirectionalSyncEngine:
         tracked_obsidian_hashes: dict[str, str] = {}
         for state, result in zip(existing_tracked, note_results):
             if not isinstance(result, BaseException):
-                tracked_obsidian_hashes[state.obsidian_path] = (
-                    self.compute_content_hash(result.content)
-                )
+                tracked_obsidian_hashes[
+                    state.obsidian_path
+                ] = self.compute_content_hash(result.content)
 
         # Process tracked items
         for state in tracked_states:
