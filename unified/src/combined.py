@@ -10,8 +10,8 @@ This wrapper:
 import hmac
 import logging
 
-from .auth import INTERNAL_API_KEY, PUBLIC_EXPOSURE, _oidc
 from . import mcp_transport
+from .auth import INTERNAL_API_KEY, PUBLIC_EXPOSURE, _oidc
 from .main import app as rest_app
 
 _log = logging.getLogger("openbrain.combined")
@@ -32,11 +32,7 @@ _REST_EXACT = {
 
 
 def _is_rest_path(path: str) -> bool:
-    return (
-        path in _REST_EXACT
-        or path.startswith("/api")
-        or path.startswith("/.well-known/")
-    )
+    return path in _REST_EXACT or path.startswith(("/api", "/.well-known/"))
 
 
 async def _send_root_redirect(send) -> None:

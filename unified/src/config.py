@@ -7,9 +7,9 @@ scattered os.environ.get() calls in other modules.
 
 from __future__ import annotations
 
-from functools import lru_cache
 import math
 import re
+from functools import lru_cache
 from urllib.parse import urlparse
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
@@ -64,7 +64,7 @@ class AuthConfig(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def validate_public_mode_secrets(self) -> "AuthConfig":
+    def validate_public_mode_secrets(self) -> AuthConfig:
         """Validate required secrets in public mode."""
         is_public = self.public_mode or bool(self.public_base_url)
         if is_public:
@@ -233,7 +233,7 @@ class MCPConfig(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def validate_timeout_relationship(self) -> "MCPConfig":
+    def validate_timeout_relationship(self) -> MCPConfig:
         """Ensure health_probe_timeout does not exceed backend_timeout."""
         if self.health_probe_timeout > self.backend_timeout:
             raise ValueError("MCP_HEALTH_PROBE_TIMEOUT_S must be <= BACKEND_TIMEOUT_S")
@@ -277,7 +277,7 @@ class AppConfig(BaseSettings):
     rate_limit_per_minute: int = Field(default=100, alias="AUTH_RATE_LIMIT_RPM")
 
 
-@lru_cache()
+@lru_cache
 def get_config() -> AppConfig:
     """Get cached application configuration.
 

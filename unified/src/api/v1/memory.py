@@ -9,77 +9,86 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# PUBLIC_MODE is imported from auth module
+from ...auth import PUBLIC_EXPOSURE as PUBLIC_MODE
 from ...auth import (
-    require_auth,
+    get_policy_registry,
     get_subject,
     get_tenant_id,
     is_privileged_user,
-    get_policy_registry,
+    require_auth,
     set_policy_registry,
 )
 from ...db import get_session
 from ...memory_reads import (
-    get_memory_as_record,
     export_memories,
-    get_memory,
+    get_maintenance_report,
     get_memories_batch,
+    get_memory,
+    get_memory_as_record,
     get_test_data_hygiene_report,
     list_maintenance_reports,
-    get_maintenance_report,
     sync_check,
 )
-from ...use_cases.memory import (
-    cleanup_build_test_data as cleanup_build_test_data_use_case,
-    store_memory as handle_memory_write,
-    store_memories_many as handle_memory_write_many,
-    search_memories as find_memories_v1,
-    get_memory_context as get_grounding_pack,
-    delete_memory,
-    update_memory,
-    run_maintenance,
-    upsert_memories_bulk,
-)
 from ...schemas import (
+    BuildTestDataCleanupRequest,
+    BuildTestDataCleanupResponse,
+    BulkUpsertResult,
+    ExportRequest,
+    MaintenanceReport,
+    MaintenanceReportDetail,
+    MaintenanceReportEntry,
+    MaintenanceRequest,
     MemoryFindRequest,
     MemoryGetContextRequest,
     MemoryGetContextResponse,
     MemoryRecord,
+    MemoryUpdate,
+    MemoryUpsertItem,
     MemoryWriteManyRequest,
     MemoryWriteManyResponse,
     MemoryWriteRequest,
     MemoryWriteResponse,
-    MaintenanceRequest,
-    MaintenanceReport,
-    MaintenanceReportEntry,
-    MaintenanceReportDetail,
-    ExportRequest,
     PolicyRegistry,
     SyncCheckRequest,
     SyncCheckResponse,
-    MemoryUpdate,
-    MemoryUpsertItem,
-    BulkUpsertResult,
-    BuildTestDataCleanupRequest,
-    BuildTestDataCleanupResponse,
     TestDataHygieneReport,
 )
-from ...telemetry import incr_metric
-
-# PUBLIC_MODE is imported from auth module
-from ...auth import PUBLIC_EXPOSURE as PUBLIC_MODE
 
 # Security imports
 from ...security import (
+    _effective_domain_scope,
+    _is_scoped_user,
+    _record_access_denied,
+    apply_owner_scope,
     enforce_domain_access,
     enforce_memory_access,
-    apply_owner_scope,
+    hide_memory_access_denied,
+    require_admin,
     resolve_owner_for_write,
     resolve_tenant_for_write,
-    require_admin,
-    _is_scoped_user,
-    _effective_domain_scope,
-    _record_access_denied,
-    hide_memory_access_denied,
+)
+from ...telemetry import incr_metric
+from ...use_cases.memory import (
+    cleanup_build_test_data as cleanup_build_test_data_use_case,
+)
+from ...use_cases.memory import (
+    delete_memory,
+    run_maintenance,
+    update_memory,
+    upsert_memories_bulk,
+)
+from ...use_cases.memory import (
+    get_memory_context as get_grounding_pack,
+)
+from ...use_cases.memory import (
+    search_memories as find_memories_v1,
+)
+from ...use_cases.memory import (
+    store_memories_many as handle_memory_write_many,
+)
+from ...use_cases.memory import (
+    store_memory as handle_memory_write,
 )
 
 router = APIRouter(prefix="/memory", tags=["memory"])

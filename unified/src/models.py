@@ -17,12 +17,14 @@ from typing import Any
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     DateTime,
+    Enum,
+    Float,
     Index,
     Integer,
-    Float,
     String,
     Text,
-    Enum,
+)
+from sqlalchemy import (
     text as sa_text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB

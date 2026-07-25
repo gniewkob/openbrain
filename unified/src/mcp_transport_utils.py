@@ -30,7 +30,7 @@ def make_tool_guard(logger: logging.Logger) -> Callable[[F], F]:
                 logger.error(  # type: ignore[call-arg]
                     "mcp_tool_error", tool=func.__name__, error=str(exc)
                 )
-                raise ValueError(f"Tool execution failed: {str(exc)}") from exc
+                raise ValueError(f"Tool execution failed: {exc!s}") from exc
 
         return wrapper  # type: ignore[return-value]
 

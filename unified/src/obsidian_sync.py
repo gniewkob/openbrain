@@ -14,7 +14,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from .exceptions import ObsidianCliError
 
@@ -31,15 +31,17 @@ log = logging.getLogger(__name__)
 
 
 async def _mark_conflict_pending(
-    session: "AsyncSession",
+    session: AsyncSession,
     memory_id: str,
     vault: str,
     obsidian_path: str,
 ) -> None:
     """Write obsidian_conflict_pending flag into Memory.metadata_ for manual review."""
     from datetime import datetime, timezone
-    from sqlalchemy import update, cast, literal
+
+    from sqlalchemy import cast, literal, update
     from sqlalchemy.dialects.postgresql import JSONB
+
     from .models import Memory
 
     detected_at = datetime.now(timezone.utc).isoformat()
@@ -88,7 +90,7 @@ class SyncState:
     content_hash: str  # Hash of content for quick comparison
     memory_updated_at: datetime
     obsidian_modified_at: datetime
-    last_sync_at: Optional[datetime] = None
+    last_sync_at: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize SyncState to a JSON-compatible dictionary."""
@@ -109,7 +111,7 @@ class SyncState:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SyncState":
+    def from_dict(cls, data: dict[str, Any]) -> SyncState:
         """Deserialize a SyncState from a dictionary produced by to_dict."""
         return cls(
             memory_id=data["memory_id"],
@@ -137,10 +139,10 @@ class SyncChange:
     vault: str
     change_type: ChangeType
     source: Literal["openbrain", "obsidian", "both"]  # Where the change originated
-    openbrain_state: Optional[SyncState] = None
-    obsidian_state: Optional[SyncState] = None
+    openbrain_state: SyncState | None = None
+    obsidian_state: SyncState | None = None
     conflict: bool = False
-    resolution: Optional[str] = None  # How conflict was/will be resolved
+    resolution: str | None = None  # How conflict was/will be resolved
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize SyncChange to a JSON-compatible dictionary."""
@@ -166,7 +168,7 @@ class SyncResult:
     """Result of a sync operation."""
 
     started_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     changes_detected: int = 0
     changes_applied: int = 0
     conflicts: int = 0
@@ -195,7 +197,7 @@ class ObsidianChangeTracker:
     Stores sync state in a JSON file for persistence across restarts.
     """
 
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: str | None = None):
         self.storage_path = storage_path or self._default_storage_path()
         self._state: dict[str, SyncState] = {}  # key: "vault:obsidian_path"
         self._load_state()
@@ -203,6 +205,7 @@ class ObsidianChangeTracker:
     def _default_storage_path(self) -> str:
         """Default path for sync state storage."""
         import os
+
         from .config import get_config
 
         config = get_config()
@@ -242,6 +245,7 @@ class ObsidianChangeTracker:
         except ImportError:
             # Fallback to sync write in thread pool
             from pathlib import Path
+
             await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: Path(self.storage_path).write_text(content, encoding="utf-8"),
@@ -251,7 +255,7 @@ class ObsidianChangeTracker:
         """Create unique key for a vault+path combination."""
         return f"{vault}:{path}"
 
-    def get_state(self, vault: str, path: str) -> Optional[SyncState]:
+    def get_state(self, vault: str, path: str) -> SyncState | None:
         """Get last known sync state for an item."""
         key = self._make_key(vault, path)
         return self._state.get(key)
@@ -295,9 +299,9 @@ class ObsidianChangeTracker:
 
 
 async def _get_openbrain_memories(
-    session: "AsyncSession",
+    session: AsyncSession,
     vault: str,
-) -> dict[str, "MemoryOut"]:
+) -> dict[str, MemoryOut]:
     """
     Fetch all memories from OpenBrain that have obsidian_ref.
 
@@ -313,7 +317,7 @@ async def _get_openbrain_memories(
 
 
 async def _get_obsidian_files(
-    adapter: "ObsidianCliAdapter",
+    adapter: ObsidianCliAdapter,
     vault: str,
 ) -> set[str]:
     """
@@ -336,7 +340,7 @@ async def _get_obsidian_files(
 
 def _check_memory_changed(
     state: SyncState,
-    memory: "MemoryOut | None",
+    memory: MemoryOut | None,
     compute_hash: Any,
 ) -> bool:
     """
@@ -357,10 +361,7 @@ def _check_memory_changed(
     if current_hash != state.content_hash:
         return True
 
-    if memory.updated_at and memory.updated_at > state.memory_updated_at:
-        return True
-
-    return False
+    return bool(memory.updated_at and memory.updated_at > state.memory_updated_at)
 
 
 def _create_sync_change(
@@ -395,7 +396,7 @@ def _create_sync_change(
 def _detect_new_obsidian_files(
     obsidian_files: set[str],
     tracked_paths: set[str],
-    memory_map: dict[str, "MemoryOut"],
+    memory_map: dict[str, MemoryOut],
     vault: str,
 ) -> list[SyncChange]:
     """
@@ -428,7 +429,7 @@ def _detect_new_obsidian_files(
 
 
 def _detect_new_openbrain_memories(
-    memory_map: dict[str, "MemoryOut"],
+    memory_map: dict[str, MemoryOut],
     tracked_paths: set[str],
     since: datetime,
     vault: str,
@@ -470,7 +471,7 @@ class BidirectionalSyncEngine:
     def __init__(
         self,
         strategy: SyncStrategy = SyncStrategy.DOMAIN_BASED,
-        tracker: Optional[ObsidianChangeTracker] = None,
+        tracker: ObsidianChangeTracker | None = None,
     ):
         self.strategy = strategy
         self.tracker = tracker or ObsidianChangeTracker()
@@ -482,10 +483,10 @@ class BidirectionalSyncEngine:
 
     async def detect_changes(
         self,
-        session: "AsyncSession",
-        adapter: "ObsidianCliAdapter",
+        session: AsyncSession,
+        adapter: ObsidianCliAdapter,
         vault: str,
-        since: Optional[datetime] = None,
+        since: datetime | None = None,
     ) -> list[SyncChange]:
         """
         Detect changes between OpenBrain and Obsidian.
@@ -565,7 +566,7 @@ class BidirectionalSyncEngine:
     async def _determine_change(
         self,
         state: SyncState,
-        memory: "MemoryOut | None",
+        memory: MemoryOut | None,
         obsidian_exists: bool,
         memory_changed: bool,
         obsidian_changed: bool,
@@ -607,7 +608,7 @@ class BidirectionalSyncEngine:
     def resolve_conflict(
         self,
         change: SyncChange,
-        memory: Optional["MemoryOut"] = None,
+        memory: MemoryOut | None = None,
     ) -> Literal["openbrain", "obsidian", "manual"]:
         """
         Resolve conflict based on strategy.
@@ -650,13 +651,13 @@ class BidirectionalSyncEngine:
 
     async def _import_note_as_memory(
         self,
-        session: "AsyncSession",
-        adapter: "ObsidianCliAdapter",
+        session: AsyncSession,
+        adapter: ObsidianCliAdapter,
         change: SyncChange,
     ) -> None:
         """Import an Obsidian note into OpenBrain as a new memory."""
         from .memory_writes import handle_memory_write
-        from .schemas import MemoryWriteRequest, MemoryWriteRecord, WriteMode
+        from .schemas import MemoryWriteRecord, MemoryWriteRequest, WriteMode
 
         try:
             note = await adapter.read_note(change.vault, change.obsidian_path)
@@ -699,8 +700,8 @@ class BidirectionalSyncEngine:
 
     async def _update_memory_from_obsidian(
         self,
-        session: "AsyncSession",
-        adapter: "ObsidianCliAdapter",
+        session: AsyncSession,
+        adapter: ObsidianCliAdapter,
         change: SyncChange,
     ) -> None:
         """Update an existing memory from an Obsidian note."""
@@ -768,8 +769,8 @@ class BidirectionalSyncEngine:
 
     async def _export_memory_to_obsidian(
         self,
-        session: "AsyncSession",
-        adapter: "ObsidianCliAdapter",
+        session: AsyncSession,
+        adapter: ObsidianCliAdapter,
         change: SyncChange,
     ) -> None:
         """Export a new OpenBrain memory to an Obsidian note without overwrite."""
@@ -828,8 +829,8 @@ class BidirectionalSyncEngine:
 
     async def _push_memory_to_obsidian(
         self,
-        session: "AsyncSession",
-        adapter: "ObsidianCliAdapter",
+        session: AsyncSession,
+        adapter: ObsidianCliAdapter,
         change: SyncChange,
     ) -> None:
         """Overwrite an Obsidian note with authoritative OpenBrain content."""
@@ -888,8 +889,8 @@ class BidirectionalSyncEngine:
 
     async def _handle_deleted(
         self,
-        session: "AsyncSession",
-        adapter: "ObsidianCliAdapter",
+        session: AsyncSession,
+        adapter: ObsidianCliAdapter,
         change: SyncChange,
     ) -> None:
         """Handle deletion in either direction, then remove tracker state."""
@@ -938,8 +939,8 @@ class BidirectionalSyncEngine:
 
     async def apply_sync(
         self,
-        session: "AsyncSession",
-        adapter: "ObsidianCliAdapter",
+        session: AsyncSession,
+        adapter: ObsidianCliAdapter,
         change: SyncChange,
     ) -> bool:
         """Apply a single sync change. Returns True if successful, False if deferred."""
@@ -974,8 +975,8 @@ class BidirectionalSyncEngine:
 
     async def sync(
         self,
-        session: "AsyncSession",
-        adapter: "ObsidianCliAdapter",
+        session: AsyncSession,
+        adapter: ObsidianCliAdapter,
         vault: str,
         dry_run: bool = False,
     ) -> SyncResult:

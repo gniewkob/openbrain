@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
+
 from src.runtime_limits import load_runtime_limits
 
 MAX_ENTITY_TYPE_LEN = 64
@@ -129,7 +130,7 @@ class SourceMetadata(BaseModel):
     system: Literal["chatgpt", "obsidian", "notion", "slack", "github", "other"] = (
         "chatgpt"
     )
-    reference: Optional[PathStr] = None
+    reference: PathStr | None = None
 
 
 class GovernanceMetadata(BaseModel):
@@ -158,13 +159,13 @@ class MemoryRecord(BaseModel):
     """Full canonical memory record as stored and returned by the platform."""
 
     id: str
-    match_key: Optional[MatchKeyStr] = None
-    tenant_id: Optional[TenantIdStr] = None
+    match_key: MatchKeyStr | None = None
+    tenant_id: TenantIdStr | None = None
     domain: Literal["corporate", "build", "personal"]
     entity_type: EntityTypeStr
-    title: Optional[TitleStr] = None
+    title: TitleStr | None = None
     content: ContentStr
-    summary: Optional[Annotated[str, Field(max_length=MAX_QUERY_LEN)]] = None
+    summary: Annotated[str, Field(max_length=MAX_QUERY_LEN)] | None = None
     owner: OwnerStr
     tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: MemoryRelations = Field(default_factory=MemoryRelations)
@@ -176,14 +177,14 @@ class MemoryRecord(BaseModel):
     )
     source: SourceMetadata = Field(default_factory=SourceMetadata)
     governance: GovernanceMetadata = Field(default_factory=GovernanceMetadata)
-    obsidian_ref: Optional[PathStr] = None
+    obsidian_ref: PathStr | None = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
     content_hash: str
     version: int = 1
-    previous_id: Optional[str] = None
-    root_id: Optional[str] = None
-    superseded_by: Optional[str] = None
-    valid_from: Optional[datetime] = None
+    previous_id: str | None = None
+    root_id: str | None = None
+    superseded_by: str | None = None
+    valid_from: datetime | None = None
     created_at: datetime
     updated_at: datetime
     created_by: str
@@ -206,11 +207,11 @@ class MemoryRecord(BaseModel):
 class MemoryWriteRecord(BaseModel):
     """The data part of a write request."""
 
-    match_key: Optional[MatchKeyStr] = None
-    tenant_id: Optional[TenantIdStr] = None
+    match_key: MatchKeyStr | None = None
+    tenant_id: TenantIdStr | None = None
     domain: Literal["corporate", "build", "personal"]
     entity_type: EntityTypeStr = Field(default="Note", max_length=MAX_ENTITY_TYPE_LEN)
-    title: Optional[TitleStr] = None
+    title: TitleStr | None = None
     content: ContentStr
     owner: OwnerStr = ""
     tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
@@ -219,7 +220,7 @@ class MemoryWriteRecord(BaseModel):
         "internal"
     )
     source: SourceMetadata = Field(default_factory=SourceMetadata)
-    obsidian_ref: Optional[PathStr] = None
+    obsidian_ref: PathStr | None = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("custom_fields", mode="before")
@@ -234,7 +235,7 @@ class MemoryWriteRequest(BaseModel):
 
     record: MemoryWriteRecord
     write_mode: WriteMode = WriteMode.upsert
-    idempotency_key: Optional[str] = None
+    idempotency_key: str | None = None
 
 
 class MemoryWriteManyRequest(BaseModel):
@@ -248,7 +249,7 @@ class MemoryWriteManyRequest(BaseModel):
 class MemoryFindRequest(BaseModel):
     """Request to search or filter memories with optional semantic query and filters."""
 
-    query: Optional[QueryStr] = None
+    query: QueryStr | None = None
     filters: dict[str, Any] = Field(default_factory=dict)
     limit: int = Field(default=10, ge=1, le=MAX_FILTER_LIMIT)
     offset: int = Field(default=0, ge=0, le=10_000)
@@ -259,7 +260,7 @@ class MemoryGetContextRequest(BaseModel):
     """Request to retrieve a grounding context pack for a given query."""
 
     query: QueryStr
-    domain: Optional[str] = None
+    domain: str | None = None
     max_items: int = Field(default=10, ge=1, le=MAX_CONTEXT_ITEMS)
     output_mode: Literal["grounding_pack", "raw"] = "grounding_pack"
 
@@ -288,7 +289,7 @@ class ObsidianSyncRequest(BaseModel):
 
     vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     paths: list[PathStr] = Field(default_factory=list, max_length=MAX_SYNC_LIMIT)
-    folder: Optional[PathStr] = None
+    folder: PathStr | None = None
     limit: int = Field(default=50, ge=1, le=MAX_SYNC_LIMIT)
     domain: Literal["corporate", "build", "personal"] = "build"
     entity_type: EntityTypeStr = "Architecture"
@@ -305,7 +306,7 @@ class ObsidianSyncResponse(BaseModel):
     )
     scanned: int
     summary: dict[str, int]
-    results: list["BatchResultItem"] = Field(default_factory=list)
+    results: list[BatchResultItem] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -328,9 +329,9 @@ class ObsidianUpdateRequest(BaseModel):
 
     vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     path: PathStr
-    content: Optional[ContentStr] = None
+    content: ContentStr | None = None
     append: bool = False
-    tags: Optional[list[TagStr]] = Field(default=None, max_length=MAX_TAGS)
+    tags: list[TagStr] | None = Field(default=None, max_length=MAX_TAGS)
 
 
 class ObsidianWriteResponse(BaseModel):
@@ -351,11 +352,11 @@ class ObsidianExportRequest(BaseModel):
 
     vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     folder: PathStr = "OpenBrain Export"
-    memory_ids: Optional[list[str]] = Field(default=None, max_length=MAX_EXPORT_IDS)
-    query: Optional[QueryStr] = None
-    domain: Optional[Literal["corporate", "build", "personal"]] = None
+    memory_ids: list[str] | None = Field(default=None, max_length=MAX_EXPORT_IDS)
+    query: QueryStr | None = None
+    domain: Literal["corporate", "build", "personal"] | None = None
     max_items: int = Field(default=50, ge=1, le=MAX_SYNC_LIMIT)
-    template: Optional[str] = None  # Optional custom template
+    template: str | None = None  # Optional custom template
 
 
 class ObsidianExportItem(BaseModel):
@@ -384,9 +385,9 @@ class ObsidianCollectionRequest(BaseModel):
     collection_name: TitleStr
     vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Documents"
     folder: PathStr = "Collections"
-    domain: Optional[Literal["corporate", "build", "personal"]] = None
+    domain: Literal["corporate", "build", "personal"] | None = None
     max_items: int = Field(default=50, ge=1, le=MAX_SYNC_LIMIT)
-    group_by: Optional[Literal["entity_type", "owner", "tags"]] = None
+    group_by: Literal["entity_type", "owner", "tags"] | None = None
 
 
 class ObsidianCollectionResponse(BaseModel):
@@ -414,7 +415,7 @@ class ObsidianBidirectionalSyncRequest(BaseModel):
         "domain_based"
     )
     dry_run: bool = False  # If True, only detect changes without applying
-    since: Optional[datetime] = None  # Only sync changes since this time
+    since: datetime | None = None  # Only sync changes since this time
 
 
 class ObsidianSyncChange(BaseModel):
@@ -425,14 +426,14 @@ class ObsidianSyncChange(BaseModel):
     change_type: Literal["created", "updated", "deleted", "unchanged"]
     source: Literal["openbrain", "obsidian", "both"]
     conflict: bool = False
-    resolution: Optional[str] = None
+    resolution: str | None = None
 
 
 class ObsidianBidirectionalSyncResponse(BaseModel):
     """Response from bidirectional sync."""
 
     started_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     vault: str
     strategy: str
     changes_detected: int
@@ -472,13 +473,13 @@ class ObsidianConflictsResponse(BaseModel):
 class SyncCheckRequest(BaseModel):
     """Request sync status between OpenBrain and Obsidian for one record."""
 
-    memory_id: Optional[str] = Field(default=None, max_length=64)
-    match_key: Optional[MatchKeyStr] = None
-    obsidian_ref: Optional[PathStr] = None
-    file_hash: Optional[Annotated[str, Field(max_length=64)]] = None
+    memory_id: str | None = Field(default=None, max_length=64)
+    match_key: MatchKeyStr | None = None
+    obsidian_ref: PathStr | None = None
+    file_hash: Annotated[str, Field(max_length=64)] | None = None
 
     @model_validator(mode="after")
-    def validate_identifier_count(self) -> "SyncCheckRequest":
+    def validate_identifier_count(self) -> SyncCheckRequest:
         """Ensure exactly one identifier field is provided."""
         identifiers = [self.memory_id, self.match_key, self.obsidian_ref]
         provided = [value for value in identifiers if value]
@@ -494,11 +495,11 @@ class SyncCheckResponse(BaseModel):
 
     status: Literal["synced", "outdated", "missing", "exists"]
     message: str
-    memory_id: Optional[str] = None
-    match_key: Optional[str] = None
-    obsidian_ref: Optional[str] = None
-    stored_hash: Optional[str] = None
-    provided_hash: Optional[str] = None
+    memory_id: str | None = None
+    match_key: str | None = None
+    obsidian_ref: str | None = None
+    stored_hash: str | None = None
+    provided_hash: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -510,7 +511,7 @@ class MemoryWriteResponse(BaseModel):
     """Response envelope for a single memory write operation."""
 
     status: Literal["created", "updated", "versioned", "skipped", "failed"]
-    record: Optional[MemoryRecord] = None
+    record: MemoryRecord | None = None
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
 
@@ -520,17 +521,17 @@ class BatchResultItem(BaseModel):
 
     input_index: int
     status: Literal["created", "updated", "versioned", "skipped", "failed"]
-    record_id: Optional[str] = None
-    previous_record_id: Optional[str] = None
-    match_key: Optional[str] = None
+    record_id: str | None = None
+    previous_record_id: str | None = None
+    match_key: str | None = None
     warnings: list[str] = Field(default_factory=list)
-    error: Optional[str] = None
+    error: str | None = None
     # Stable machine-readable classifier for `error`. Lets clients (e.g. the
     # MCP gateway) apply remediation without string-matching on the message.
     # Known codes: "owner_required_corporate", "secret_detected", "embed_400",
     # "validation_error". `None` means "no known classifier" — clients should
     # treat as generic failure.
-    error_code: Optional[str] = None
+    error_code: str | None = None
 
 
 class MemoryWriteManyResponse(BaseModel):
@@ -574,7 +575,7 @@ class MemoryCreate(BaseModel):
     match_key: MatchKeyStr | None = None
     tenant_id: TenantIdStr | None = None
     status: Literal["active", "draft", "deprecated"] = "active"
-    valid_from: Optional[datetime] = None
+    valid_from: datetime | None = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("custom_fields", mode="before")
@@ -587,16 +588,16 @@ class MemoryCreate(BaseModel):
 class MemoryUpdate(BaseModel):
     """Partial update payload; applies only provided fields."""
 
-    content: Optional[ContentStr] = None
-    title: Optional[TitleStr] = None
+    content: ContentStr | None = None
+    title: TitleStr | None = None
     updated_by: str = "agent"
-    sensitivity: Optional[str] = None
-    owner: Optional[OwnerStr] = None
-    tags: Optional[list[TagStr]] = Field(default=None, max_length=MAX_TAGS)
-    relations: Optional[dict[str, Any]] = None
-    obsidian_ref: Optional[PathStr] = None
-    tenant_id: Optional[TenantIdStr] = None
-    custom_fields: Optional[dict[str, Any]] = None
+    sensitivity: str | None = None
+    owner: OwnerStr | None = None
+    tags: list[TagStr] | None = Field(default=None, max_length=MAX_TAGS)
+    relations: dict[str, Any] | None = None
+    obsidian_ref: PathStr | None = None
+    tenant_id: TenantIdStr | None = None
+    custom_fields: dict[str, Any] | None = None
 
     @field_validator("custom_fields", mode="before")
     @classmethod
@@ -670,7 +671,7 @@ class MemoryOut(BaseModel):
     """Flattened memory record returned to API clients."""
 
     id: str
-    tenant_id: Optional[TenantIdStr] = None
+    tenant_id: TenantIdStr | None = None
     domain: str
     entity_type: EntityTypeStr
     content: ContentStr
@@ -678,16 +679,16 @@ class MemoryOut(BaseModel):
     status: str
     version: int
     sensitivity: str
-    superseded_by: Optional[str] = None
+    superseded_by: str | None = None
     tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: dict[str, Any] = Field(default_factory=dict)
-    obsidian_ref: Optional[PathStr] = None
+    obsidian_ref: PathStr | None = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
     content_hash: str = ""
-    match_key: Optional[MatchKeyStr] = None
-    previous_id: Optional[str] = None
-    root_id: Optional[str] = None
-    valid_from: Optional[datetime] = None
+    match_key: MatchKeyStr | None = None
+    previous_id: str | None = None
+    root_id: str | None = None
+    valid_from: datetime | None = None
     created_at: datetime
     updated_at: datetime
     created_by: str
@@ -703,7 +704,7 @@ class MemoryOut(BaseModel):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def title(self) -> Optional[str]:
+    def title(self) -> str | None:
         """Return title from custom_fields, if present and non-empty."""
         v = self.custom_fields.get("title")
         if v is None:
@@ -738,7 +739,7 @@ class MaintenanceAction(BaseModel):
 class MaintenanceReport(BaseModel):
     """Summary report produced at the end of a maintenance run."""
 
-    report_id: Optional[str] = None
+    report_id: str | None = None
     dry_run: bool
     actions: list[MaintenanceAction] = Field(default_factory=list)
     total_scanned: int = 0
@@ -877,7 +878,7 @@ class ErrorDetail(BaseModel):
 
     code: str
     message: str
-    details: Optional[dict[str, Any]] = None
+    details: dict[str, Any] | None = None
     retryable: bool = False
 
 

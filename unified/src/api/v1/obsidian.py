@@ -11,32 +11,30 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...auth import require_auth
-from ...models import Memory
 from ...common.obsidian_adapter import ObsidianCliAdapter, ObsidianCliError
 from ...db import get_session
-from ...memory_reads import get_memories_batch, get_memory, search_memories
+from ...memory_reads import get_memories_batch, search_memories
+from ...models import Memory
 from ...obsidian_cli import note_to_memory_write_record
 from ...obsidian_sync import (
     BidirectionalSyncEngine,
     ObsidianChangeTracker,
     SyncStrategy,
 )
-from ...use_cases.memory import store_memories_many as handle_memory_write_many
 from ...schemas import (
+    MemoryOut,
     MemoryWriteManyRequest,
-    WriteMode,
     ObsidianBidirectionalSyncRequest,
     ObsidianBidirectionalSyncResponse,
     ObsidianCollectionRequest,
     ObsidianCollectionResponse,
     ObsidianConflict,
     ObsidianConflictsResponse,
-    MemoryOut,
     ObsidianExportItem,
     ObsidianExportRequest,
     ObsidianExportResponse,
-    ObsidianReadRequest,
     ObsidianNoteResponse,
+    ObsidianReadRequest,
     ObsidianSyncChange,
     ObsidianSyncRequest,
     ObsidianSyncResponse,
@@ -45,16 +43,18 @@ from ...schemas import (
     ObsidianWriteRequest,
     ObsidianWriteResponse,
     SearchRequest,
+    WriteMode,
 )
+
+# Import from main for now - will be moved to security module later
+from ...security import require_admin
 from ...services.converter import (
     build_collection_index,
     memory_to_frontmatter,
     memory_to_note_content,
     sanitize_filename,
 )
-
-# Import from main for now - will be moved to security module later
-from ...security import require_admin
+from ...use_cases.memory import store_memories_many as handle_memory_write_many
 
 router = APIRouter(prefix="/obsidian", tags=["obsidian"])
 
@@ -430,7 +430,7 @@ async def v1_obsidian_conflicts(
 
     stmt = (
         select(Memory)
-        .where(Memory.metadata_["obsidian_conflict_pending"] != None)  # noqa: E711
+        .where(Memory.metadata_["obsidian_conflict_pending"] != None)
         .where(Memory.status == "active")
     )
     if vault:

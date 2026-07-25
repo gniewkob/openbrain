@@ -25,7 +25,7 @@ from .crud_common import (
     _to_record,
 )
 from .db import AsyncSessionLocal
-from .embed import get_embedding, EMBED_MAX_CHARS
+from .embed import EMBED_MAX_CHARS, get_embedding
 from .memory_reads import get_memory, get_memory_raw
 from .models import AuditLog, DomainEnum, Memory
 from .schemas import (

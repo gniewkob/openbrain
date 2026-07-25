@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
-
+from typing_extensions import Self
 
 # =============================================================================
 # Base Exception Hierarchy
@@ -325,9 +325,7 @@ async def generic_exception_handler(
     """Handler for unhandled exceptions."""
     response = create_error_response(exc, request)
 
-    if isinstance(exc, OpenBrainError):
-        status_code = exc.status_code
-    elif isinstance(exc, HTTPException):
+    if isinstance(exc, (OpenBrainError, HTTPException)):
         status_code = exc.status_code
     else:
         status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -398,7 +396,7 @@ class ErrorContext:
         self.error_class = error_class
         self.error_kwargs = error_kwargs
 
-    def __enter__(self) -> ErrorContext:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Literal[False]:

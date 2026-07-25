@@ -2,13 +2,13 @@
 
 # Repository exports (ARCH-002)
 from .repositories import (
+    InMemoryMemoryRepository,
     MemoryRepository,
     SQLAlchemyMemoryRepository,
-    InMemoryMemoryRepository,
 )
 
 __all__ = [
+    "InMemoryMemoryRepository",
     "MemoryRepository",
     "SQLAlchemyMemoryRepository",
-    "InMemoryMemoryRepository",
 ]

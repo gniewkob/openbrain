@@ -8,7 +8,7 @@ All tools now use the V1 API engine for consistent metadata handling.
 from __future__ import annotations
 
 import os
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
@@ -20,6 +20,12 @@ from .capabilities_health import build_capabilities_health
 from .capabilities_manifest import load_capabilities_manifest
 from .capabilities_metadata import load_capabilities_metadata
 from .http_error_adapter import backend_error_message, backend_request_failure_message
+from .mcp_transport_utils import (
+    extract_record_from_write_response,
+    http_obsidian_disabled_reason,
+    make_tool_guard,
+    redact_logged_payload,
+)
 from .memory_paths import (
     memory_item_absolute_path,
     memory_item_path,
@@ -39,12 +45,6 @@ from .response_normalizers import (
     to_legacy_memory_shape,
 )
 from .runtime_limits import load_runtime_limits
-from .mcp_transport_utils import (
-    extract_record_from_write_response,
-    http_obsidian_disabled_reason,
-    make_tool_guard,
-    redact_logged_payload,
-)
 
 log = structlog.get_logger()
 
@@ -164,7 +164,7 @@ _SENSITIVE_LOG_FIELDS = {
 }
 
 
-def _client() -> "_SharedClient":
+def _client() -> _SharedClient:
     return _SharedClient()
 
 
@@ -454,13 +454,13 @@ async def brain_store(
     content: str,
     domain: Literal["corporate", "build", "personal"] = "corporate",
     entity_type: str = "Note",
-    title: Optional[str] = None,
+    title: str | None = None,
     owner: str = "",
-    tenant_id: Optional[str] = None,
-    tags: Optional[list[str]] = None,
-    custom_fields: Optional[dict[str, Any]] = None,
-    match_key: Optional[str] = None,
-    obsidian_ref: Optional[str] = None,
+    tenant_id: str | None = None,
+    tags: list[str] | None = None,
+    custom_fields: dict[str, Any] | None = None,
+    match_key: str | None = None,
+    obsidian_ref: str | None = None,
     sensitivity: Literal[
         "public", "internal", "confidential", "restricted"
     ] = "internal",
@@ -496,13 +496,13 @@ async def brain_update(
     memory_id: str,
     content: str,
     updated_by: str = "agent",
-    title: Optional[str] = None,
-    owner: Optional[str] = None,
-    tenant_id: Optional[str] = None,
-    tags: Optional[list[str]] = None,
-    custom_fields: Optional[dict[str, Any]] = None,
-    obsidian_ref: Optional[str] = None,
-    sensitivity: Optional[str] = None,
+    title: str | None = None,
+    owner: str | None = None,
+    tenant_id: str | None = None,
+    tags: list[str] | None = None,
+    custom_fields: dict[str, Any] | None = None,
+    obsidian_ref: str | None = None,
+    sensitivity: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing memory.
 
@@ -577,7 +577,7 @@ async def brain_list(
 
 @mcp.tool()
 @mcp_tool_guard
-async def brain_get_context(query: str, domain: Optional[str] = None) -> dict[str, Any]:
+async def brain_get_context(query: str, domain: str | None = None) -> dict[str, Any]:
     """Synthesize a grounding pack for the current conversation topic."""
     payload = {"query": query, "domain": domain, "max_items": 10}
     return await _safe_req("POST", memory_path("get_context"), json=payload)
