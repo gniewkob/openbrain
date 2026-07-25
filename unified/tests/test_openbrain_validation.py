@@ -19,6 +19,23 @@ class TestFastAPIApp:
         assert app.version == "2.0.0"
 
 
+def _get_app_paths(app) -> list[str]:
+    paths = []
+    for route in app.routes:
+        if hasattr(route, "path"):
+            paths.append(route.path)
+        elif "IncludedRouter" in type(route).__name__:
+            prefix = (
+                getattr(route, "include_context", None)
+                and getattr(route.include_context, "prefix", "")
+                or ""
+            )
+            for r in getattr(route.original_router, "routes", []):
+                if hasattr(r, "path"):
+                    paths.append(prefix + r.path)
+    return paths
+
+
 class TestRouteRegistration:
     """Test that all routes are registered."""
 
@@ -26,7 +43,7 @@ class TestRouteRegistration:
         """Test health check routes."""
         from src.main import app
 
-        paths = [r.path for r in app.routes if hasattr(r, "path")]
+        paths = _get_app_paths(app)
 
         assert "/api/v1/healthz" in paths
         assert "/api/v1/readyz" in paths
@@ -36,7 +53,7 @@ class TestRouteRegistration:
         """Test V1 API routes."""
         from src.main import app
 
-        paths = [r.path for r in app.routes if hasattr(r, "path")]
+        paths = _get_app_paths(app)
 
         assert "/api/v1/memory/write" in paths
         assert "/api/v1/memory/write-many" in paths
@@ -48,7 +65,7 @@ class TestRouteRegistration:
         """Test Obsidian API routes."""
         from src.main import app
 
-        paths = [r.path for r in app.routes if hasattr(r, "path")]
+        paths = _get_app_paths(app)
 
         assert "/api/v1/obsidian/vaults" in paths
         assert "/api/v1/obsidian/read-note" in paths
@@ -66,8 +83,9 @@ class TestRepositoryPattern:
 
     def test_memory_repository_abc(self) -> None:
         """Test MemoryRepository abstract base class."""
-        from src.repositories import MemoryRepository
         from abc import ABC
+
+        from src.repositories import MemoryRepository
 
         assert issubclass(MemoryRepository, ABC)
 
@@ -182,8 +200,9 @@ class TestEmbedCache:
 
     def test_cache_function_exists(self) -> None:
         """Test cache function exists."""
-        from src.embed import _embedding_cache
         from collections import OrderedDict
+
+        from src.embed import _embedding_cache
 
         assert isinstance(_embedding_cache, OrderedDict)
 

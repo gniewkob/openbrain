@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Memory
@@ -342,12 +342,13 @@ class InMemoryMemoryRepository(MemoryRepository):
 
         Uses dot product as similarity metric (not cosine, for simplicity in tests).
         """
-        import numpy as np
-
         if not embedding:
             return []
 
-        query_vec = np.array(embedding)
+        query_norm = sum(x * x for x in embedding) ** 0.5
+        if query_norm == 0:
+            return []
+
         results = []
 
         for memory in self._storage.values():
@@ -356,15 +357,14 @@ class InMemoryMemoryRepository(MemoryRepository):
             if memory.status != "active":
                 continue
 
-            mem_vec = np.array(memory.embedding)
-            # Normalize for cosine similarity approximation
-            query_norm = np.linalg.norm(query_vec)
-            mem_norm = np.linalg.norm(mem_vec)
+            mem_emb = memory.embedding
+            mem_norm = sum(x * x for x in mem_emb) ** 0.5
 
-            if query_norm == 0 or mem_norm == 0:
+            if mem_norm == 0:
                 continue
 
-            similarity = float(np.dot(query_vec, mem_vec) / (query_norm * mem_norm))
+            dot_product = sum(q * m for q, m in zip(embedding, mem_emb))
+            similarity = float(dot_product / (query_norm * mem_norm))
 
             if similarity >= threshold:
                 results.append((memory, similarity))

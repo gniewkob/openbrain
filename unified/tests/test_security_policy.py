@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 from fastapi import HTTPException
-
+from src.schemas import MemoryOut
 from src.security.policy import (
     apply_owner_scope,
     enforce_domain_access,
@@ -17,26 +17,25 @@ from src.security.policy import (
     resolve_owner_for_write,
     resolve_tenant_for_write,
 )
-from src.schemas import MemoryOut
 
 _NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 def _memory_out(**kwargs):
-    defaults = dict(
-        id="m1",
-        domain="build",
-        entity_type="Note",
-        content="c",
-        owner="alice",
-        status="active",
-        version=1,
-        sensitivity="internal",
-        tags=[],
-        created_at=_NOW,
-        updated_at=_NOW,
-        created_by="alice",
-    )
+    defaults = {
+        "id": "m1",
+        "domain": "build",
+        "entity_type": "Note",
+        "content": "c",
+        "owner": "alice",
+        "status": "active",
+        "version": 1,
+        "sensitivity": "internal",
+        "tags": [],
+        "created_at": _NOW,
+        "updated_at": _NOW,
+        "created_by": "alice",
+    }
     defaults.update(kwargs)
     return MemoryOut(**defaults)
 
