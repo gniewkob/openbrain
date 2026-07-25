@@ -126,9 +126,9 @@ class SourceMetadata(BaseModel):
     """Origin metadata describing how and where a memory was created."""
 
     type: Literal["manual", "agent", "sync", "import", "api"] = "agent"
-    system: Literal["chatgpt", "obsidian", "notion", "slack", "github", "other"] = (
-        "chatgpt"
-    )
+    system: Literal[
+        "chatgpt", "obsidian", "notion", "slack", "github", "other"
+    ] = "chatgpt"
     reference: Optional[PathStr] = None
 
 
@@ -168,12 +168,12 @@ class MemoryRecord(BaseModel):
     owner: OwnerStr
     tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: MemoryRelations = Field(default_factory=MemoryRelations)
-    status: Literal["active", "archived", "superseded", "deleted", "duplicate"] = (
-        "active"
-    )
-    sensitivity: Literal["public", "internal", "confidential", "restricted"] = (
-        "internal"
-    )
+    status: Literal[
+        "active", "archived", "superseded", "deleted", "duplicate"
+    ] = "active"
+    sensitivity: Literal[
+        "public", "internal", "confidential", "restricted"
+    ] = "internal"
     source: SourceMetadata = Field(default_factory=SourceMetadata)
     governance: GovernanceMetadata = Field(default_factory=GovernanceMetadata)
     obsidian_ref: Optional[PathStr] = None
@@ -215,9 +215,9 @@ class MemoryWriteRecord(BaseModel):
     owner: OwnerStr = ""
     tags: list[TagStr] = Field(default_factory=list, max_length=MAX_TAGS)
     relations: MemoryRelations = Field(default_factory=MemoryRelations)
-    sensitivity: Literal["public", "internal", "confidential", "restricted"] = (
-        "internal"
-    )
+    sensitivity: Literal[
+        "public", "internal", "confidential", "restricted"
+    ] = "internal"
     source: SourceMetadata = Field(default_factory=SourceMetadata)
     obsidian_ref: Optional[PathStr] = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
@@ -410,9 +410,9 @@ class ObsidianBidirectionalSyncRequest(BaseModel):
     """Request for bidirectional sync."""
 
     vault: Annotated[str, Field(max_length=MAX_VAULT_LEN)] = "Memory"
-    strategy: Literal["last_write_wins", "domain_based", "manual_review"] = (
-        "domain_based"
-    )
+    strategy: Literal[
+        "last_write_wins", "domain_based", "manual_review"
+    ] = "domain_based"
     dry_run: bool = False  # If True, only detect changes without applying
     since: Optional[datetime] = None  # Only sync changes since this time
 

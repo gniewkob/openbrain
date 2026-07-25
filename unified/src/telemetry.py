@@ -128,9 +128,10 @@ class TelemetryRegistry:
     def __init__(self) -> None:
         """Initialize the registry with pre-seeded known counters."""
         self._lock = Lock()
-        self._counter_backend, self._counter_backend_meta = (
-            build_counter_backend_with_meta(KNOWN_COUNTERS)
-        )
+        (
+            self._counter_backend,
+            self._counter_backend_meta,
+        ) = build_counter_backend_with_meta(KNOWN_COUNTERS)
         if self._counter_backend_meta.fallback_reason is not None:
             self._counter_backend.incr("telemetry_counter_backend_fallback_total", 1)
         self._gauges: dict[str, float] = {}
