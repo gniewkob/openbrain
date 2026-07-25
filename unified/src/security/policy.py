@@ -7,12 +7,12 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..auth import (
+    PUBLIC_EXPOSURE,
     get_domain_scope,
     get_registry_domain_scope,
     get_subject,
     get_tenant_id,
     is_privileged_user,
-    PUBLIC_EXPOSURE,
 )
 from ..schemas import MemoryOut
 from ..telemetry import incr_metric

@@ -16,9 +16,9 @@ import logging
 import os
 import threading
 import time
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any
 
 import httpx
 import jwt
@@ -52,8 +52,8 @@ class OIDCMetadata:
     authorization_endpoint: str
     token_endpoint: str
     jwks_uri: str
-    introspection_endpoint: Optional[str] = None
-    registration_endpoint: Optional[str] = None
+    introspection_endpoint: str | None = None
+    registration_endpoint: str | None = None
 
 
 class OIDCVerifier:
@@ -497,7 +497,7 @@ def is_privileged_user(claims: dict[str, Any]) -> bool:
 
     normalized = {value.lower() for value in role_values}
     return any(
-        value in normalized for value in {"admin", "openbrain:admin", "maintain:admin"}
+        value in normalized for value in ("admin", "openbrain:admin", "maintain:admin")
     )
 
 
@@ -549,7 +549,6 @@ def _get_redis_client():
             logger.debug(
                 f"Redis connection failed, falling back to in-memory limiter: {e}"
             )
-            pass
     return _redis_client
 
 

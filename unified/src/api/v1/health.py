@@ -5,11 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
+import structlog
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-
-import structlog
 
 from ...auth import require_auth
 from ...config import get_config

@@ -48,6 +48,7 @@ test-unified: check-unified-venv
 		unified.tests.test_policy_enforcement \
 		unified.tests.test_policy_registry \
 		unified.tests.test_search_policy \
+		unified.tests.test_security_policy \
 		unified.tests.test_startup_smoke \
 		unified.tests.test_sync_check \
 		unified.tests.test_update_memory \

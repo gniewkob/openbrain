@@ -13,12 +13,12 @@ from .telemetry import (
     bulk_load_metrics,
     get_metrics_snapshot,
 )
+from .telemetry_gauges import refresh_memory_gauges
 from .telemetry_store import (
     get_telemetry_counters,
     get_telemetry_histograms,
     upsert_telemetry_metrics,
 )
-from .telemetry_gauges import refresh_memory_gauges
 
 log = structlog.get_logger()
 

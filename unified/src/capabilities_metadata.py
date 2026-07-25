@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any
 
 _SEMVER = re.compile(r"^\d+\.\d+\.\d+$")

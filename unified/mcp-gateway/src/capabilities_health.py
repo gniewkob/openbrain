@@ -27,13 +27,11 @@ def build_capabilities_health(
     api = _api_component(str(backend.get("api", "unknown")))
     db = _store_component(str(backend.get("db", "unknown")))
     vector_store = _store_component(str(backend.get("vector_store", "unknown")))
-    if api == "unavailable":
+    if api == "unavailable" or backend.get("status") == "unavailable":
         overall = "unavailable"
-    elif backend.get("status") == "unavailable":
-        overall = "unavailable"
-    elif backend.get("status") == "degraded":
-        overall = "degraded"
-    elif any(x in {"degraded", "unknown", "unavailable"} for x in (db, vector_store)):
+    elif backend.get("status") == "degraded" or any(
+        x in {"degraded", "unknown", "unavailable"} for x in (db, vector_store)
+    ):
         overall = "degraded"
     else:
         overall = "healthy"

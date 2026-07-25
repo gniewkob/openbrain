@@ -3,8 +3,8 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI
 from fastapi.responses import PlainTextResponse
 
+from .api.v1.health import health, healthz, readyz
 from .auth import require_auth
-from .api.v1.health import healthz, readyz, health
 from .config import get_config
 
 

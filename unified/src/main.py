@@ -10,14 +10,14 @@ from __future__ import annotations
 import structlog
 from fastapi.responses import PlainTextResponse
 
+from .api.v1 import health_router, memory_router, obsidian_router
 from .app_factory import create_app
 from .auth import PUBLIC_EXPOSURE
 from .db import AsyncSessionLocal
 from .lifespan import lifespan
 from .middleware import MetricsMiddleware, RequestIDMiddleware
-from .telemetry_gauges import refresh_memory_gauges
-from .api.v1 import health_router, memory_router, obsidian_router
 from .telemetry import render_prometheus_metrics
+from .telemetry_gauges import refresh_memory_gauges
 
 structlog.configure(
     processors=[

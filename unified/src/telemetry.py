@@ -104,7 +104,7 @@ class Histogram:
         }
 
     @classmethod
-    def from_snapshot(cls, name: str, data: dict[str, Any]) -> "Histogram":
+    def from_snapshot(cls, name: str, data: dict[str, Any]) -> Histogram:
         """Reconstruct a Histogram from a previously serialized snapshot."""
         raw_buckets = list(data.get("buckets") or [])
         finite_buckets = tuple(

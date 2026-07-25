@@ -4,8 +4,8 @@ from inspect import isawaitable
 from typing import Any
 
 from sqlalchemy import or_
-from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from .models import AuditLog, DomainEnum, Memory
 from .schemas import (

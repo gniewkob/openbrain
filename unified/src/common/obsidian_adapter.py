@@ -43,11 +43,17 @@ def _load_schema_types():
     - gateway fallback context: from schemas import ...
     """
     try:
-        from ..schemas import MemoryWriteRecord, SourceMetadata  # type: ignore[import-not-found]
+        from ..schemas import (  # type: ignore[import-not-found]
+            MemoryWriteRecord,
+            SourceMetadata,
+        )
 
         return MemoryWriteRecord, SourceMetadata
     except ImportError:
-        from schemas import MemoryWriteRecord, SourceMetadata  # type: ignore[import-not-found]
+        from schemas import (  # type: ignore[import-not-found]
+            MemoryWriteRecord,
+            SourceMetadata,
+        )
 
         return MemoryWriteRecord, SourceMetadata
 
@@ -117,7 +123,7 @@ def _configured_vault_names_from_env() -> list[str]:
     paths_raw = os.environ.get("OBSIDIAN_VAULT_PATHS")
     if paths_raw:
         parsed = _parse_vault_paths_mapping(paths_raw)
-        names.update(str(k).strip() for k in parsed.keys() if str(k).strip())
+        names.update(str(k).strip() for k in parsed if str(k).strip())
 
     prefix = "OBSIDIAN_VAULT_"
     suffix = "_PATH"
@@ -364,7 +370,7 @@ def note_to_memory_write_record(
     default_entity_type: str,
     default_owner: str = "",
     default_tags: list[str] | None = None,
-) -> "MemoryWriteRecord":
+) -> MemoryWriteRecord:
     """Convert ObsidianNote to MemoryWriteRecord for direct use."""
     MemoryWriteRecord, SourceMetadata = _load_schema_types()
 
@@ -586,9 +592,7 @@ class ObsidianCliAdapter:
                 ]
             elif isinstance(parsed, dict):
                 cli_tags = [
-                    str(key).strip().lstrip("#")
-                    for key in parsed.keys()
-                    if str(key).strip()
+                    str(key).strip().lstrip("#") for key in parsed if str(key).strip()
                 ]
             else:
                 cli_tags = [
@@ -651,7 +655,6 @@ class ObsidianCliAdapter:
                 if "already exists" in str(e):
                     raise
                 # Note doesn't exist, proceed
-                pass
 
         # Build full content with frontmatter
         full_content = _build_note_content(content, frontmatter)

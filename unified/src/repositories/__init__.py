@@ -1,13 +1,13 @@
 # Repository Pattern Implementation (ARCH-002)
 
 from .memory_repository import (
+    InMemoryMemoryRepository,
     MemoryRepository,
     SQLAlchemyMemoryRepository,
-    InMemoryMemoryRepository,
 )
 
 __all__ = [
+    "InMemoryMemoryRepository",
     "MemoryRepository",
     "SQLAlchemyMemoryRepository",
-    "InMemoryMemoryRepository",
 ]
